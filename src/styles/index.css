@@ -1,0 +1,36 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background-color: #f8fafc;
+  color: #0f172a;
+}
+
+.ant-picker {
+  background-color: #ffffff;
+  border-color: #e2e8f0;
+  color: #0f172a;
+}
+
+.ant-picker:hover {
+  border-color: rgba(59, 130, 246, 0.7);
+}
+
+.ant-picker-focused {
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+  border-color: rgba(59, 130, 246, 0.7);
+}
+
+.ant-picker input {
+  color: #0f172a;
+}
+
+.ant-picker input::placeholder {
+  color: rgba(100, 116, 139, 0.7);
+}
