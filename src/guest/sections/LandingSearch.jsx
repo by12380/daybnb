@@ -3,6 +3,7 @@ import { DatePicker, TimePicker } from "antd";
 import dayjs from "dayjs";
 import Button from "../components/ui/Button.jsx";
 import Card from "../components/ui/Card.jsx";
+import FormInput, { INPUT_STYLES } from "../components/ui/FormInput.jsx";
 import {
   BOOKING_TYPES,
   DAYTIME_END,
@@ -20,14 +21,18 @@ const LandingSearch = React.memo(({ onSearch }) => {
     guests: 1,
   });
 
+  const isFullDay = bookingType === "full-day";
+
   const onTypeChange = useCallback((event) => {
     const value = event.target.value;
     setBookingType(value);
-    setFormState((prev) => ({
-      ...prev,
-      start: value === "full-day" ? DAYTIME_START : prev.start,
-      end: value === "full-day" ? DAYTIME_END : prev.end,
-    }));
+    if (value === "full-day") {
+      setFormState((prev) => ({
+        ...prev,
+        start: DAYTIME_START,
+        end: DAYTIME_END,
+      }));
+    }
   }, []);
 
   const onChange = useCallback((event) => {
@@ -39,26 +44,17 @@ const LandingSearch = React.memo(({ onSearch }) => {
     setFormState((prev) => ({ ...prev, date: dateString }));
   }, []);
 
-  const onStartChange = useCallback((value) => {
+  const onTimeChange = useCallback((field, value) => {
     setFormState((prev) => ({
       ...prev,
-      start: value ? value.format("HH:mm") : "",
-    }));
-  }, []);
-
-  const onEndChange = useCallback((value) => {
-    setFormState((prev) => ({
-      ...prev,
-      end: value ? value.format("HH:mm") : "",
+      [field]: value ? value.format("HH:mm") : "",
     }));
   }, []);
 
   const onSubmit = useCallback(
     (event) => {
       event.preventDefault();
-      if (onSearch) {
-        onSearch({ ...formState, bookingType });
-      }
+      onSearch?.({ ...formState, bookingType });
     },
     [bookingType, formState, onSearch]
   );
@@ -79,21 +75,19 @@ const LandingSearch = React.memo(({ onSearch }) => {
         onSubmit={onSubmit}
         noValidate
       >
-        <label className="flex flex-col gap-2 md:col-span-2">
-          <span className="text-sm font-medium text-muted">Location</span>
-          <input
-            name="location"
-            value={formState.location}
-            onChange={onChange}
-            placeholder="City or neighborhood"
-            className="rounded-xl border border-border bg-white px-3 py-2 text-sm text-ink shadow-sm placeholder:text-muted/70 focus:border-brand-400/70 focus:outline-none focus:ring-2 focus:ring-brand-200"
-            type="text"
-          />
-        </label>
+        <FormInput
+          label="Location"
+          name="location"
+          value={formState.location}
+          onChange={onChange}
+          placeholder="City or neighborhood"
+          type="text"
+          className="md:col-span-2"
+        />
         <label className="flex flex-col gap-2 md:col-span-1">
           <span className="text-sm font-medium text-muted">Date</span>
           <DatePicker
-            className="rounded-xl border border-border bg-white px-3 py-2 text-sm text-ink shadow-sm focus:border-brand-400/70 focus:outline-none focus:ring-2 focus:ring-brand-200"
+            className={INPUT_STYLES}
             placeholder="Select date"
             value={formState.date ? dayjs(formState.date) : null}
             onChange={onDateChange}
@@ -105,7 +99,7 @@ const LandingSearch = React.memo(({ onSearch }) => {
             name="bookingType"
             value={bookingType}
             onChange={onTypeChange}
-            className="rounded-xl border border-border bg-white px-3 py-2 text-sm text-ink shadow-sm focus:border-brand-400/70 focus:outline-none focus:ring-2 focus:ring-brand-200"
+            className={INPUT_STYLES}
           >
             {BOOKING_TYPES.map((type) => (
               <option key={type.value} value={type.value}>
@@ -117,36 +111,34 @@ const LandingSearch = React.memo(({ onSearch }) => {
         <label className="flex flex-col gap-2 md:col-span-1">
           <span className="text-sm font-medium text-muted">Start</span>
           <TimePicker
-            className="rounded-xl border border-border bg-white px-3 py-2 text-sm text-ink shadow-sm focus:border-brand-400/70 focus:outline-none focus:ring-2 focus:ring-brand-200"
+            className={INPUT_STYLES}
             placeholder="Start time"
             value={formState.start ? dayjs(formState.start, "HH:mm") : null}
             format="HH:mm"
-            onChange={onStartChange}
-            disabled={bookingType === "full-day"}
+            onChange={(value) => onTimeChange("start", value)}
+            disabled={isFullDay}
           />
         </label>
         <label className="flex flex-col gap-2 md:col-span-1">
           <span className="text-sm font-medium text-muted">End</span>
           <TimePicker
-            className="rounded-xl border border-border bg-white px-3 py-2 text-sm text-ink shadow-sm focus:border-brand-400/70 focus:outline-none focus:ring-2 focus:ring-brand-200"
+            className={INPUT_STYLES}
             placeholder="End time"
             value={formState.end ? dayjs(formState.end, "HH:mm") : null}
             format="HH:mm"
-            onChange={onEndChange}
-            disabled={bookingType === "full-day"}
+            onChange={(value) => onTimeChange("end", value)}
+            disabled={isFullDay}
           />
         </label>
-        <label className="flex flex-col gap-2 md:col-span-1">
-          <span className="text-sm font-medium text-muted">Guests</span>
-          <input
-            name="guests"
-            min="1"
-            value={formState.guests}
-            onChange={onChange}
-            className="rounded-xl border border-border bg-white px-3 py-2 text-sm text-ink shadow-sm placeholder:text-muted/70 focus:border-brand-400/70 focus:outline-none focus:ring-2 focus:ring-brand-200"
-            type="number"
-          />
-        </label>
+        <FormInput
+          label="Guests"
+          name="guests"
+          min="1"
+          value={formState.guests}
+          onChange={onChange}
+          type="number"
+          className="md:col-span-1"
+        />
         <div className="md:col-span-6">
           <Button type="submit" className="w-full md:w-auto">
             Search daytime stays

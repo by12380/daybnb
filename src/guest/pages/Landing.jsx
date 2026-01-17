@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useState } from "react";
 import LandingHero from "../sections/LandingHero.jsx";
 import LandingGallery from "../sections/LandingGallery.jsx";
 import LandingSearch from "../sections/LandingSearch.jsx";
@@ -9,40 +9,40 @@ import LandingTestimonials from "../sections/LandingTestimonials.jsx";
 import LandingCTA from "../sections/LandingCTA.jsx";
 
 const Landing = React.memo(() => {
-  const [searchParams, setSearchParams] = useState({
-    location: "",
-    date: "",
-    start: "",
-    end: "",
-    guests: "",
-    bookingType: "hourly",
-  });
+  const [location, setLocation] = useState("");
+  const [guests, setGuests] = useState(0);
 
   const onSearch = useCallback((params) => {
-    setSearchParams(params);
+    setLocation(params.location || "");
+    setGuests(Number(params.guests) || 0);
   }, []);
-
-  const sections = useMemo(
-    () => [
-      { id: "hero", component: <LandingHero /> },
-      { id: "gallery", component: <LandingGallery searchParams={searchParams} /> },
-      { id: "search", component: <LandingSearch onSearch={onSearch} /> },
-      { id: "features", component: <LandingFeatures /> },
-      { id: "categories", component: <LandingCategories /> },
-      { id: "how", component: <LandingHowItWorks /> },
-      { id: "testimonials", component: <LandingTestimonials /> },
-      { id: "cta", component: <LandingCTA /> },
-    ],
-    [onSearch, searchParams]
-  );
 
   return (
     <>
-      {sections.map((section) => (
-        <section key={section.id} id={section.id} className="py-8">
-          {section.component}
-        </section>
-      ))}
+      <section id="hero" className="py-8">
+        <LandingHero />
+      </section>
+      <section id="gallery" className="py-8">
+        <LandingGallery location={location} guests={guests} />
+      </section>
+      <section id="search" className="py-8">
+        <LandingSearch onSearch={onSearch} />
+      </section>
+      <section id="features" className="py-8">
+        <LandingFeatures />
+      </section>
+      <section id="categories" className="py-8">
+        <LandingCategories />
+      </section>
+      <section id="how" className="py-8">
+        <LandingHowItWorks />
+      </section>
+      <section id="testimonials" className="py-8">
+        <LandingTestimonials />
+      </section>
+      <section id="cta" className="py-8">
+        <LandingCTA />
+      </section>
     </>
   );
 });

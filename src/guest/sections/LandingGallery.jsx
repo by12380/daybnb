@@ -2,10 +2,38 @@ import React, { useMemo } from "react";
 import Card from "../components/ui/Card.jsx";
 import { rooms } from "../data/rooms.js";
 
-const LandingGallery = React.memo(({ searchParams }) => {
+const RoomCard = React.memo(({ room }) => (
+  <Card className="overflow-hidden p-0">
+    <img
+      src={room.image}
+      alt={room.title}
+      className="h-48 w-full object-cover"
+      loading="lazy"
+    />
+    <div className="space-y-2 p-4">
+      <div className="flex items-center justify-between text-xs text-muted">
+        <span>{room.location}</span>
+        <span>{room.guests} guests</span>
+      </div>
+      <p className="text-sm font-semibold text-ink">{room.title}</p>
+      <div className="flex flex-wrap gap-2">
+        {room.tags.map((tag) => (
+          <span
+            key={tag}
+            className="rounded-full border border-border bg-white px-2 py-0.5 text-[11px] text-muted"
+          >
+            {tag}
+          </span>
+        ))}
+      </div>
+    </div>
+  </Card>
+));
+
+const LandingGallery = React.memo(({ location = "", guests = 0 }) => {
   const items = useMemo(() => {
-    const locationQuery = (searchParams?.location || "").toLowerCase().trim();
-    const guestsQuery = Number(searchParams?.guests || 0);
+    const locationQuery = location.toLowerCase().trim();
+    const guestsQuery = Number(guests);
 
     return rooms.filter((room) => {
       const matchesLocation =
@@ -15,7 +43,7 @@ const LandingGallery = React.memo(({ searchParams }) => {
       const matchesGuests = !guestsQuery || room.guests >= guestsQuery;
       return matchesLocation && matchesGuests;
     });
-  }, [searchParams]);
+  }, [location, guests]);
 
   return (
     <div>
@@ -40,33 +68,7 @@ const LandingGallery = React.memo(({ searchParams }) => {
             </p>
           </Card>
         ) : (
-          items.map((room) => (
-            <Card key={room.id} className="overflow-hidden p-0">
-              <img
-                src={room.image}
-                alt={room.title}
-                className="h-48 w-full object-cover"
-                loading="lazy"
-              />
-              <div className="space-y-2 p-4">
-                <div className="flex items-center justify-between text-xs text-muted">
-                  <span>{room.location}</span>
-                  <span>{room.guests} guests</span>
-                </div>
-                <p className="text-sm font-semibold text-ink">{room.title}</p>
-                <div className="flex flex-wrap gap-2">
-                  {room.tags.map((tag) => (
-                    <span
-                      key={tag}
-                      className="rounded-full border border-border bg-white px-2 py-0.5 text-[11px] text-muted"
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </Card>
-          ))
+          items.map((room) => <RoomCard key={room.id} room={room} />)
         )}
       </div>
     </div>
