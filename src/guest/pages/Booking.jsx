@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { DatePicker } from "antd";
 import dayjs from "dayjs";
 import Card from "../components/ui/Card.jsx";
@@ -68,9 +68,35 @@ function buildTimeOptions({ start, end, stepMinutes }) {
   return out;
 }
 
+function getDisabledTimeSlots(existingBookings) {
+  const disabled = new Set();
+  for (const booking of existingBookings) {
+    const bookingStart = parseTimeToMinutes(booking.start_time);
+    const bookingEnd = parseTimeToMinutes(booking.end_time);
+    // Mark all slots within this booking as disabled
+    for (let m = bookingStart; m < bookingEnd; m += TIME_STEP_MINUTES) {
+      disabled.add(m);
+    }
+  }
+  return disabled;
+}
+
+function isTimeSlotOverlapping(existingBookings, startMinutes, endMinutes) {
+  for (const booking of existingBookings) {
+    const bookingStart = parseTimeToMinutes(booking.start_time);
+    const bookingEnd = parseTimeToMinutes(booking.end_time);
+    // Check for overlap: two ranges overlap if start1 < end2 AND start2 < end1
+    if (startMinutes < bookingEnd && bookingStart < endMinutes) {
+      return true;
+    }
+  }
+  return false;
+}
+
 const Booking = React.memo(() => {
   const { roomId } = useParams();
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   const [room, setRoom] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -83,6 +109,10 @@ const Booking = React.memo(() => {
   const [phone, setPhone] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState("");
+
+  // State for existing bookings on selected date
+  const [dateBookings, setDateBookings] = useState([]);
+  const [loadingBookings, setLoadingBookings] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -144,6 +174,38 @@ const Booking = React.memo(() => {
     setPhone((prev) => (prev ? prev : String(phoneFromMeta || "")));
   }, [user]);
 
+  // Fetch existing bookings for the selected date and room
+  useEffect(() => {
+    if (!date || !roomId || !supabase) {
+      setDateBookings([]);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function fetchDateBookings() {
+      setLoadingBookings(true);
+      const { data, error: fetchError } = await supabase
+        .from(BOOKINGS_TABLE)
+        .select("*")
+        .eq("room_id", roomId)
+        .eq("booking_date", date);
+
+      if (cancelled) return;
+
+      if (fetchError) {
+        console.error("Error fetching bookings for date:", fetchError);
+        setDateBookings([]);
+      } else {
+        setDateBookings(data || []);
+      }
+      setLoadingBookings(false);
+    }
+
+    fetchDateBookings();
+    return () => { cancelled = true; };
+  }, [date, roomId]);
+
   const tags = useMemo(() => normalizeTags(room?.tags, room?.type), [room?.tags, room?.type]);
 
   const allTimes = useMemo(
@@ -162,15 +224,37 @@ const Booking = React.memo(() => {
   const startMinutes = useMemo(() => parseTimeToMinutes(startTime), [startTime]);
   const endMinutes = useMemo(() => parseTimeToMinutes(endTime), [endTime]);
 
+  const disabledSlots = useMemo(
+    () => getDisabledTimeSlots(dateBookings),
+    [dateBookings]
+  );
+
   const startOptions = useMemo(() => {
     const lastStart = daytimeEndMinutes - TIME_STEP_MINUTES;
-    return allTimes.filter((t) => t.minutes >= daytimeStartMinutes && t.minutes <= lastStart);
-  }, [allTimes, daytimeEndMinutes, daytimeStartMinutes]);
+    return allTimes
+      .filter((t) => t.minutes >= daytimeStartMinutes && t.minutes <= lastStart)
+      .map((t) => ({
+        ...t,
+        disabled: disabledSlots.has(t.minutes),
+      }));
+  }, [allTimes, daytimeEndMinutes, daytimeStartMinutes, disabledSlots]);
 
   const endOptions = useMemo(() => {
     const minEnd = startMinutes + TIME_STEP_MINUTES;
-    return allTimes.filter((t) => t.minutes >= minEnd && t.minutes <= daytimeEndMinutes);
-  }, [allTimes, daytimeEndMinutes, startMinutes]);
+    return allTimes
+      .filter((t) => t.minutes >= minEnd && t.minutes <= daytimeEndMinutes)
+      .map((t) => {
+        // End time is disabled if any slot between start and this end is booked
+        let isDisabled = false;
+        for (let m = startMinutes; m < t.minutes; m += TIME_STEP_MINUTES) {
+          if (disabledSlots.has(m)) {
+            isDisabled = true;
+            break;
+          }
+        }
+        return { ...t, disabled: isDisabled };
+      });
+  }, [allTimes, daytimeEndMinutes, startMinutes, disabledSlots]);
 
   useEffect(() => {
     // Keep end time valid if start time changes.
@@ -241,6 +325,14 @@ const Booking = React.memo(() => {
         return;
       }
 
+      // Check for overlapping bookings
+      const s = parseTimeToMinutes(startTime);
+      const en = parseTimeToMinutes(endTime);
+      if (isTimeSlotOverlapping(dateBookings, s, en)) {
+        setError("This time slot overlaps with an existing booking. Please choose a different time.");
+        return;
+      }
+
       setSubmitting(true);
       setError("");
 
@@ -255,7 +347,11 @@ const Booking = React.memo(() => {
         user_phone: phone?.trim() || null,
       };
 
-      const { error: insertError } = await supabase.from(BOOKINGS_TABLE).insert(payload);
+      const { data: insertedData, error: insertError } = await supabase
+        .from(BOOKINGS_TABLE)
+        .insert(payload)
+        .select()
+        .single();
 
       if (insertError) {
         const hint =
@@ -272,9 +368,15 @@ const Booking = React.memo(() => {
       }
 
       setSubmitting(false);
-      setSuccess("Booking submitted! Your daytime reservation has been saved.");
+      setSuccess("Booking submitted! Redirecting to your bookings...");
+
+      // Navigate to My Bookings page after a short delay
+      setTimeout(() => {
+        const bookingId = insertedData?.id;
+        navigate(bookingId ? `/my-bookings?highlight=${bookingId}` : "/my-bookings");
+      }, 1500);
     },
-    [date, endTime, fullName, phone, roomId, startTime, user?.email, user?.id, validate]
+    [date, dateBookings, endTime, fullName, navigate, phone, roomId, startTime, user?.email, user?.id, validate]
   );
 
   if (loading) {
@@ -368,13 +470,17 @@ const Booking = React.memo(() => {
             />
           </label>
 
+          {loadingBookings && (
+            <p className="text-xs text-muted">Loading available time slots...</p>
+          )}
+
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="flex flex-col gap-2">
               <span className="text-sm font-medium text-muted">Start time</span>
               <select value={startTime} onChange={onStartChange} className={INPUT_STYLES}>
                 {startOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
+                  <option key={opt.value} value={opt.value} disabled={opt.disabled}>
+                    {opt.label}{opt.disabled ? " (Booked)" : ""}
                   </option>
                 ))}
               </select>
@@ -383,8 +489,8 @@ const Booking = React.memo(() => {
               <span className="text-sm font-medium text-muted">End time</span>
               <select value={endTime} onChange={onEndChange} className={INPUT_STYLES}>
                 {endOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
+                  <option key={opt.value} value={opt.value} disabled={opt.disabled}>
+                    {opt.label}{opt.disabled ? " (Unavailable)" : ""}
                   </option>
                 ))}
               </select>
