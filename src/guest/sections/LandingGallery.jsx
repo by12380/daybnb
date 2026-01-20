@@ -4,11 +4,26 @@ import Card from "../components/ui/Card.jsx";
 import Button from "../components/ui/Button.jsx";
 import { supabase } from "../../lib/supabaseClient.js";
 
+function formatMoney(value) {
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) return "—";
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency: "USD",
+      maximumFractionDigits: 2,
+    }).format(amount);
+  } catch {
+    return `$${amount.toFixed(2)}`;
+  }
+}
+
 const RoomCard = React.memo(({ room }) => {
   const navigate = useNavigate();
 
   // Handle tags - could be array or null from Supabase
   const tags = room.tags || [];
+  const rate = Number(room?.price_per_hour);
 
   return (
     <Card className="overflow-hidden p-0">
@@ -23,9 +38,14 @@ const RoomCard = React.memo(({ room }) => {
       <div className="space-y-2 p-4">
         <div className="flex items-center justify-between text-xs text-muted">
           <span>{room.location}</span>
-          <span>{room.guests} guests</span>
+          <span>
+            {Number.isFinite(rate) && rate > 0 ? `${formatMoney(rate)}/hr` : `${room.guests} guests`}
+          </span>
         </div>
         <p className="text-sm font-semibold text-ink">{room.title}</p>
+        {Number.isFinite(rate) && rate > 0 ? (
+          <p className="text-xs text-muted">{room.guests} guests · {formatMoney(rate)}/hr</p>
+        ) : null}
         {tags.length > 0 && (
           <div className="flex flex-wrap gap-2">
             {tags.map((tag) => (

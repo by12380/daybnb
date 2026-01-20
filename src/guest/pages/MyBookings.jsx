@@ -18,6 +18,7 @@ import { supabase } from "../../lib/supabaseClient.js";
 
 const BOOKINGS_TABLE = "bookings";
 const TIME_STEP_MINUTES = 30;
+const MIN_BOOKING_HOURS = 2;
 
 function getBookingKey(b) {
   if (!b) return "";
@@ -51,6 +52,20 @@ function safeDateText(value) {
     return new Date(value).toLocaleString();
   } catch {
     return String(value);
+  }
+}
+
+function formatMoney(value) {
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) return "—";
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency: "USD",
+      maximumFractionDigits: 2,
+    }).format(amount);
+  } catch {
+    return `$${amount.toFixed(2)}`;
   }
 }
 
@@ -222,7 +237,7 @@ const MyBookings = React.memo(() => {
       ...t,
       disabled: !startHasAnyValidEnd({
         start: t.minutes,
-        minEnd: t.minutes + TIME_STEP_MINUTES,
+        minEnd: t.minutes + MIN_BOOKING_HOURS * 60,
         maxEnd: dayEndMinutes,
         stepMinutes: TIME_STEP_MINUTES,
         intervals: bookedIntervals,
@@ -231,7 +246,7 @@ const MyBookings = React.memo(() => {
   }, [allTimes, bookedIntervals, dayEndMinutes, dayStartMinutes, draft?.booking_date]);
 
   const endOptions = useMemo(() => {
-    const minEnd = draftStartMinutes + TIME_STEP_MINUTES;
+    const minEnd = draftStartMinutes + MIN_BOOKING_HOURS * 60;
     const candidates = allTimes.filter((t) => t.minutes >= minEnd && t.minutes <= dayEndMinutes);
     if (!draft?.booking_date) return candidates.map((t) => ({ ...t, disabled: true }));
     return candidates.map((t) => ({
@@ -414,6 +429,16 @@ const MyBookings = React.memo(() => {
         user_phone: draft.user_phone?.trim() || null,
       };
 
+      const roomRate = Number(roomsById?.[draft.room_id]?.price_per_hour);
+      if (Number.isFinite(roomRate) && roomRate > 0) {
+        const minutes = Math.max(0, eMin - s);
+        const hours = Math.round((minutes / 60) * 100) / 100;
+        const total = Math.round(roomRate * hours * 100) / 100;
+        updatePayload.price_per_hour = roomRate;
+        updatePayload.billable_hours = hours || null;
+        updatePayload.total_price = total || null;
+      }
+
       const hasId = draft.id !== undefined && draft.id !== null;
       const updateQuery = supabase.from(BOOKINGS_TABLE).update(updatePayload).select("*");
       const { data: updatedRows, error: updateError } = hasId
@@ -465,7 +490,7 @@ const MyBookings = React.memo(() => {
         )
       );
     },
-    [bookedIntervals, draft, setSearchParams, user.id]
+    [bookedIntervals, draft, roomsById, setSearchParams, user.id]
   );
 
   if (loading) {
@@ -527,6 +552,7 @@ const MyBookings = React.memo(() => {
             const active = key === getBookingKey(selectedBooking);
             const room = roomsById[b.room_id];
             const title = room?.title || `Room ${b.room_id || "—"}`;
+            const total = b.total_price ?? null;
             return (
               <button
                 key={key}
@@ -542,6 +568,9 @@ const MyBookings = React.memo(() => {
                 <p className="mt-1 text-xs text-muted">
                   {b.booking_date || "—"} · {b.start_time || "—"}–{b.end_time || "—"}
                 </p>
+                {total !== null && total !== undefined && total !== "" ? (
+                  <p className="mt-1 text-xs text-muted">Total: {formatMoney(total)}</p>
+                ) : null}
               </button>
             );
           })}
@@ -665,6 +694,14 @@ const MyBookings = React.memo(() => {
                 {selectedBooking.booking_date || "—"} · {selectedBooking.start_time || "—"}–
                 {selectedBooking.end_time || "—"}
               </p>
+              {selectedBooking.total_price !== undefined &&
+              selectedBooking.total_price !== null &&
+              selectedBooking.total_price !== "" ? (
+                <p className="mt-2 text-sm text-ink">
+                  Total:{" "}
+                  <span className="font-semibold">{formatMoney(selectedBooking.total_price)}</span>
+                </p>
+              ) : null}
               <p className="mt-2 text-xs text-muted">
                 Created: {safeDateText(selectedBooking.created_at)}
               </p>
