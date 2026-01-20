@@ -12,9 +12,6 @@ export default function Navbar() {
           <button className="rounded-md border border-slate-700 px-3 py-1.5 hover:border-slate-500">
             Sign in
           </button>
-          <button className="rounded-md bg-emerald-500 px-3 py-1.5 text-slate-950 hover:bg-emerald-400">
-            Get started
-          </button>
         </nav>
       </div>
     </header>

@@ -22,11 +22,11 @@ const Landing = React.memo(() => {
       <section id="hero" className="py-8">
         <LandingHero />
       </section>
-      <section id="gallery" className="py-8">
-        <LandingGallery location={location} guests={guests} />
-      </section>
       <section id="search" className="py-8">
         <LandingSearch onSearch={onSearch} />
+      </section>
+      <section id="gallery" className="py-8">
+        <LandingGallery location={location} guests={guests} />
       </section>
       <section id="features" className="py-8">
         <LandingFeatures />

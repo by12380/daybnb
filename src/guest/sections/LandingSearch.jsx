@@ -1,38 +1,79 @@
-import React, { useCallback, useState } from "react";
-import { DatePicker, TimePicker } from "antd";
+import React, { useCallback, useEffect, useState } from "react";
+import { DatePicker } from "antd";
 import dayjs from "dayjs";
 import Button from "../components/ui/Button.jsx";
 import Card from "../components/ui/Card.jsx";
 import FormInput, { INPUT_STYLES } from "../components/ui/FormInput.jsx";
 import {
   BOOKING_TYPES,
-  DAYTIME_END,
-  DAYTIME_START,
   MIN_BOOKING_HOURS,
 } from "../utils/constants.js";
+import { supabase } from "../../lib/supabaseClient.js";
 
 const LandingSearch = React.memo(({ onSearch }) => {
   const [bookingType, setBookingType] = useState("hourly");
+  const [cities, setCities] = useState([]);
+  const [citiesLoading, setCitiesLoading] = useState(false);
+  const [citiesError, setCitiesError] = useState("");
   const [formState, setFormState] = useState({
     location: "",
     date: "",
-    start: DAYTIME_START,
-    end: DAYTIME_END,
     guests: 1,
   });
 
-  const isFullDay = bookingType === "full-day";
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchCities = async () => {
+      setCitiesError("");
+      setCities([]);
+
+      if (!supabase) {
+        setCitiesError(
+          "Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY."
+        );
+        return;
+      }
+
+      setCitiesLoading(true);
+
+      const { data, error } = await supabase.from("rooms").select("location");
+      if (cancelled) return;
+
+      if (error) {
+        setCitiesError(error.message || "Failed to load locations.");
+        setCitiesLoading(false);
+        return;
+      }
+
+      // Extract unique cities
+      const uniqueCities = [
+        ...new Set(
+          data
+            .map((room) => String(room?.location ?? "").trim())
+            .filter(Boolean)
+        ),
+      ].sort((a, b) => a.localeCompare(b));
+
+      if (!uniqueCities.length) {
+        setCitiesError(
+          "No cities returned from Supabase. If RLS is enabled on `rooms`, add a SELECT policy for anon/authenticated users."
+        );
+      }
+
+      setCities(uniqueCities);
+      setCitiesLoading(false);
+    };
+
+    fetchCities();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const onTypeChange = useCallback((event) => {
-    const value = event.target.value;
-    setBookingType(value);
-    if (value === "full-day") {
-      setFormState((prev) => ({
-        ...prev,
-        start: DAYTIME_START,
-        end: DAYTIME_END,
-      }));
-    }
+    setBookingType(event.target.value);
   }, []);
 
   const onChange = useCallback((event) => {
@@ -42,13 +83,6 @@ const LandingSearch = React.memo(({ onSearch }) => {
 
   const onDateChange = useCallback((_, dateString) => {
     setFormState((prev) => ({ ...prev, date: dateString }));
-  }, []);
-
-  const onTimeChange = useCallback((field, value) => {
-    setFormState((prev) => ({
-      ...prev,
-      [field]: value ? value.format("HH:mm") : "",
-    }));
   }, []);
 
   const onSubmit = useCallback(
@@ -75,15 +109,32 @@ const LandingSearch = React.memo(({ onSearch }) => {
         onSubmit={onSubmit}
         noValidate
       >
-        <FormInput
-          label="Location"
-          name="location"
-          value={formState.location}
-          onChange={onChange}
-          placeholder="City or neighborhood"
-          type="text"
-          className="md:col-span-2"
-        />
+        <label className="flex flex-col gap-2 md:col-span-2">
+          <span className="text-sm font-medium text-muted">Location</span>
+          <select
+            name="location"
+            value={formState.location}
+            onChange={onChange}
+            className={INPUT_STYLES}
+            disabled={citiesLoading || Boolean(citiesError)}
+          >
+            <option value="">
+              {citiesLoading
+                ? "Loading cities…"
+                : citiesError
+                  ? "Unable to load cities"
+                  : "Select a city"}
+            </option>
+            {cities.map((city) => (
+              <option key={city} value={city}>
+                {city}
+              </option>
+            ))}
+          </select>
+          {citiesError ? (
+            <span className="text-xs text-red-600">{citiesError}</span>
+          ) : null}
+        </label>
         <label className="flex flex-col gap-2 md:col-span-1">
           <span className="text-sm font-medium text-muted">Date</span>
           <DatePicker
@@ -107,28 +158,6 @@ const LandingSearch = React.memo(({ onSearch }) => {
               </option>
             ))}
           </select>
-        </label>
-        <label className="flex flex-col gap-2 md:col-span-1">
-          <span className="text-sm font-medium text-muted">Start</span>
-          <TimePicker
-            className={INPUT_STYLES}
-            placeholder="Start time"
-            value={formState.start ? dayjs(formState.start, "HH:mm") : null}
-            format="HH:mm"
-            onChange={(value) => onTimeChange("start", value)}
-            disabled={isFullDay}
-          />
-        </label>
-        <label className="flex flex-col gap-2 md:col-span-1">
-          <span className="text-sm font-medium text-muted">End</span>
-          <TimePicker
-            className={INPUT_STYLES}
-            placeholder="End time"
-            value={formState.end ? dayjs(formState.end, "HH:mm") : null}
-            format="HH:mm"
-            onChange={(value) => onTimeChange("end", value)}
-            disabled={isFullDay}
-          />
         </label>
         <FormInput
           label="Guests"
