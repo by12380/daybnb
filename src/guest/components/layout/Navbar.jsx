@@ -38,9 +38,22 @@ export default function GuestNavbar() {
             <div className="h-5 w-5 animate-spin rounded-full border-2 border-brand-200 border-t-brand-600" />
           ) : user ? (
             <>
-              <span className="max-w-[150px] truncate text-xs text-muted">
-                {user.email}
-              </span>
+              <Link
+                to="/my-bookings"
+                className="rounded-full px-3 py-1.5 text-sm font-semibold text-ink hover:text-brand-600"
+              >
+                My bookings
+              </Link>
+              <Link
+                to="/profile"
+                className="flex items-center gap-2 rounded-full px-3 py-1.5 hover:text-brand-600"
+                title="View profile"
+              >
+                <span className="flex h-7 w-7 items-center justify-center rounded-full border border-border bg-white text-xs font-semibold text-ink">
+                  {(user.email || "?").slice(0, 1).toUpperCase()}
+                </span>
+                <span className="max-w-[140px] truncate text-xs text-muted">{user.email}</span>
+              </Link>
               <Button variant="outline" onClick={handleSignOut}>
                 Sign out
               </Button>

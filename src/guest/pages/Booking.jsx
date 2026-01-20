@@ -1,11 +1,19 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { DatePicker } from "antd";
 import dayjs from "dayjs";
 import Card from "../components/ui/Card.jsx";
 import Button from "../components/ui/Button.jsx";
 import FormInput, { INPUT_STYLES } from "../components/ui/FormInput.jsx";
 import { DAYTIME_END, DAYTIME_START } from "../utils/constants.js";
+import {
+  bookingsToIntervals,
+  buildTimeOptions,
+  minutesToTimeValue,
+  parseTimeToMinutes,
+  rangeOverlapsAny,
+  startHasAnyValidEnd,
+} from "../utils/bookingTime.js";
 import { useAuth } from "../../auth/useAuth.js";
 import { supabase } from "../../lib/supabaseClient.js";
 
@@ -26,51 +34,10 @@ function normalizeTags(value, type) {
   return type ? [String(type)] : [];
 }
 
-function clamp(n, min, max) {
-  return Math.min(max, Math.max(min, n));
-}
-
-function parseTimeToMinutes(value) {
-  const [h, m] = String(value || "0:0")
-    .split(":")
-    .map((v) => Number(v));
-  if (!Number.isFinite(h) || !Number.isFinite(m)) return 0;
-  return clamp(h, 0, 23) * 60 + clamp(m, 0, 59);
-}
-
-function pad2(n) {
-  return String(n).padStart(2, "0");
-}
-
-function minutesToTimeValue(totalMinutes) {
-  const h = Math.floor(totalMinutes / 60);
-  const m = totalMinutes % 60;
-  return `${pad2(h)}:${pad2(m)}`;
-}
-
-function minutesToLabel(totalMinutes) {
-  const h24 = Math.floor(totalMinutes / 60);
-  const m = totalMinutes % 60;
-  const suffix = h24 >= 12 ? "PM" : "AM";
-  const h12 = ((h24 + 11) % 12) + 1;
-  const mm = pad2(m);
-  return `${h12}:${mm} ${suffix}`;
-}
-
-function buildTimeOptions({ start, end, stepMinutes }) {
-  const startM = parseTimeToMinutes(start);
-  const endM = parseTimeToMinutes(end);
-  const step = Math.max(5, Number(stepMinutes) || 30);
-  const out = [];
-  for (let m = startM; m <= endM; m += step) {
-    out.push({ value: minutesToTimeValue(m), label: minutesToLabel(m), minutes: m });
-  }
-  return out;
-}
-
 const Booking = React.memo(() => {
   const { roomId } = useParams();
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   const [room, setRoom] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -83,6 +50,8 @@ const Booking = React.memo(() => {
   const [phone, setPhone] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState("");
+  const [bookedIntervals, setBookedIntervals] = useState([]);
+  const [bookingsLoading, setBookingsLoading] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -164,22 +133,92 @@ const Booking = React.memo(() => {
 
   const startOptions = useMemo(() => {
     const lastStart = daytimeEndMinutes - TIME_STEP_MINUTES;
-    return allTimes.filter((t) => t.minutes >= daytimeStartMinutes && t.minutes <= lastStart);
-  }, [allTimes, daytimeEndMinutes, daytimeStartMinutes]);
+    const candidates = allTimes.filter(
+      (t) => t.minutes >= daytimeStartMinutes && t.minutes <= lastStart
+    );
+    if (!date) return candidates.map((t) => ({ ...t, disabled: true }));
+    return candidates.map((t) => {
+      const disabled =
+        !startHasAnyValidEnd({
+          start: t.minutes,
+          minEnd: t.minutes + TIME_STEP_MINUTES,
+          maxEnd: daytimeEndMinutes,
+          stepMinutes: TIME_STEP_MINUTES,
+          intervals: bookedIntervals,
+        }) || false;
+      return { ...t, disabled };
+    });
+  }, [allTimes, bookedIntervals, date, daytimeEndMinutes, daytimeStartMinutes]);
 
   const endOptions = useMemo(() => {
     const minEnd = startMinutes + TIME_STEP_MINUTES;
-    return allTimes.filter((t) => t.minutes >= minEnd && t.minutes <= daytimeEndMinutes);
-  }, [allTimes, daytimeEndMinutes, startMinutes]);
+    const candidates = allTimes.filter((t) => t.minutes >= minEnd && t.minutes <= daytimeEndMinutes);
+    if (!date) return candidates.map((t) => ({ ...t, disabled: true }));
+    return candidates.map((t) => ({
+      ...t,
+      disabled: rangeOverlapsAny(startMinutes, t.minutes, bookedIntervals),
+    }));
+  }, [allTimes, bookedIntervals, date, daytimeEndMinutes, startMinutes]);
 
   useEffect(() => {
     // Keep end time valid if start time changes.
     const minEnd = startMinutes + TIME_STEP_MINUTES;
     if (endMinutes < minEnd) {
-      const next = minutesToTimeValue(clamp(minEnd, daytimeStartMinutes, daytimeEndMinutes));
-      setEndTime(next);
+      setEndTime(minutesToTimeValue(minEnd));
     }
-  }, [daytimeEndMinutes, daytimeStartMinutes, endMinutes, startMinutes]);
+  }, [endMinutes, startMinutes]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadBooked() {
+      if (!supabase || !roomId || !date) {
+        setBookedIntervals([]);
+        setBookingsLoading(false);
+        return;
+      }
+
+      setBookingsLoading(true);
+      const { data, error: fetchError } = await supabase
+        .from(BOOKINGS_TABLE)
+        .select("id,start_time,end_time")
+        .eq("room_id", roomId)
+        .eq("booking_date", date);
+
+      if (cancelled) return;
+
+      if (fetchError) {
+        console.warn("Failed to load existing bookings:", fetchError);
+        setBookedIntervals([]);
+      } else {
+        setBookedIntervals(bookingsToIntervals(data));
+      }
+      setBookingsLoading(false);
+    }
+
+    loadBooked();
+    return () => {
+      cancelled = true;
+    };
+  }, [date, roomId]);
+
+  useEffect(() => {
+    if (!date) return;
+    const selectedStart = startOptions.find((o) => o.value === startTime);
+    if (!selectedStart || selectedStart.disabled) {
+      const first = startOptions.find((o) => !o.disabled);
+      if (first) setStartTime(first.value);
+    }
+  }, [date, startOptions, startTime]);
+
+  useEffect(() => {
+    if (!date) return;
+    const selectedEnd = endOptions.find((o) => o.value === endTime);
+    if (!selectedEnd || selectedEnd.disabled) {
+      const first = endOptions.find((o) => !o.disabled);
+      if (first) setEndTime(first.value);
+    }
+  }, [date, endOptions, endTime]);
 
   const durationText = useMemo(() => {
     const minutes = Math.max(0, endMinutes - startMinutes);
@@ -220,8 +259,11 @@ const Booking = React.memo(() => {
     if (s < min || s >= max) return "Start time must be between 8:00 AM and 5:00 PM.";
     if (e <= min || e > max) return "End time must be between 8:00 AM and 5:00 PM.";
     if (e <= s) return "End time must be after start time.";
+    if (rangeOverlapsAny(s, e, bookedIntervals)) {
+      return "That time range is already booked. Please select a different time window.";
+    }
     return "";
-  }, [date, endTime, roomId, startTime, user?.id]);
+  }, [bookedIntervals, date, endTime, roomId, startTime, user?.id]);
 
   const onSubmit = useCallback(
     async (e) => {
@@ -244,6 +286,28 @@ const Booking = React.memo(() => {
       setSubmitting(true);
       setError("");
 
+      // Re-check overlaps server-side just before insert.
+      const { data: existing, error: existingError } = await supabase
+        .from(BOOKINGS_TABLE)
+        .select("id,start_time,end_time")
+        .eq("room_id", roomId)
+        .eq("booking_date", date);
+
+      if (existingError) {
+        setError(existingError.message || "Failed to validate availability.");
+        setSubmitting(false);
+        return;
+      }
+
+      const intervals = bookingsToIntervals(existing);
+      const sMin = parseTimeToMinutes(startTime);
+      const eMin = parseTimeToMinutes(endTime);
+      if (rangeOverlapsAny(sMin, eMin, intervals)) {
+        setError("That time range was just booked. Please pick another time window.");
+        setSubmitting(false);
+        return;
+      }
+
       const payload = {
         room_id: roomId,
         booking_date: date,
@@ -255,7 +319,11 @@ const Booking = React.memo(() => {
         user_phone: phone?.trim() || null,
       };
 
-      const { error: insertError } = await supabase.from(BOOKINGS_TABLE).insert(payload);
+      const { data: inserted, error: insertError } = await supabase
+        .from(BOOKINGS_TABLE)
+        .insert(payload)
+        .select("*")
+        .maybeSingle();
 
       if (insertError) {
         const hint =
@@ -272,9 +340,22 @@ const Booking = React.memo(() => {
       }
 
       setSubmitting(false);
-      setSuccess("Booking submitted! Your daytime reservation has been saved.");
+      setSuccess("Booking submitted! Redirecting to My Bookings…");
+      const bookingId = inserted?.id;
+      navigate(bookingId ? `/my-bookings?bookingId=${encodeURIComponent(bookingId)}` : "/my-bookings");
     },
-    [date, endTime, fullName, phone, roomId, startTime, user?.email, user?.id, validate]
+    [
+      date,
+      endTime,
+      fullName,
+      navigate,
+      phone,
+      roomId,
+      startTime,
+      user?.email,
+      user?.id,
+      validate,
+    ]
   );
 
   if (loading) {
@@ -371,9 +452,14 @@ const Booking = React.memo(() => {
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="flex flex-col gap-2">
               <span className="text-sm font-medium text-muted">Start time</span>
-              <select value={startTime} onChange={onStartChange} className={INPUT_STYLES}>
+              <select
+                value={startTime}
+                onChange={onStartChange}
+                className={INPUT_STYLES}
+                disabled={!date || bookingsLoading}
+              >
                 {startOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
+                  <option key={opt.value} value={opt.value} disabled={opt.disabled}>
                     {opt.label}
                   </option>
                 ))}
@@ -381,15 +467,28 @@ const Booking = React.memo(() => {
             </label>
             <label className="flex flex-col gap-2">
               <span className="text-sm font-medium text-muted">End time</span>
-              <select value={endTime} onChange={onEndChange} className={INPUT_STYLES}>
+              <select
+                value={endTime}
+                onChange={onEndChange}
+                className={INPUT_STYLES}
+                disabled={!date || bookingsLoading}
+              >
                 {endOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
+                  <option key={opt.value} value={opt.value} disabled={opt.disabled}>
                     {opt.label}
                   </option>
                 ))}
               </select>
             </label>
           </div>
+
+          {date ? (
+            <p className="text-xs text-muted">
+              {bookingsLoading
+                ? "Checking availability…"
+                : "Unavailable time slots are disabled to prevent overlaps."}
+            </p>
+          ) : null}
 
           {durationText ? (
             <p className="text-xs text-muted">Total time: {durationText}</p>
