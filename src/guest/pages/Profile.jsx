@@ -127,6 +127,8 @@ const Profile = React.memo(() => {
         postal_code: postalCode.trim() || null,
         country: country || null,
         updated_at: new Date().toISOString(),
+        // Default user_type to 'user' for new profiles (won't override existing value)
+        ...(profile ? {} : { user_type: 'user' }),
       };
 
       const { error: upsertError } = await supabase

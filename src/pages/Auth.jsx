@@ -4,15 +4,17 @@ import Card from "../guest/components/ui/Card.jsx";
 import Button from "../guest/components/ui/Button.jsx";
 import FormInput from "../guest/components/ui/FormInput.jsx";
 import { useAuth } from "../auth/useAuth.js";
+import { useProfile } from "../auth/useProfile.js";
 
 const Auth = React.memo(() => {
   const { session, loading, signIn, signUp } = useAuth();
+  const { isAdmin, loading: profileLoading } = useProfile();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
   const redirectTo = useMemo(() => {
     const redirect = searchParams.get("redirect");
-    return redirect && redirect.startsWith("/") ? redirect : "/";
+    return redirect && redirect.startsWith("/") ? redirect : null;
   }, [searchParams]);
 
   const [mode, setMode] = useState("login"); // login | signup
@@ -23,10 +25,19 @@ const Auth = React.memo(() => {
   const [info, setInfo] = useState("");
 
   useEffect(() => {
-    if (!loading && session) {
-      navigate(redirectTo, { replace: true });
+    if (!loading && !profileLoading && session) {
+      // If there's a specific redirect URL, use it (unless admin going to user page)
+      if (redirectTo && !isAdmin) {
+        navigate(redirectTo, { replace: true });
+      } else if (isAdmin) {
+        // Admin users go to admin dashboard
+        navigate("/admin", { replace: true });
+      } else {
+        // Regular users go to landing page
+        navigate("/", { replace: true });
+      }
     }
-  }, [loading, navigate, redirectTo, session]);
+  }, [loading, profileLoading, navigate, redirectTo, session, isAdmin]);
 
   const onSubmit = useCallback(
     async (e) => {

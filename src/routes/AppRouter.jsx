@@ -8,6 +8,14 @@ import Booking from "../guest/pages/Booking.jsx";
 import Profile from "../guest/pages/Profile.jsx";
 import MyBookings from "../guest/pages/MyBookings.jsx";
 import RequireAuth from "../auth/RequireAuth.jsx";
+import RequireAdmin from "../auth/RequireAdmin.jsx";
+
+// Admin imports
+import AdminLayout from "../admin/components/layout/AdminLayout.jsx";
+import AdminDashboard from "../admin/pages/Dashboard.jsx";
+import AdminBookings from "../admin/pages/Bookings.jsx";
+import AdminUsers from "../admin/pages/Users.jsx";
+import AdminRooms from "../admin/pages/Rooms.jsx";
 
 export default function AppRouter() {
   return (
@@ -29,6 +37,16 @@ export default function AppRouter() {
         </Route>
         <Route element={<MainLayout />}>
           <Route path="/host" element={<Dashboard />} />
+        </Route>
+        
+        {/* Admin Routes - Protected by RequireAdmin */}
+        <Route element={<RequireAdmin />}>
+          <Route element={<AdminLayout />}>
+            <Route path="/admin" element={<AdminDashboard />} />
+            <Route path="/admin/bookings" element={<AdminBookings />} />
+            <Route path="/admin/users" element={<AdminUsers />} />
+            <Route path="/admin/rooms" element={<AdminRooms />} />
+          </Route>
         </Route>
       </Routes>
     </BrowserRouter>
