@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../../auth/useAuth.js";
+import { useProfile } from "../../../auth/useProfile.js";
 import Button from "../ui/Button.jsx";
 
 export default function GuestNavbar() {
   const { user, loading, signOut } = useAuth();
+  const { isAdmin } = useProfile();
   const navigate = useNavigate();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
@@ -108,6 +110,18 @@ export default function GuestNavbar() {
                       </svg>
                       My Bookings
                     </Link>
+                    {isAdmin && (
+                      <Link
+                        to="/admin"
+                        onClick={() => setDropdownOpen(false)}
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-ink transition hover:bg-slate-50"
+                      >
+                        <svg className="h-5 w-5 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17v-2a4 4 0 014-4h2m-6 6h6m2 0a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v8a2 2 0 002 2h2" />
+                        </svg>
+                        Admin Panel
+                      </Link>
+                    )}
                   </div>
 
                   <div className="border-t border-border pt-1">

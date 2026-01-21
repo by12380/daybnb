@@ -91,49 +91,87 @@ export default function AdminDashboard() {
     setLoading(true);
 
     try {
-      // Fetch bookings with room data
-      const { data: bookings, error: bookingsError } = await supabase
+      // Fetch all bookings
+      const { data: bookingsData, error: bookingsError } = await supabase
         .from("bookings")
-        .select("*, room:rooms(*)")
+        .select("*")
         .order("created_at", { ascending: false });
 
-      if (bookingsError) throw bookingsError;
+      if (bookingsError) {
+        console.error("Error fetching bookings:", bookingsError);
+      }
 
-      // Fetch users count (from profiles or auth)
-      const { count: usersCount, error: usersError } = await supabase
-        .from("profiles")
-        .select("*", { count: "exact", head: true });
+      const bookings = bookingsData || [];
+      console.log("Fetched bookings:", bookings);
 
-      // Fetch rooms count
-      const { count: roomsCount, error: roomsError } = await supabase
+      // Fetch all rooms
+      const { data: roomsData, error: roomsError } = await supabase
         .from("rooms")
-        .select("*", { count: "exact", head: true });
+        .select("*");
+
+      if (roomsError) {
+        console.error("Error fetching rooms:", roomsError);
+      }
+
+      console.log("Fetched rooms:", roomsData);
+
+      // Create rooms lookup map
+      const roomsMap = {};
+      (roomsData || []).forEach((room) => {
+        roomsMap[room.id] = room;
+      });
+
+      console.log("Rooms map keys:", Object.keys(roomsMap));
+
+      // Fetch all profiles
+      const { data: profilesData, error: profilesError } = await supabase
+        .from("profiles")
+        .select("*");
+
+      if (profilesError) {
+        console.error("Error fetching profiles:", profilesError);
+      }
+
+      console.log("Fetched profiles:", profilesData);
+
+      // Create profiles lookup map
+      const profilesMap = {};
+      (profilesData || []).forEach((profile) => {
+        profilesMap[profile.id] = profile;
+      });
+
+      // Enrich bookings with room and user data
+      const enrichedBookings = bookings.map((booking) => {
+        const room = roomsMap[booking.room_id] || null;
+        const user = profilesMap[booking.user_id] || null;
+        console.log(`Booking ${booking.id}: room_id=${booking.room_id}, found room=${!!room}, user_id=${booking.user_id}, found user=${!!user}`);
+        return {
+          ...booking,
+          room,
+          user,
+        };
+      });
 
       const today = new Date().toISOString().split("T")[0];
-      const upcomingCount = (bookings || []).filter(
+      const upcomingCount = bookings.filter(
         (b) => b.booking_date >= today
       ).length;
 
-      const totalRevenue = (bookings || []).reduce(
+      const totalRevenue = bookings.reduce(
         (sum, b) => sum + (b.total_price || 0),
         0
       );
 
       setStats({
-        totalBookings: bookings?.length || 0,
+        totalBookings: bookings.length,
         totalRevenue,
-        totalUsers: usersCount || 0,
-        totalRooms: roomsCount || 0,
+        totalUsers: (profilesData || []).length,
+        totalRooms: (roomsData || []).length,
         upcomingBookings: upcomingCount,
       });
 
-      // Get recent bookings with user email
-      const recentWithEmail = (bookings || []).slice(0, 5).map((b) => ({
-        ...b,
-        user_email: b.user_id ? `User ${b.user_id.slice(0, 8)}...` : "N/A",
-      }));
-
-      setRecentBookings(recentWithEmail);
+      // Keep a small recent slice for the table
+      setRecentBookings(enrichedBookings.slice(0, 5));
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
     } finally {
@@ -306,8 +344,12 @@ export default function AdminDashboard() {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <p className="text-sm text-ink">{booking.user_full_name || "Guest"}</p>
-                      <p className="text-xs text-muted">{booking.user_email}</p>
+                      <p className="text-sm text-ink">
+                        {booking.user_full_name || booking.user?.full_name || "Guest"}
+                      </p>
+                      <p className="text-xs text-muted">
+                        {booking.user?.email || booking.user_email || "N/A"}
+                      </p>
                     </td>
                     <td className="px-6 py-4">
                       <p className="text-sm text-ink">

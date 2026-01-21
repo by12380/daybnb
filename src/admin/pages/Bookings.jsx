@@ -62,7 +62,7 @@ function formatTime(timeStr) {
   return minutesToLabel(parseTimeToMinutes(timeStr));
 }
 
-const ViewBookingModal = React.memo(({ open, booking, room, onClose }) => {
+const ViewBookingModal = React.memo(({ open, booking, room, userProfile, onClose }) => {
   if (!booking) return null;
 
   const isPast = new Date(booking.booking_date) < new Date(new Date().toDateString());
@@ -117,11 +117,21 @@ const ViewBookingModal = React.memo(({ open, booking, room, onClose }) => {
           </div>
           <div>
             <p className="text-xs font-medium text-muted">Guest Name</p>
-            <p className="mt-1 text-sm font-medium text-ink">{booking.user_full_name || "N/A"}</p>
+            <p className="mt-1 text-sm font-medium text-ink">
+              {booking.user_full_name || userProfile?.full_name || "N/A"}
+            </p>
           </div>
           <div>
             <p className="text-xs font-medium text-muted">Phone</p>
-            <p className="mt-1 text-sm font-medium text-ink">{booking.user_phone || "N/A"}</p>
+            <p className="mt-1 text-sm font-medium text-ink">
+              {booking.user_phone || userProfile?.phone || "N/A"}
+            </p>
+          </div>
+          <div className="sm:col-span-2">
+            <p className="text-xs font-medium text-muted">Email</p>
+            <p className="mt-1 text-sm font-medium text-ink">
+              {userProfile?.email || booking.user_email || "N/A"}
+            </p>
           </div>
         </div>
 
@@ -442,6 +452,7 @@ const DeleteBookingModal = React.memo(({ open, booking, room, onClose, onConfirm
 export default function AdminBookings() {
   const [bookings, setBookings] = useState([]);
   const [rooms, setRooms] = useState({});
+  const [profilesById, setProfilesById] = useState({});
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -455,34 +466,57 @@ export default function AdminBookings() {
 
     setLoading(true);
 
-    const { data, error } = await supabase
+    // Fetch all bookings
+    const { data: bookingsData, error: bookingsError } = await supabase
       .from(BOOKINGS_TABLE)
       .select("*")
       .order("booking_date", { ascending: false });
 
-    if (error) {
-      console.error("Error fetching bookings:", error);
+    if (bookingsError) {
+      console.error("Error fetching bookings:", bookingsError);
       setLoading(false);
       return;
     }
 
-    setBookings(data || []);
+    // Fetch all rooms
+    const { data: roomsData, error: roomsError } = await supabase
+      .from("rooms")
+      .select("*");
 
-    // Fetch room details
-    const roomIds = [...new Set((data || []).map((b) => b.room_id).filter(Boolean))];
-    if (roomIds.length > 0) {
-      const { data: roomsData } = await supabase
-        .from("rooms")
-        .select("*")
-        .in("id", roomIds);
-
-      const roomsMap = {};
-      (roomsData || []).forEach((r) => {
-        roomsMap[r.id] = r;
-      });
-      setRooms(roomsMap);
+    if (roomsError) {
+      console.error("Error fetching rooms:", roomsError);
     }
 
+    // Fetch all profiles
+    const { data: profilesData, error: profilesError } = await supabase
+      .from("profiles")
+      .select("*");
+
+    if (profilesError) {
+      console.error("Error fetching profiles:", profilesError);
+    }
+
+    // Create lookup maps
+    const roomsMap = {};
+    (roomsData || []).forEach((room) => {
+      roomsMap[room.id] = room;
+    });
+
+    const profilesMap = {};
+    (profilesData || []).forEach((profile) => {
+      profilesMap[profile.id] = profile;
+    });
+
+    // Enrich bookings with room and user data
+    const enrichedBookings = (bookingsData || []).map((booking) => ({
+      ...booking,
+      room: roomsMap[booking.room_id] || null,
+      user: profilesMap[booking.user_id] || null,
+    }));
+
+    setBookings(enrichedBookings);
+    setRooms(roomsMap);
+    setProfilesById(profilesMap);
     setLoading(false);
   }, []);
 
@@ -501,16 +535,22 @@ export default function AdminBookings() {
       // Search filter
       if (searchTerm) {
         const search = searchTerm.toLowerCase();
-        const room = rooms[booking.room_id];
+        const room = booking.room || rooms[booking.room_id];
+        const profile = booking.user || profilesById[booking.user_id];
         const matchesRoom = room?.title?.toLowerCase().includes(search);
-        const matchesGuest = booking.user_full_name?.toLowerCase().includes(search);
+        const matchesGuest =
+          booking.user_full_name?.toLowerCase().includes(search) ||
+          profile?.full_name?.toLowerCase().includes(search);
         const matchesPhone = booking.user_phone?.includes(search);
-        if (!matchesRoom && !matchesGuest && !matchesPhone) return false;
+        const matchesEmail =
+          booking.user_email?.toLowerCase?.().includes(search) ||
+          profile?.email?.toLowerCase?.().includes(search);
+        if (!matchesRoom && !matchesGuest && !matchesPhone && !matchesEmail) return false;
       }
 
       return true;
     });
-  }, [bookings, rooms, searchTerm, statusFilter]);
+  }, [bookings, profilesById, rooms, searchTerm, statusFilter]);
 
   const handleEditSave = useCallback(() => {
     setEditingBooking(null);
@@ -550,7 +590,7 @@ export default function AdminBookings() {
         <div className="flex-1">
           <input
             type="text"
-            placeholder="Search by room, guest name, or phone..."
+            placeholder="Search by room, guest name, email, or phone..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className={`${INPUT_STYLES} w-full`}
@@ -596,7 +636,8 @@ export default function AdminBookings() {
               </thead>
               <tbody>
                 {filteredBookings.map((booking) => {
-                  const room = rooms[booking.room_id];
+                  const room = booking.room || rooms[booking.room_id];
+                  const profile = booking.user || profilesById[booking.user_id];
                   const isPast = new Date(booking.booking_date) < new Date(new Date().toDateString());
                   const statusColor = isPast ? "bg-slate-100 text-slate-600" : "bg-green-50 text-green-700";
                   const statusText = isPast ? "Completed" : "Upcoming";
@@ -619,8 +660,12 @@ export default function AdminBookings() {
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <p className="text-sm font-medium text-ink">{booking.user_full_name || "Guest"}</p>
-                        <p className="text-xs text-muted">{booking.user_phone || "No phone"}</p>
+                        <p className="text-sm font-medium text-ink">
+                          {booking.user_full_name || profile?.full_name || "Guest"}
+                        </p>
+                        <p className="text-xs text-muted">
+                          {profile?.email || booking.user_email || booking.user_phone || "N/A"}
+                        </p>
                       </td>
                       <td className="px-6 py-4">
                         <p className="text-sm text-ink">{formatDate(booking.booking_date)}</p>
@@ -681,14 +726,15 @@ export default function AdminBookings() {
       <ViewBookingModal
         open={!!viewingBooking}
         booking={viewingBooking}
-        room={viewingBooking ? rooms[viewingBooking.room_id] : null}
+        room={viewingBooking ? (viewingBooking.room || rooms[viewingBooking.room_id]) : null}
+        userProfile={viewingBooking ? (viewingBooking.user || profilesById[viewingBooking.user_id]) : null}
         onClose={() => setViewingBooking(null)}
       />
 
       <EditBookingModal
         open={!!editingBooking}
         booking={editingBooking}
-        room={editingBooking ? rooms[editingBooking.room_id] : null}
+        room={editingBooking ? (editingBooking.room || rooms[editingBooking.room_id]) : null}
         onClose={() => setEditingBooking(null)}
         onSave={handleEditSave}
       />
@@ -696,7 +742,7 @@ export default function AdminBookings() {
       <DeleteBookingModal
         open={!!deletingBooking}
         booking={deletingBooking}
-        room={deletingBooking ? rooms[deletingBooking.room_id] : null}
+        room={deletingBooking ? (deletingBooking.room || rooms[deletingBooking.room_id]) : null}
         onClose={() => setDeletingBooking(null)}
         onConfirm={handleDeleteConfirm}
       />

@@ -5,6 +5,7 @@ import Button from "../guest/components/ui/Button.jsx";
 import FormInput from "../guest/components/ui/FormInput.jsx";
 import { useAuth } from "../auth/useAuth.js";
 import { useProfile } from "../auth/useProfile.js";
+import { supabase } from "../lib/supabaseClient.js";
 
 const Auth = React.memo(() => {
   const { session, loading, signIn, signUp } = useAuth();
@@ -23,6 +24,52 @@ const Auth = React.memo(() => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
+
+  const ensureProfileRow = useCallback(
+    async ({ user, isSignUp }) => {
+      if (!supabase || !user?.id) return;
+
+      // Only create a profile if it doesn't exist yet.
+      // Important: do NOT overwrite `user_type` for existing users (admin/user).
+      const { data: existing, error: existingError } = await supabase
+        .from("profiles")
+        .select("id,user_type")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (existingError) {
+        // Non-fatal; the profile screen can still create it later.
+        console.warn("Could not check existing profile:", existingError);
+        return;
+      }
+
+      if (existing?.id) {
+        // Keep email in sync without touching user_type.
+        await supabase
+          .from("profiles")
+          .update({
+            email: user.email ?? null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", user.id);
+        return;
+      }
+
+      await supabase.from("profiles").insert({
+        id: user.id,
+        email: user.email ?? null,
+        full_name:
+          user.user_metadata?.full_name ||
+          user.user_metadata?.name ||
+          user.user_metadata?.display_name ||
+          null,
+        phone: user.phone || user.user_metadata?.phone || null,
+        user_type: isSignUp ? "user" : null,
+        updated_at: new Date().toISOString(),
+      });
+    },
+    []
+  );
 
   useEffect(() => {
     if (!loading && !profileLoading && session) {
@@ -48,14 +95,17 @@ const Auth = React.memo(() => {
       try {
         const authFn = mode === "signup" ? signUp : signIn;
         const result = await authFn({ email, password });
-        
+
+        // Ensure the `profiles` row exists so `user_type` gating works reliably.
+        const authedUser = result?.data?.user || result?.data?.session?.user || null;
+        await ensureProfileRow({ user: authedUser, isSignUp: mode === "signup" });
       } catch (err) {
         setError(err?.message || "Authentication failed.");
       } finally {
         setSubmitting(false);
       }
     },
-    [email, mode, password, signIn, signUp]
+    [email, mode, password, signIn, signUp, ensureProfileRow]
   );
 
   const toggleMode = useCallback(() => {

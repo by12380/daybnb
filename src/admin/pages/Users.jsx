@@ -60,6 +60,10 @@ const ViewUserModal = React.memo(({ open, user, bookings, onClose }) => {
           <h4 className="font-medium text-ink">Account Information</h4>
           <div className="grid gap-2 text-sm">
             <div className="flex justify-between">
+              <span className="text-muted">Role</span>
+              <span className="font-medium text-ink capitalize">{user.user_type || "user"}</span>
+            </div>
+            <div className="flex justify-between">
               <span className="text-muted">User ID</span>
               <span className="font-mono text-xs text-ink">{user.id}</span>
             </div>
@@ -428,6 +432,16 @@ export default function AdminUsers() {
                       <p className="text-sm text-muted">{user.email}</p>
                     </div>
                   </div>
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${
+                      user.user_type === "admin"
+                        ? "bg-purple-50 text-purple-700"
+                        : "bg-slate-100 text-slate-700"
+                    }`}
+                    title="User role"
+                  >
+                    {user.user_type || "user"}
+                  </span>
                 </div>
 
                 <div className="mt-4 flex items-center gap-4 text-sm">
