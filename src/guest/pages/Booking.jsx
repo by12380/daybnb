@@ -6,6 +6,7 @@ import Card from "../components/ui/Card.jsx";
 import Button from "../components/ui/Button.jsx";
 import FormInput, { INPUT_STYLES } from "../components/ui/FormInput.jsx";
 import { DAYTIME_END, DAYTIME_START } from "../utils/constants.js";
+import { formatPrice, calculateTotalPrice } from "../utils/format.js";
 import { useAuth } from "../../auth/useAuth.js";
 import { supabase } from "../../lib/supabaseClient.js";
 
@@ -265,12 +266,22 @@ const Booking = React.memo(() => {
     }
   }, [daytimeEndMinutes, daytimeStartMinutes, endMinutes, startMinutes]);
 
-  const durationText = useMemo(() => {
+  const durationHours = useMemo(() => {
     const minutes = Math.max(0, endMinutes - startMinutes);
-    const hours = minutes / 60;
-    if (!Number.isFinite(hours) || hours <= 0) return "";
-    return `${hours % 1 === 0 ? String(hours) : hours.toFixed(1)} hour${hours === 1 ? "" : "s"}`;
+    return minutes / 60;
   }, [endMinutes, startMinutes]);
+
+  const durationText = useMemo(() => {
+    if (!Number.isFinite(durationHours) || durationHours <= 0) return "";
+    return `${durationHours % 1 === 0 ? String(durationHours) : durationHours.toFixed(1)} hour${durationHours === 1 ? "" : "s"}`;
+  }, [durationHours]);
+
+  // Price calculation
+  const pricePerHour = room?.price_per_hour ?? 0;
+  const totalPrice = useMemo(() => {
+    if (!Number.isFinite(durationHours) || durationHours <= 0) return 0;
+    return calculateTotalPrice(durationHours, pricePerHour);
+  }, [durationHours, pricePerHour]);
 
   const onDateChange = useCallback((_, dateString) => {
     setDate(dateString || "");
@@ -345,6 +356,9 @@ const Booking = React.memo(() => {
         user_email: user.email ?? null,
         user_full_name: fullName?.trim() || null,
         user_phone: phone?.trim() || null,
+        total_price: totalPrice > 0 ? totalPrice : null,
+        price_per_hour: pricePerHour > 0 ? pricePerHour : null,
+        billable_hours: durationHours > 0 ? durationHours : null,
       };
 
       const { data: insertedData, error: insertError } = await supabase
@@ -376,7 +390,7 @@ const Booking = React.memo(() => {
         navigate(bookingId ? `/my-bookings?highlight=${bookingId}` : "/my-bookings");
       }, 1500);
     },
-    [date, dateBookings, endTime, fullName, navigate, phone, roomId, startTime, user?.email, user?.id, validate]
+    [date, dateBookings, durationHours, endTime, fullName, navigate, phone, pricePerHour, roomId, startTime, totalPrice, user?.email, user?.id, validate]
   );
 
   if (loading) {
@@ -435,6 +449,11 @@ const Booking = React.memo(() => {
           <p className="mt-1 text-sm text-muted">
             {room.location} · Up to {room.guests} guests
           </p>
+          {pricePerHour > 0 && (
+            <p className="mt-2 text-lg font-semibold text-brand-700">
+              {formatPrice(pricePerHour)}<span className="text-sm font-normal text-muted">/hour</span>
+            </p>
+          )}
           {tags.length ? (
             <div className="mt-4 flex flex-wrap gap-2">
               {tags.map((tag) => (
@@ -497,7 +516,28 @@ const Booking = React.memo(() => {
             </label>
           </div>
 
-          {durationText ? (
+          {/* Price Breakdown */}
+          {durationText && pricePerHour > 0 ? (
+            <div className="rounded-xl border border-brand-100 bg-brand-50 p-4">
+              <p className="text-sm font-semibold text-ink">Price Breakdown</p>
+              <div className="mt-3 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted">Duration</span>
+                  <span className="font-medium text-ink">{durationText}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted">Hourly Rate</span>
+                  <span className="font-medium text-ink">{formatPrice(pricePerHour)}/hr</span>
+                </div>
+                <div className="border-t border-brand-100 pt-2">
+                  <div className="flex justify-between">
+                    <span className="font-semibold text-ink">Total</span>
+                    <span className="text-lg font-bold text-brand-700">{formatPrice(totalPrice)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : durationText ? (
             <p className="text-xs text-muted">Total time: {durationText}</p>
           ) : null}
 

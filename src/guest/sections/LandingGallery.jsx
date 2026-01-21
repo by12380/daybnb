@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Card from "../components/ui/Card.jsx";
 import Button from "../components/ui/Button.jsx";
+import { formatPrice } from "../utils/format.js";
 import { supabase } from "../../lib/supabaseClient.js";
 
 const RoomCard = React.memo(({ room }) => {
@@ -26,6 +27,11 @@ const RoomCard = React.memo(({ room }) => {
           <span>{room.guests} guests</span>
         </div>
         <p className="text-sm font-semibold text-ink">{room.title}</p>
+        {room.price_per_hour > 0 && (
+          <p className="text-lg font-semibold text-brand-700">
+            {formatPrice(room.price_per_hour)}<span className="text-xs font-normal text-muted">/hour</span>
+          </p>
+        )}
         {tags.length > 0 && (
           <div className="flex flex-wrap gap-2">
             {tags.map((tag) => (

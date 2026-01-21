@@ -6,6 +6,7 @@ import Card from "../components/ui/Card.jsx";
 import Button from "../components/ui/Button.jsx";
 import FormInput, { INPUT_STYLES } from "../components/ui/FormInput.jsx";
 import { DAYTIME_END, DAYTIME_START } from "../utils/constants.js";
+import { formatPrice, calculateTotalPrice } from "../utils/format.js";
 import { useAuth } from "../../auth/useAuth.js";
 import { supabase } from "../../lib/supabaseClient.js";
 
@@ -97,6 +98,11 @@ const BookingCard = React.memo(({ booking, room, onEdit, onCancel, isHighlighted
   const statusBg = isPast ? "bg-slate-100" : "bg-green-50";
   const statusText = isPast ? "Completed" : "Upcoming";
 
+  // Calculate duration for display
+  const startMinutes = parseTimeToMinutes(booking.start_time);
+  const endMinutes = parseTimeToMinutes(booking.end_time);
+  const durationHours = (endMinutes - startMinutes) / 60;
+
   return (
     <Card className={`transition-all ${isHighlighted ? "ring-2 ring-brand-500 ring-offset-2" : ""}`}>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -129,7 +135,26 @@ const BookingCard = React.memo(({ booking, room, onEdit, onCancel, isHighlighted
                   {formatTime(booking.start_time)} - {formatTime(booking.end_time)}
                 </span>
               </div>
+              {durationHours > 0 && (
+                <div>
+                  <span className="text-muted">Duration: </span>
+                  <span className="font-medium text-ink">
+                    {durationHours % 1 === 0 ? durationHours : durationHours.toFixed(1)} hr{durationHours !== 1 ? "s" : ""}
+                  </span>
+                </div>
+              )}
             </div>
+            {/* Price Information */}
+            {booking.total_price != null && booking.total_price > 0 && (
+              <div className="mt-2 flex items-center gap-2">
+                <span className="text-lg font-semibold text-brand-700">{formatPrice(booking.total_price)}</span>
+                {booking.price_per_hour && (
+                  <span className="text-xs text-muted">
+                    ({formatPrice(booking.price_per_hour)}/hr × {booking.billable_hours || durationHours} hrs)
+                  </span>
+                )}
+              </div>
+            )}
             {(booking.user_full_name || booking.user_phone) && (
               <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
                 {booking.user_full_name && <span>Name: {booking.user_full_name}</span>}
@@ -174,6 +199,9 @@ const EditBookingModal = React.memo(({
   const [error, setError] = useState("");
   const [dateBookings, setDateBookings] = useState([]);
   const [loadingBookings, setLoadingBookings] = useState(false);
+
+  // Price calculation
+  const pricePerHour = room?.price_per_hour ?? 0;
 
   useEffect(() => {
     if (booking && open) {
@@ -268,6 +296,22 @@ const EditBookingModal = React.memo(({
     }
   }, [daytimeEndMinutes, endMinutes, startMinutes]);
 
+  // Calculate duration and total price
+  const durationHours = useMemo(() => {
+    const minutes = Math.max(0, endMinutes - startMinutes);
+    return minutes / 60;
+  }, [endMinutes, startMinutes]);
+
+  const totalPrice = useMemo(() => {
+    if (!Number.isFinite(durationHours) || durationHours <= 0) return 0;
+    return calculateTotalPrice(durationHours, pricePerHour);
+  }, [durationHours, pricePerHour]);
+
+  const durationText = useMemo(() => {
+    if (!Number.isFinite(durationHours) || durationHours <= 0) return "";
+    return `${durationHours % 1 === 0 ? String(durationHours) : durationHours.toFixed(1)} hour${durationHours === 1 ? "" : "s"}`;
+  }, [durationHours]);
+
   const handleSave = useCallback(async () => {
     setError("");
 
@@ -300,6 +344,9 @@ const EditBookingModal = React.memo(({
         end_time: endTime,
         user_full_name: fullName.trim() || null,
         user_phone: phone.trim() || null,
+        total_price: totalPrice > 0 ? totalPrice : null,
+        price_per_hour: pricePerHour > 0 ? pricePerHour : null,
+        billable_hours: durationHours > 0 ? durationHours : null,
       })
       .eq("id", booking.id);
 
@@ -311,7 +358,7 @@ const EditBookingModal = React.memo(({
     }
 
     onSave();
-  }, [booking?.id, date, dateBookings, endTime, fullName, onSave, phone, startTime]);
+  }, [booking?.id, date, dateBookings, durationHours, endTime, fullName, onSave, phone, pricePerHour, startTime, totalPrice]);
 
   return (
     <Modal
@@ -388,6 +435,29 @@ const EditBookingModal = React.memo(({
             </select>
           </label>
         </div>
+
+        {/* Price Breakdown */}
+        {durationText && pricePerHour > 0 && (
+          <div className="rounded-xl border border-brand-100 bg-brand-50 p-4">
+            <p className="text-sm font-semibold text-ink">Price Breakdown</p>
+            <div className="mt-3 space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted">Duration</span>
+                <span className="font-medium text-ink">{durationText}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted">Hourly Rate</span>
+                <span className="font-medium text-ink">{formatPrice(pricePerHour)}/hr</span>
+              </div>
+              <div className="border-t border-brand-100 pt-2">
+                <div className="flex justify-between">
+                  <span className="font-semibold text-ink">Total</span>
+                  <span className="text-lg font-bold text-brand-700">{formatPrice(totalPrice)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="grid gap-3 sm:grid-cols-2">
           <FormInput
