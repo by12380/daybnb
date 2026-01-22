@@ -110,6 +110,21 @@ export default function GuestNavbar() {
                       </svg>
                       My Bookings
                     </Link>
+                    <Link
+                      to="/liked-rooms"
+                      onClick={() => setDropdownOpen(false)}
+                      className="flex items-center gap-3 px-4 py-2.5 text-sm text-ink transition hover:bg-slate-50"
+                    >
+                      <svg className="h-5 w-5 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={1.5}
+                          d="M11.995 21s-7.5-4.35-9.77-8.78C.71 9.29 2.02 6.4 4.86 5.57c1.64-.48 3.41.02 4.65 1.27l2.49 2.52 2.49-2.52c1.24-1.25 3.01-1.75 4.65-1.27 2.84.83 4.15 3.72 2.63 6.65C19.495 16.65 11.995 21 11.995 21z"
+                        />
+                      </svg>
+                      Liked Rooms
+                    </Link>
                     {isAdmin && (
                       <Link
                         to="/admin"

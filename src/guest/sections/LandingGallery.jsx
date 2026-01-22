@@ -1,64 +1,21 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Card from "../components/ui/Card.jsx";
-import Button from "../components/ui/Button.jsx";
-import { formatPrice } from "../utils/format.js";
 import { supabase } from "../../lib/supabaseClient.js";
-
-const RoomCard = React.memo(({ room }) => {
-  const navigate = useNavigate();
-
-  // Handle tags - could be array or null from Supabase
-  const tags = room.tags || [];
-
-  return (
-    <Card className="overflow-hidden p-0">
-      {room.image && (
-        <img
-          src={room.image}
-          alt={room.title}
-          className="h-48 w-full object-cover"
-          loading="lazy"
-        />
-      )}
-      <div className="space-y-2 p-4">
-        <div className="flex items-center justify-between text-xs text-muted">
-          <span>{room.location}</span>
-          <span>{room.guests} guests</span>
-        </div>
-        <p className="text-sm font-semibold text-ink">{room.title}</p>
-        {room.price_per_hour > 0 && (
-          <p className="text-lg font-semibold text-brand-700">
-            {formatPrice(room.price_per_hour)}<span className="text-xs font-normal text-muted">/hour</span>
-          </p>
-        )}
-        {tags.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {tags.map((tag) => (
-              <span
-                key={tag}
-                className="rounded-full border border-border bg-white px-2 py-0.5 text-[11px] text-muted"
-              >
-                {tag}
-              </span>
-            ))}
-          </div>
-        )}
-        <Button
-          onClick={() => navigate(`/book/${room.id}`)}
-          className="mt-2 w-full"
-        >
-          Book Now
-        </Button>
-      </div>
-    </Card>
-  );
-});
+import { useAuth } from "../../auth/useAuth.js";
+import RoomCard from "../components/RoomCard.jsx";
+import { fetchLikedRoomIds, likeRoom, unlikeRoom } from "../utils/roomLikes.js";
+import { fetchRatingsForRooms } from "../utils/roomReviews.js";
 
 const LandingGallery = React.memo(({ location = "", guests = 0 }) => {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [likedIds, setLikedIds] = useState(() => new Set());
+  const [ratingsByRoomId, setRatingsByRoomId] = useState({});
 
   // Fetch rooms from Supabase
   useEffect(() => {
@@ -105,6 +62,58 @@ const LandingGallery = React.memo(({ location = "", guests = 0 }) => {
     };
   }, []);
 
+  // Fetch current user's liked room ids
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadLikes() {
+      if (!user?.id || !supabase) {
+        setLikedIds(new Set());
+        return;
+      }
+
+      try {
+        const set = await fetchLikedRoomIds(user.id);
+        if (!cancelled) setLikedIds(set);
+      } catch (e) {
+        // Non-blocking
+        console.warn("Failed to load likes:", e);
+      }
+    }
+
+    loadLikes();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
+
+  // Fetch ratings summaries for the rooms we display
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadRatings() {
+      if (!supabase) return;
+      const ids = (rooms || []).map((r) => r.id).filter(Boolean);
+      if (!ids.length) {
+        setRatingsByRoomId({});
+        return;
+      }
+
+      try {
+        const map = await fetchRatingsForRooms(ids);
+        if (!cancelled) setRatingsByRoomId(map || {});
+      } catch (e) {
+        // Non-blocking
+        console.warn("Failed to load ratings:", e);
+      }
+    }
+
+    loadRatings();
+    return () => {
+      cancelled = true;
+    };
+  }, [rooms]);
+
   // Filter rooms based on search params
   const items = useMemo(() => {
     const locationQuery = location.toLowerCase().trim();
@@ -119,6 +128,38 @@ const LandingGallery = React.memo(({ location = "", guests = 0 }) => {
       return matchesLocation && matchesGuests;
     });
   }, [rooms, location, guests]);
+
+  const toggleLike = async (room) => {
+    if (!room?.id) return;
+    if (!user?.id) {
+      navigate("/auth");
+      return;
+    }
+
+    const isLiked = likedIds.has(room.id);
+
+    // optimistic update
+    setLikedIds((prev) => {
+      const next = new Set(prev);
+      if (isLiked) next.delete(room.id);
+      else next.add(room.id);
+      return next;
+    });
+
+    try {
+      if (isLiked) await unlikeRoom({ userId: user.id, roomId: room.id });
+      else await likeRoom({ userId: user.id, roomId: room.id });
+    } catch (e) {
+      // revert on failure
+      setLikedIds((prev) => {
+        const next = new Set(prev);
+        if (isLiked) next.add(room.id);
+        else next.delete(room.id);
+        return next;
+      });
+      console.warn("Failed to toggle like:", e);
+    }
+  };
 
   return (
     <div>
@@ -154,7 +195,20 @@ const LandingGallery = React.memo(({ location = "", guests = 0 }) => {
             </p>
           </Card>
         ) : (
-          items.map((room) => <RoomCard key={room.id} room={room} />)
+          items.map((room) => {
+            const rating = ratingsByRoomId?.[room.id] || { avg: 0, count: 0 };
+            return (
+              <RoomCard
+                key={room.id}
+                room={room}
+                liked={likedIds.has(room.id)}
+                onToggleLike={toggleLike}
+                ratingAvg={rating.avg}
+                ratingCount={rating.count}
+                showLike
+              />
+            );
+          })
         )}
       </div>
     </div>

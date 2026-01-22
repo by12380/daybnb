@@ -7,6 +7,7 @@ import Auth from "../pages/Auth.jsx";
 import Booking from "../guest/pages/Booking.jsx";
 import Profile from "../guest/pages/Profile.jsx";
 import MyBookings from "../guest/pages/MyBookings.jsx";
+import LikedRooms from "../guest/pages/LikedRooms.jsx";
 import RequireAuth from "../auth/RequireAuth.jsx";
 import RequireAdmin from "../auth/RequireAdmin.jsx";
 
@@ -33,6 +34,7 @@ export default function AppRouter() {
             <Route path="/book/:roomId" element={<Booking />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/my-bookings" element={<MyBookings />} />
+            <Route path="/liked-rooms" element={<LikedRooms />} />
           </Route>
         </Route>
         <Route element={<MainLayout />}>

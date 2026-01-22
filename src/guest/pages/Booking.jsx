@@ -5,16 +5,19 @@ import dayjs from "dayjs";
 import Card from "../components/ui/Card.jsx";
 import Button from "../components/ui/Button.jsx";
 import FormInput, { INPUT_STYLES } from "../components/ui/FormInput.jsx";
+import { StarsDisplay, StarsInput } from "../components/ui/Stars.jsx";
 import { DAYTIME_END, DAYTIME_START } from "../utils/constants.js";
 import { formatPrice, calculateTotalPrice } from "../utils/format.js";
 import { useAuth } from "../../auth/useAuth.js";
 import { supabase } from "../../lib/supabaseClient.js";
+import { fetchReviewsForRoom, upsertRoomReview } from "../utils/roomReviews.js";
 
 const FALLBACK_IMAGE =
   "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=60";
 
 const TIME_STEP_MINUTES = 30;
 const BOOKINGS_TABLE = "bookings";
+const ROOM_REVIEWS_TABLE = "room_reviews";
 
 function normalizeTags(value, type) {
   if (Array.isArray(value)) return value.map(String).filter(Boolean);
@@ -115,6 +118,17 @@ const Booking = React.memo(() => {
   const [dateBookings, setDateBookings] = useState([]);
   const [loadingBookings, setLoadingBookings] = useState(false);
 
+  // Reviews state
+  const [reviews, setReviews] = useState([]);
+  const [loadingReviews, setLoadingReviews] = useState(false);
+  const [reviewsError, setReviewsError] = useState("");
+  const [canReview, setCanReview] = useState(false);
+  const [latestPastBookingId, setLatestPastBookingId] = useState(null);
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewNote, setReviewNote] = useState("");
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [reviewSuccess, setReviewSuccess] = useState("");
+
   useEffect(() => {
     let cancelled = false;
 
@@ -162,6 +176,86 @@ const Booking = React.memo(() => {
       cancelled = true;
     };
   }, [roomId]);
+
+  // Load reviews for this room
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadRoomReviews() {
+      setReviewsError("");
+      setReviewSuccess("");
+
+      if (!roomId || !supabase) {
+        setReviews([]);
+        return;
+      }
+
+      setLoadingReviews(true);
+      try {
+        const rows = await fetchReviewsForRoom(roomId);
+        if (!cancelled) setReviews(rows || []);
+      } catch (e) {
+        if (!cancelled) setReviewsError(e.message || "Failed to load reviews.");
+      } finally {
+        if (!cancelled) setLoadingReviews(false);
+      }
+    }
+
+    loadRoomReviews();
+    return () => {
+      cancelled = true;
+    };
+  }, [roomId]);
+
+  // Determine if the current user can review this room (must have a past booking)
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadReviewEligibility() {
+      setCanReview(false);
+      setLatestPastBookingId(null);
+
+      if (!supabase || !roomId || !user?.id) return;
+
+      const today = dayjs().format("YYYY-MM-DD");
+
+      const { data, error: qErr } = await supabase
+        .from(BOOKINGS_TABLE)
+        .select("id, booking_date")
+        .eq("room_id", roomId)
+        .eq("user_id", user.id)
+        .lt("booking_date", today)
+        .order("booking_date", { ascending: false })
+        .limit(1);
+
+      if (cancelled) return;
+      if (qErr) return;
+
+      const past = (data || [])[0];
+      if (past?.id) {
+        setCanReview(true);
+        setLatestPastBookingId(past.id);
+
+        // Prefill if user already reviewed this room
+        const { data: existing, error: existingErr } = await supabase
+          .from(ROOM_REVIEWS_TABLE)
+          .select("rating, note")
+          .eq("room_id", roomId)
+          .eq("user_id", user.id)
+          .maybeSingle();
+
+        if (!cancelled && !existingErr && existing) {
+          setReviewRating(Number(existing.rating) || 0);
+          setReviewNote(existing.note || "");
+        }
+      }
+    }
+
+    loadReviewEligibility();
+    return () => {
+      cancelled = true;
+    };
+  }, [roomId, user?.id]);
 
   useEffect(() => {
     // Prefill from Supabase user metadata where possible.
@@ -303,6 +397,81 @@ const Booking = React.memo(() => {
 
   const onFullNameChange = useCallback((e) => setFullName(e.target.value), []);
   const onPhoneChange = useCallback((e) => setPhone(e.target.value), []);
+
+  const ratingSummary = useMemo(() => {
+    const count = (reviews || []).length;
+    if (!count) return { avg: 0, count: 0 };
+    const sum = (reviews || []).reduce((acc, r) => acc + (Number(r.rating) || 0), 0);
+    return { avg: sum / count, count };
+  }, [reviews]);
+
+  const onSubmitReview = useCallback(
+    async (e) => {
+      e.preventDefault();
+      setReviewsError("");
+      setReviewSuccess("");
+
+      if (!user?.id) {
+        setReviewsError("You must be signed in to leave a review.");
+        return;
+      }
+
+      if (!canReview) {
+        setReviewsError("You can leave a review after you’ve completed a booking for this room.");
+        return;
+      }
+
+      const rating = Number(reviewRating);
+      if (!Number.isFinite(rating) || rating < 1 || rating > 5) {
+        setReviewsError("Please select a star rating (1–5).");
+        return;
+      }
+
+      if (!supabase) {
+        setReviewsError(
+          "Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY."
+        );
+        return;
+      }
+
+      const nameFromMeta =
+        user?.user_metadata?.full_name ||
+        user?.user_metadata?.name ||
+        user?.user_metadata?.display_name ||
+        null;
+
+      setReviewSubmitting(true);
+      try {
+        await upsertRoomReview({
+          room_id: roomId,
+          user_id: user.id,
+          booking_id: latestPastBookingId,
+          user_email: user.email ?? null,
+          user_full_name: nameFromMeta ? String(nameFromMeta) : null,
+          rating,
+          note: reviewNote?.trim() || null,
+        });
+
+        const rows = await fetchReviewsForRoom(roomId);
+        setReviews(rows || []);
+        setReviewSuccess("Thanks! Your review has been saved.");
+      } catch (err) {
+        const message = err?.message || "Failed to save review.";
+        const hint =
+          message?.toLowerCase?.().includes("does not exist") ||
+          message?.toLowerCase?.().includes("not found")
+            ? `\n\nCreate a \`${ROOM_REVIEWS_TABLE}\` table with columns: room_id (uuid/text), user_id (uuid/text), booking_id (uuid/text, optional), rating (int), note (text, optional), user_email (text), user_full_name (text), created_at (timestamptz). Add a UNIQUE constraint on (user_id, room_id).`
+            : message?.toLowerCase?.().includes("row level security") ||
+                message?.toLowerCase?.().includes("rls")
+              ? `\n\nIf RLS is enabled, add INSERT/UPDATE/SELECT policies to \`${ROOM_REVIEWS_TABLE}\` for authenticated users.`
+              : "";
+        setReviewsError(`${message}${hint}`);
+      } finally {
+        setReviewSubmitting(false);
+      }
+    },
+    [canReview, latestPastBookingId, reviewNote, reviewRating, roomId, user?.email, user?.id, user?.user_metadata]
+  );
 
   const validate = useCallback(() => {
     if (!roomId) return "Missing room id.";
@@ -449,6 +618,9 @@ const Booking = React.memo(() => {
           <p className="mt-1 text-sm text-muted">
             {room.location} · Up to {room.guests} guests
           </p>
+          <div className="mt-3">
+            <StarsDisplay value={ratingSummary.avg} count={ratingSummary.count} />
+          </div>
           {pricePerHour > 0 && (
             <p className="mt-2 text-lg font-semibold text-brand-700">
               {formatPrice(pricePerHour)}<span className="text-sm font-normal text-muted">/hour</span>
@@ -576,6 +748,89 @@ const Booking = React.memo(() => {
             </Button>
           </div>
         </form>
+      </Card>
+
+      <Card className="md:col-span-5">
+        <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-ink">Reviews</p>
+            <p className="mt-1 text-sm text-muted">
+              What guests are saying about <span className="font-medium text-ink">{room.title}</span>
+            </p>
+
+            <div className="mt-3">
+              <StarsDisplay value={ratingSummary.avg} count={ratingSummary.count} />
+            </div>
+
+            {loadingReviews ? (
+              <p className="mt-4 text-sm text-muted">Loading reviews…</p>
+            ) : reviewsError ? (
+              <p className="mt-4 whitespace-pre-wrap text-sm text-red-600">{reviewsError}</p>
+            ) : reviews.length === 0 ? (
+              <p className="mt-4 text-sm text-muted">No reviews yet. Be the first to review this room.</p>
+            ) : (
+              <div className="mt-4 space-y-4">
+                {reviews.map((r) => (
+                  <div key={r.id} className="rounded-2xl border border-border bg-white p-4">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="text-sm font-semibold text-ink">
+                          {r.user_full_name || r.user_email || "Guest"}
+                        </p>
+                        <p className="text-xs text-muted">
+                          {r.created_at ? new Date(r.created_at).toLocaleDateString() : ""}
+                        </p>
+                      </div>
+                      <StarsDisplay value={Number(r.rating) || 0} className="sm:justify-end" />
+                    </div>
+                    {r.note ? (
+                      <p className="mt-3 whitespace-pre-wrap text-sm text-ink/90">{r.note}</p>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="w-full md:w-[360px]">
+            <p className="text-sm font-semibold text-ink">Leave a review</p>
+            <p className="mt-1 text-sm text-muted">
+              {canReview
+                ? "Rate your completed stay and add a note."
+                : "You can review after you’ve completed a booking for this room."}
+            </p>
+
+            <form className="mt-4 space-y-3" onSubmit={onSubmitReview}>
+              <div className="rounded-2xl border border-border bg-slate-50 p-3">
+                <p className="text-xs font-medium text-muted">Your rating</p>
+                <StarsInput
+                  value={reviewRating}
+                  onChange={setReviewRating}
+                  disabled={!canReview || reviewSubmitting}
+                  size="lg"
+                  className="mt-1"
+                />
+              </div>
+
+              <label className="flex flex-col gap-2">
+                <span className="text-xs font-medium text-muted">Note (optional)</span>
+                <textarea
+                  className={`${INPUT_STYLES} min-h-[96px] resize-none`}
+                  value={reviewNote}
+                  onChange={(e) => setReviewNote(e.target.value)}
+                  disabled={!canReview || reviewSubmitting}
+                  placeholder="Share what you liked (or what could be improved)…"
+                />
+              </label>
+
+              {reviewSuccess ? <p className="text-sm text-green-700">{reviewSuccess}</p> : null}
+
+              <Button type="submit" disabled={!canReview || reviewSubmitting}>
+                {reviewSubmitting ? "Saving…" : "Submit review"}
+              </Button>
+            </form>
+          </div>
+        </div>
       </Card>
     </div>
   );
