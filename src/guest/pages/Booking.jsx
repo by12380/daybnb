@@ -9,6 +9,8 @@ import { DAYTIME_END, DAYTIME_START } from "../utils/constants.js";
 import { formatPrice, calculateTotalPrice } from "../utils/format.js";
 import { useAuth } from "../../auth/useAuth.js";
 import { supabase } from "../../lib/supabaseClient.js";
+import { useReviews } from "../hooks/useReviews.js";
+import { useLikedRooms } from "../hooks/useLikedRooms.js";
 
 const FALLBACK_IMAGE =
   "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=60";
@@ -94,10 +96,323 @@ function isTimeSlotOverlapping(existingBookings, startMinutes, endMinutes) {
   return false;
 }
 
+// Star Rating Display Component
+const StarRatingDisplay = React.memo(({ rating, size = "md" }) => {
+  const fullStars = Math.floor(rating);
+  const hasHalfStar = rating % 1 >= 0.5;
+  const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
+
+  const starSize = size === "sm" ? "h-4 w-4" : size === "lg" ? "h-6 w-6" : "h-5 w-5";
+
+  return (
+    <div className="flex">
+      {[...Array(fullStars)].map((_, i) => (
+        <svg
+          key={`full-${i}`}
+          className={`${starSize} text-yellow-400`}
+          fill="currentColor"
+          viewBox="0 0 20 20"
+        >
+          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+        </svg>
+      ))}
+      {hasHalfStar && (
+        <svg className={`${starSize} text-yellow-400`} fill="currentColor" viewBox="0 0 20 20">
+          <defs>
+            <linearGradient id="halfStarBooking">
+              <stop offset="50%" stopColor="currentColor" />
+              <stop offset="50%" stopColor="#D1D5DB" />
+            </linearGradient>
+          </defs>
+          <path
+            fill="url(#halfStarBooking)"
+            d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"
+          />
+        </svg>
+      )}
+      {[...Array(emptyStars)].map((_, i) => (
+        <svg
+          key={`empty-${i}`}
+          className={`${starSize} text-gray-300`}
+          fill="currentColor"
+          viewBox="0 0 20 20"
+        >
+          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+        </svg>
+      ))}
+    </div>
+  );
+});
+
+// Interactive Star Rating Input Component
+const StarRatingInput = React.memo(({ value, onChange, disabled }) => {
+  const [hoverValue, setHoverValue] = useState(0);
+
+  return (
+    <div className="flex gap-1">
+      {[1, 2, 3, 4, 5].map((star) => (
+        <button
+          key={star}
+          type="button"
+          disabled={disabled}
+          onClick={() => onChange(star)}
+          onMouseEnter={() => setHoverValue(star)}
+          onMouseLeave={() => setHoverValue(0)}
+          className={`transition-transform ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer hover:scale-110"}`}
+        >
+          <svg
+            className={`h-8 w-8 ${
+              (hoverValue || value) >= star ? "text-yellow-400" : "text-gray-300"
+            }`}
+            fill="currentColor"
+            viewBox="0 0 20 20"
+          >
+            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+          </svg>
+        </button>
+      ))}
+    </div>
+  );
+});
+
+// Like Button Component for Room
+const LikeButton = React.memo(({ isLiked, onClick }) => {
+  return (
+    <button
+      onClick={onClick}
+      className="rounded-full border border-border bg-white p-2 shadow-sm transition-all hover:scale-105 hover:shadow-md"
+      aria-label={isLiked ? "Remove from favorites" : "Add to favorites"}
+    >
+      <svg
+        className={`h-5 w-5 transition-colors ${
+          isLiked ? "fill-red-500 text-red-500" : "fill-transparent text-gray-600"
+        }`}
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={2}
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+        />
+      </svg>
+    </button>
+  );
+});
+
+// Review Form Component
+const ReviewForm = React.memo(({ roomId, userReview, onSubmit, submitting }) => {
+  const [rating, setRating] = useState(userReview?.rating || 0);
+  const [comment, setComment] = useState(userReview?.note || "");
+  const [localError, setLocalError] = useState("");
+  const [localSuccess, setLocalSuccess] = useState("");
+
+  useEffect(() => {
+    if (userReview) {
+      setRating(userReview.rating || 0);
+      setComment(userReview.note || "");
+    }
+  }, [userReview]);
+
+  const handleSubmit = useCallback(
+    async (e) => {
+      e.preventDefault();
+      setLocalError("");
+      setLocalSuccess("");
+
+      if (rating === 0) {
+        setLocalError("Please select a star rating.");
+        return;
+      }
+
+      const result = await onSubmit({ rating, comment });
+
+      if (result.error) {
+        setLocalError(result.error);
+      } else {
+        setLocalSuccess(userReview ? "Review updated successfully!" : "Review submitted successfully!");
+        setTimeout(() => setLocalSuccess(""), 3000);
+      }
+    },
+    [rating, comment, onSubmit, userReview]
+  );
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <label className="mb-2 block text-sm font-medium text-ink">
+          {userReview ? "Update your rating" : "Rate this room"}
+        </label>
+        <StarRatingInput value={rating} onChange={setRating} disabled={submitting} />
+      </div>
+
+      <div>
+        <label className="mb-2 block text-sm font-medium text-ink">
+          {userReview ? "Update your review (optional)" : "Write a review (optional)"}
+        </label>
+        <textarea
+          value={comment}
+          onChange={(e) => setComment(e.target.value)}
+          placeholder="Share your experience with this room..."
+          rows={3}
+          disabled={submitting}
+          className={`${INPUT_STYLES} resize-none`}
+        />
+      </div>
+
+      {localError && <p className="text-sm text-red-600">{localError}</p>}
+      {localSuccess && <p className="text-sm text-green-600">{localSuccess}</p>}
+
+      <Button type="submit" disabled={submitting || rating === 0} className="w-full">
+        {submitting ? "Saving..." : userReview ? "Update Review" : "Submit Review"}
+      </Button>
+    </form>
+  );
+});
+
+// Single Review Card Component
+const ReviewCard = React.memo(({ review }) => {
+  const formattedDate = new Date(review.created_at).toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+
+  const initial = review.user_full_name?.[0]?.toUpperCase() || "U";
+
+  return (
+    <div className="rounded-xl border border-border bg-white p-4">
+      <div className="flex items-start justify-between">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-accent-500 text-sm font-semibold text-white">
+            {initial}
+          </div>
+          <div>
+            <p className="font-medium text-ink">{review.user_full_name || "Anonymous"}</p>
+            <p className="text-xs text-muted">{formattedDate}</p>
+          </div>
+        </div>
+        <StarRatingDisplay rating={review.rating} size="sm" />
+      </div>
+      {review.note && (
+        <p className="mt-3 text-sm text-muted">{review.note}</p>
+      )}
+    </div>
+  );
+});
+
+// Reviews Section Component
+const ReviewsSection = React.memo(({ roomId, user }) => {
+  const {
+    reviews,
+    loading,
+    averageRating,
+    reviewCount,
+    userReview,
+    submitReview,
+  } = useReviews(roomId);
+  const [submitting, setSubmitting] = useState(false);
+  const [showAllReviews, setShowAllReviews] = useState(false);
+
+  const handleSubmitReview = useCallback(
+    async (data) => {
+      setSubmitting(true);
+      const result = await submitReview(data);
+      setSubmitting(false);
+      return result;
+    },
+    [submitReview]
+  );
+
+  const displayedReviews = showAllReviews ? reviews : reviews.slice(0, 3);
+
+  return (
+    <Card className="mt-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm font-semibold text-ink">Reviews</p>
+          {reviewCount > 0 && (
+            <div className="mt-1 flex items-center gap-2">
+              <StarRatingDisplay rating={averageRating} size="sm" />
+              <span className="text-sm font-medium text-ink">
+                {averageRating.toFixed(1)}
+              </span>
+              <span className="text-sm text-muted">({reviewCount} review{reviewCount !== 1 ? "s" : ""})</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Review Form - Only show for authenticated users */}
+      {user && (
+        <div className="mt-4 border-t border-border pt-4">
+          <ReviewForm
+            roomId={roomId}
+            userReview={userReview}
+            onSubmit={handleSubmitReview}
+            submitting={submitting}
+          />
+        </div>
+      )}
+
+      {/* Reviews List */}
+      {loading ? (
+        <p className="mt-4 text-sm text-muted">Loading reviews...</p>
+      ) : reviews.length === 0 ? (
+        <div className="mt-4 rounded-xl border border-dashed border-border bg-slate-50 p-6 text-center">
+          <svg
+            className="mx-auto h-8 w-8 text-muted"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.5}
+              d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"
+            />
+          </svg>
+          <p className="mt-2 text-sm font-medium text-ink">No reviews yet</p>
+          <p className="text-xs text-muted">Be the first to review this room!</p>
+        </div>
+      ) : (
+        <div className="mt-4 space-y-3">
+          {displayedReviews.map((review) => (
+            <ReviewCard key={review.id} review={review} />
+          ))}
+          
+          {reviews.length > 3 && !showAllReviews && (
+            <button
+              onClick={() => setShowAllReviews(true)}
+              className="w-full rounded-xl border border-border py-2 text-sm font-medium text-brand-600 transition hover:bg-brand-50"
+            >
+              Show all {reviews.length} reviews
+            </button>
+          )}
+          
+          {showAllReviews && reviews.length > 3 && (
+            <button
+              onClick={() => setShowAllReviews(false)}
+              className="w-full rounded-xl border border-border py-2 text-sm font-medium text-muted transition hover:bg-slate-50"
+            >
+              Show less
+            </button>
+          )}
+        </div>
+      )}
+    </Card>
+  );
+});
+
 const Booking = React.memo(() => {
   const { roomId } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
+  
+  // Like functionality
+  const { isLiked, toggleLike } = useLikedRooms();
 
   const [room, setRoom] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -434,40 +749,58 @@ const Booking = React.memo(() => {
 
   return (
     <div className="grid gap-4 md:grid-cols-5">
-      <Card className="md:col-span-3 overflow-hidden p-0">
-        <img
-          src={room.image || FALLBACK_IMAGE}
-          alt={room.title}
-          className="h-56 w-full object-cover"
-          loading="lazy"
-        />
-        <div className="p-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-700">
-            Booking
-          </p>
-          <h1 className="mt-2 text-2xl font-semibold text-ink">{room.title}</h1>
-          <p className="mt-1 text-sm text-muted">
-            {room.location} · Up to {room.guests} guests
-          </p>
-          {pricePerHour > 0 && (
-            <p className="mt-2 text-lg font-semibold text-brand-700">
-              {formatPrice(pricePerHour)}<span className="text-sm font-normal text-muted">/hour</span>
-            </p>
-          )}
-          {tags.length ? (
-            <div className="mt-4 flex flex-wrap gap-2">
-              {tags.map((tag) => (
-                <span
-                  key={tag}
-                  className="rounded-full border border-border bg-white px-2 py-0.5 text-[11px] text-muted"
-                >
-                  {tag}
-                </span>
-              ))}
+      <div className="md:col-span-3 space-y-4">
+        <Card className="overflow-hidden p-0">
+          <div className="relative">
+            <img
+              src={room.image || FALLBACK_IMAGE}
+              alt={room.title}
+              className="h-56 w-full object-cover"
+              loading="lazy"
+            />
+            {/* Like button on image */}
+            <div className="absolute right-3 top-3">
+              <LikeButton
+                isLiked={isLiked(roomId)}
+                onClick={() => toggleLike(roomId)}
+              />
             </div>
-          ) : null}
-        </div>
-      </Card>
+          </div>
+          <div className="p-6">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-700">
+                  Booking
+                </p>
+                <h1 className="mt-2 text-2xl font-semibold text-ink">{room.title}</h1>
+              </div>
+            </div>
+            <p className="mt-1 text-sm text-muted">
+              {room.location} · Up to {room.guests} guests
+            </p>
+            {pricePerHour > 0 && (
+              <p className="mt-2 text-lg font-semibold text-brand-700">
+                {formatPrice(pricePerHour)}<span className="text-sm font-normal text-muted">/hour</span>
+              </p>
+            )}
+            {tags.length ? (
+              <div className="mt-4 flex flex-wrap gap-2">
+                {tags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="rounded-full border border-border bg-white px-2 py-0.5 text-[11px] text-muted"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        </Card>
+        
+        {/* Reviews Section */}
+        <ReviewsSection roomId={roomId} user={user} />
+      </div>
 
       <Card className="md:col-span-2">
         <p className="text-sm font-semibold text-ink">Book your daytime stay</p>

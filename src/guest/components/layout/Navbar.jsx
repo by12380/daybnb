@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../../auth/useAuth.js";
+import { useLikedRooms } from "../../hooks/useLikedRooms.js";
 import Button from "../ui/Button.jsx";
 
 export default function GuestNavbar() {
   const { user, loading, signOut } = useAuth();
+  const { count: likedCount } = useLikedRooms();
   const navigate = useNavigate();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
@@ -55,6 +57,29 @@ export default function GuestNavbar() {
         <nav className="flex items-center gap-3 text-sm text-muted">
           <Link to="/" className="rounded-full px-3 py-1.5 hover:text-brand-600">
             Browse
+          </Link>
+          <Link to="/liked-rooms" className="relative rounded-full px-3 py-1.5 hover:text-brand-600">
+            <span className="flex items-center gap-1">
+              <svg
+                className="h-4 w-4"
+                fill={likedCount > 0 ? "currentColor" : "none"}
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+                />
+              </svg>
+              Favorites
+              {likedCount > 0 && (
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-medium text-white">
+                  {likedCount > 9 ? "9+" : likedCount}
+                </span>
+              )}
+            </span>
           </Link>
           <a href="#how-it-works" className="rounded-full px-3 py-1.5 hover:text-brand-600">
             How it works
@@ -107,6 +132,21 @@ export default function GuestNavbar() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                       </svg>
                       My Bookings
+                    </Link>
+                    <Link
+                      to="/liked-rooms"
+                      onClick={() => setDropdownOpen(false)}
+                      className="flex items-center gap-3 px-4 py-2.5 text-sm text-ink transition hover:bg-slate-50"
+                    >
+                      <svg className="h-5 w-5 text-red-400" fill="currentColor" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                      </svg>
+                      Liked Rooms
+                      {likedCount > 0 && (
+                        <span className="ml-auto rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-600">
+                          {likedCount}
+                        </span>
+                      )}
                     </Link>
                   </div>
 
