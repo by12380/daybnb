@@ -49,7 +49,10 @@ function buildTimeOptions({ start, end, stepMinutes }) {
 
 function formatDate(dateStr) {
   if (!dateStr) return "N/A";
-  return new Date(dateStr).toLocaleDateString("en-US", {
+  // Parse date parts directly to avoid timezone conversion
+  const [year, month, day] = dateStr.split("-").map(Number);
+  const date = new Date(year, month - 1, day); // month is 0-indexed
+  return date.toLocaleDateString("en-US", {
     weekday: "short",
     year: "numeric",
     month: "short",
@@ -65,7 +68,10 @@ function formatTime(timeStr) {
 const ViewBookingModal = React.memo(({ open, booking, room, userProfile, onClose }) => {
   if (!booking) return null;
 
-  const isPast = new Date(booking.booking_date) < new Date(new Date().toDateString());
+  // Use local date for comparison (YYYY-MM-DD format)
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const isPast = booking.booking_date < today;
   const statusColor = isPast ? "bg-slate-100 text-slate-600" : "bg-green-50 text-green-700";
   const statusText = isPast ? "Completed" : "Upcoming";
 
@@ -525,13 +531,14 @@ export default function AdminBookings() {
   }, [fetchBookings]);
 
   const filteredBookings = useMemo(() => {
-    const today = new Date().toISOString().split("T")[0];
+    // Use local date for comparison (YYYY-MM-DD format)
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 
     return bookings.filter((booking) => {
       // Status filter
       if (statusFilter === "upcoming" && booking.booking_date < today) return false;
       if (statusFilter === "completed" && booking.booking_date >= today) return false;
-
       // Search filter
       if (searchTerm) {
         const search = searchTerm.toLowerCase();
@@ -638,9 +645,14 @@ export default function AdminBookings() {
                 {filteredBookings.map((booking) => {
                   const room = booking.room || rooms[booking.room_id];
                   const profile = booking.user || profilesById[booking.user_id];
-                  const isPast = new Date(booking.booking_date) < new Date(new Date().toDateString());
+                  // Use local date for comparison (YYYY-MM-DD format)
+                  const now = new Date();
+                  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+                  const isPast = booking.booking_date < todayStr;
                   const statusColor = isPast ? "bg-slate-100 text-slate-600" : "bg-green-50 text-green-700";
                   const statusText = isPast ? "Completed" : "Upcoming";
+
+                  console.log(booking.booking_date);
 
                   return (
                     <tr key={booking.id} className="border-b border-border last:border-0 hover:bg-slate-50">

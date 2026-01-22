@@ -175,6 +175,8 @@ const RoomFormModal = React.memo(({ open, room, onClose, onSave, isNew }) => {
 
     let result;
     if (isNew) {
+      // Generate UUID for new rooms
+      roomData.id = crypto.randomUUID();
       result = await supabase.from("rooms").insert([roomData]).select().single();
     } else {
       result = await supabase
@@ -216,7 +218,7 @@ const RoomFormModal = React.memo(({ open, room, onClose, onSave, isNew }) => {
           label="Location"
           value={location}
           onChange={(e) => setLocation(e.target.value)}
-          placeholder="e.g., Goa, India"
+          placeholder="e.g., Washington"
         />
 
         <div className="grid gap-4 sm:grid-cols-2">
