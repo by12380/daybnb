@@ -122,8 +122,6 @@ const Booking = React.memo(() => {
   const [reviews, setReviews] = useState([]);
   const [loadingReviews, setLoadingReviews] = useState(false);
   const [reviewsError, setReviewsError] = useState("");
-  const [canReview, setCanReview] = useState(false);
-  const [latestPastBookingId, setLatestPastBookingId] = useState(null);
   const [reviewRating, setReviewRating] = useState(0);
   const [reviewNote, setReviewNote] = useState("");
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
@@ -207,51 +205,26 @@ const Booking = React.memo(() => {
     };
   }, [roomId]);
 
-  // Determine if the current user can review this room (must have a past booking)
+  // Prefill if user already reviewed this room
   useEffect(() => {
     let cancelled = false;
 
-    async function loadReviewEligibility() {
-      setCanReview(false);
-      setLatestPastBookingId(null);
-
+    async function loadExistingReview() {
       if (!supabase || !roomId || !user?.id) return;
-
-      const today = dayjs().format("YYYY-MM-DD");
-
-      const { data, error: qErr } = await supabase
-        .from(BOOKINGS_TABLE)
-        .select("id, booking_date")
+      const { data: existing, error: existingErr } = await supabase
+        .from(ROOM_REVIEWS_TABLE)
+        .select("rating, note")
         .eq("room_id", roomId)
         .eq("user_id", user.id)
-        .lt("booking_date", today)
-        .order("booking_date", { ascending: false })
-        .limit(1);
+        .maybeSingle();
 
-      if (cancelled) return;
-      if (qErr) return;
-
-      const past = (data || [])[0];
-      if (past?.id) {
-        setCanReview(true);
-        setLatestPastBookingId(past.id);
-
-        // Prefill if user already reviewed this room
-        const { data: existing, error: existingErr } = await supabase
-          .from(ROOM_REVIEWS_TABLE)
-          .select("rating, note")
-          .eq("room_id", roomId)
-          .eq("user_id", user.id)
-          .maybeSingle();
-
-        if (!cancelled && !existingErr && existing) {
-          setReviewRating(Number(existing.rating) || 0);
-          setReviewNote(existing.note || "");
-        }
+      if (!cancelled && !existingErr && existing) {
+        setReviewRating(Number(existing.rating) || 0);
+        setReviewNote(existing.note || "");
       }
     }
 
-    loadReviewEligibility();
+    loadExistingReview();
     return () => {
       cancelled = true;
     };
@@ -416,11 +389,6 @@ const Booking = React.memo(() => {
         return;
       }
 
-      if (!canReview) {
-        setReviewsError("You can leave a review after you’ve completed a booking for this room.");
-        return;
-      }
-
       const rating = Number(reviewRating);
       if (!Number.isFinite(rating) || rating < 1 || rating > 5) {
         setReviewsError("Please select a star rating (1–5).");
@@ -445,7 +413,7 @@ const Booking = React.memo(() => {
         await upsertRoomReview({
           room_id: roomId,
           user_id: user.id,
-          booking_id: latestPastBookingId,
+          booking_id: null,
           user_email: user.email ?? null,
           user_full_name: nameFromMeta ? String(nameFromMeta) : null,
           rating,
@@ -470,7 +438,7 @@ const Booking = React.memo(() => {
         setReviewSubmitting(false);
       }
     },
-    [canReview, latestPastBookingId, reviewNote, reviewRating, roomId, user?.email, user?.id, user?.user_metadata]
+    [reviewNote, reviewRating, roomId, user?.email, user?.id, user?.user_metadata]
   );
 
   const validate = useCallback(() => {
@@ -795,9 +763,7 @@ const Booking = React.memo(() => {
           <div className="w-full md:w-[360px]">
             <p className="text-sm font-semibold text-ink">Leave a review</p>
             <p className="mt-1 text-sm text-muted">
-              {canReview
-                ? "Rate your completed stay and add a note."
-                : "You can review after you’ve completed a booking for this room."}
+              Rate this room and add a note.
             </p>
 
             <form className="mt-4 space-y-3" onSubmit={onSubmitReview}>
@@ -806,7 +772,7 @@ const Booking = React.memo(() => {
                 <StarsInput
                   value={reviewRating}
                   onChange={setReviewRating}
-                  disabled={!canReview || reviewSubmitting}
+                  disabled={reviewSubmitting}
                   size="lg"
                   className="mt-1"
                 />
@@ -818,14 +784,14 @@ const Booking = React.memo(() => {
                   className={`${INPUT_STYLES} min-h-[96px] resize-none`}
                   value={reviewNote}
                   onChange={(e) => setReviewNote(e.target.value)}
-                  disabled={!canReview || reviewSubmitting}
+                  disabled={reviewSubmitting}
                   placeholder="Share what you liked (or what could be improved)…"
                 />
               </label>
 
               {reviewSuccess ? <p className="text-sm text-green-700">{reviewSuccess}</p> : null}
 
-              <Button type="submit" disabled={!canReview || reviewSubmitting}>
+              <Button type="submit" disabled={reviewSubmitting}>
                 {reviewSubmitting ? "Saving…" : "Submit review"}
               </Button>
             </form>
