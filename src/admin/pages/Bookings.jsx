@@ -6,6 +6,7 @@ import { formatPrice } from "../../guest/utils/format.js";
 import Button from "../../guest/components/ui/Button.jsx";
 import FormInput, { INPUT_STYLES } from "../../guest/components/ui/FormInput.jsx";
 import { DAYTIME_START, DAYTIME_END } from "../../guest/utils/constants.js";
+import { useAuth } from "../../auth/useAuth.js";
 
 const BOOKINGS_TABLE = "bookings";
 const TIME_STEP_MINUTES = 30;
@@ -72,8 +73,13 @@ const ViewBookingModal = React.memo(({ open, booking, room, userProfile, onClose
   const now = new Date();
   const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
   const isPast = booking.booking_date < today;
-  const statusColor = isPast ? "bg-slate-100 text-slate-600" : "bg-green-50 text-green-700";
-  const statusText = isPast ? "Completed" : "Upcoming";
+  const dayStatusColor = isPast ? "bg-slate-100 text-slate-600" : "bg-green-50 text-green-700";
+  const dayStatusText = isPast ? "Completed" : "Upcoming";
+
+  const approvalStatus = booking.status || "approved";
+  const isPending = approvalStatus === "pending";
+  const approvalColor = isPending ? "bg-yellow-50 text-yellow-800" : "bg-emerald-50 text-emerald-700";
+  const approvalText = isPending ? "Pending" : "Approved";
 
   return (
     <Modal
@@ -102,11 +108,11 @@ const ViewBookingModal = React.memo(({ open, booking, room, userProfile, onClose
         )}
 
         {/* Status */}
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-muted">Status:</span>
-          <span className={`rounded-full px-3 py-1 text-xs font-medium ${statusColor}`}>
-            {statusText}
-          </span>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm font-medium text-muted">Approval:</span>
+          <span className={`rounded-full px-3 py-1 text-xs font-medium ${approvalColor}`}>{approvalText}</span>
+          <span className="ml-2 text-sm font-medium text-muted">Day:</span>
+          <span className={`rounded-full px-3 py-1 text-xs font-medium ${dayStatusColor}`}>{dayStatusText}</span>
         </div>
 
         {/* Booking Details */}
@@ -456,12 +462,14 @@ const DeleteBookingModal = React.memo(({ open, booking, room, onClose, onConfirm
 });
 
 export default function AdminBookings() {
+  const { user } = useAuth();
   const [bookings, setBookings] = useState([]);
   const [rooms, setRooms] = useState({});
   const [profilesById, setProfilesById] = useState({});
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [timeFilter, setTimeFilter] = useState("all");
+  const [approvalFilter, setApprovalFilter] = useState("all");
 
   const [viewingBooking, setViewingBooking] = useState(null);
   const [editingBooking, setEditingBooking] = useState(null);
@@ -537,8 +545,13 @@ export default function AdminBookings() {
 
     return bookings.filter((booking) => {
       // Status filter
-      if (statusFilter === "upcoming" && booking.booking_date < today) return false;
-      if (statusFilter === "completed" && booking.booking_date >= today) return false;
+      if (timeFilter === "upcoming" && booking.booking_date < today) return false;
+      if (timeFilter === "completed" && booking.booking_date >= today) return false;
+
+      const approvalStatus = booking.status || "approved";
+      if (approvalFilter === "pending" && approvalStatus !== "pending") return false;
+      if (approvalFilter === "approved" && approvalStatus !== "approved") return false;
+
       // Search filter
       if (searchTerm) {
         const search = searchTerm.toLowerCase();
@@ -557,7 +570,33 @@ export default function AdminBookings() {
 
       return true;
     });
-  }, [bookings, profilesById, rooms, searchTerm, statusFilter]);
+  }, [approvalFilter, bookings, profilesById, rooms, searchTerm, timeFilter]);
+
+  const handleApprove = useCallback(
+    (booking) => {
+      if (!booking?.id) return;
+      Modal.confirm({
+        title: "Approve booking?",
+        content: "This will confirm the booking and notify the user.",
+        okText: "Approve",
+        cancelText: "Cancel",
+        okButtonProps: { className: "!bg-green-600 hover:!bg-green-700" },
+        async onOk() {
+          const { error: updateError } = await supabase
+            .from(BOOKINGS_TABLE)
+            .update({
+              status: "approved",
+              approved_at: new Date().toISOString(),
+              approved_by: user?.id || null,
+            })
+            .eq("id", booking.id);
+          if (updateError) throw updateError;
+          await fetchBookings();
+        },
+      });
+    },
+    [fetchBookings, user?.id]
+  );
 
   const handleEditSave = useCallback(() => {
     setEditingBooking(null);
@@ -604,13 +643,22 @@ export default function AdminBookings() {
           />
         </div>
         <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
+          value={timeFilter}
+          onChange={(e) => setTimeFilter(e.target.value)}
           className={INPUT_STYLES}
         >
           <option value="all">All Bookings</option>
           <option value="upcoming">Upcoming</option>
           <option value="completed">Completed</option>
+        </select>
+        <select
+          value={approvalFilter}
+          onChange={(e) => setApprovalFilter(e.target.value)}
+          className={INPUT_STYLES}
+        >
+          <option value="all">All Approval States</option>
+          <option value="pending">Pending</option>
+          <option value="approved">Approved</option>
         </select>
       </div>
 
@@ -623,7 +671,7 @@ export default function AdminBookings() {
             </svg>
             <p className="mt-4 text-sm font-medium text-ink">No bookings found</p>
             <p className="mt-1 text-sm text-muted">
-              {searchTerm || statusFilter !== "all"
+              {searchTerm || timeFilter !== "all" || approvalFilter !== "all"
                 ? "Try adjusting your filters"
                 : "Bookings will appear here when guests make reservations"}
             </p>
@@ -636,7 +684,8 @@ export default function AdminBookings() {
                   <th className="px-6 py-3">Room</th>
                   <th className="px-6 py-3">Guest</th>
                   <th className="px-6 py-3">Date & Time</th>
-                  <th className="px-6 py-3">Status</th>
+                  <th className="px-6 py-3">Approval</th>
+                  <th className="px-6 py-3">Day</th>
                   <th className="px-6 py-3">Amount</th>
                   <th className="px-6 py-3 text-right">Actions</th>
                 </tr>
@@ -649,10 +698,13 @@ export default function AdminBookings() {
                   const now = new Date();
                   const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
                   const isPast = booking.booking_date < todayStr;
-                  const statusColor = isPast ? "bg-slate-100 text-slate-600" : "bg-green-50 text-green-700";
-                  const statusText = isPast ? "Completed" : "Upcoming";
+                  const dayStatusColor = isPast ? "bg-slate-100 text-slate-600" : "bg-green-50 text-green-700";
+                  const dayStatusText = isPast ? "Completed" : "Upcoming";
 
-                  console.log(booking.booking_date);
+                  const approvalStatus = booking.status || "approved";
+                  const isPending = approvalStatus === "pending";
+                  const approvalColor = isPending ? "bg-yellow-50 text-yellow-800" : "bg-emerald-50 text-emerald-700";
+                  const approvalText = isPending ? "Pending" : "Approved";
 
                   return (
                     <tr key={booking.id} className="border-b border-border last:border-0 hover:bg-slate-50">
@@ -686,8 +738,13 @@ export default function AdminBookings() {
                         </p>
                       </td>
                       <td className="px-6 py-4">
-                        <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${statusColor}`}>
-                          {statusText}
+                        <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${approvalColor}`}>
+                          {approvalText}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${dayStatusColor}`}>
+                          {dayStatusText}
                         </span>
                       </td>
                       <td className="px-6 py-4">
@@ -695,6 +752,17 @@ export default function AdminBookings() {
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex justify-end gap-2">
+                          {isPending && !isPast && (
+                            <button
+                              onClick={() => handleApprove(booking)}
+                              className="rounded-lg p-1.5 text-muted transition-colors hover:bg-emerald-50 hover:text-emerald-700"
+                              title="Approve"
+                            >
+                              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                            </button>
+                          )}
                           <button
                             onClick={() => setViewingBooking(booking)}
                             className="rounded-lg p-1.5 text-muted transition-colors hover:bg-slate-100 hover:text-ink"

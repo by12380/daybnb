@@ -94,9 +94,16 @@ function getDisabledTimeSlots(existingBookings, excludeBookingId = null) {
 
 const BookingCard = React.memo(({ booking, room, onEdit, onCancel, isHighlighted }) => {
   const isPast = new Date(booking.booking_date) < new Date(new Date().toDateString());
-  const statusColor = isPast ? "text-muted" : "text-green-700";
-  const statusBg = isPast ? "bg-slate-100" : "bg-green-50";
-  const statusText = isPast ? "Completed" : "Upcoming";
+  const dayStatusColor = isPast ? "text-muted" : "text-green-700";
+  const dayStatusBg = isPast ? "bg-slate-100" : "bg-green-50";
+  const dayStatusText = isPast ? "Completed" : "Upcoming";
+
+  const approvalStatus = booking.status || "approved";
+  const isPending = approvalStatus === "pending";
+  const approvalColor = isPending ? "text-yellow-800" : "text-emerald-700";
+  const approvalBg = isPending ? "bg-yellow-50" : "bg-emerald-50";
+  const approvalText = isPending ? "Pending approval" : "Confirmed";
+  const canEdit = !isPast && isPending;
 
   // Calculate duration for display
   const startMinutes = parseTimeToMinutes(booking.start_time);
@@ -119,8 +126,11 @@ const BookingCard = React.memo(({ booking, room, onEdit, onCancel, isHighlighted
               <h3 className="text-lg font-semibold text-ink">
                 {room?.title || "Room"}
               </h3>
-              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusBg} ${statusColor}`}>
-                {statusText}
+              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${approvalBg} ${approvalColor}`}>
+                {approvalText}
+              </span>
+              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${dayStatusBg} ${dayStatusColor}`}>
+                {dayStatusText}
               </span>
             </div>
             <p className="mt-1 text-sm text-muted">{room?.location || "Location unavailable"}</p>
@@ -165,7 +175,13 @@ const BookingCard = React.memo(({ booking, room, onEdit, onCancel, isHighlighted
         </div>
         {!isPast && (
           <div className="flex gap-2 sm:flex-col">
-            <Button variant="outline" onClick={() => onEdit(booking)}>
+            <Button
+              variant="outline"
+              onClick={() => (canEdit ? onEdit(booking) : null)}
+              disabled={!canEdit}
+              className={!canEdit ? "opacity-50" : ""}
+              title={!canEdit ? "Only pending bookings can be edited." : "Edit"}
+            >
               Edit
             </Button>
             <Button

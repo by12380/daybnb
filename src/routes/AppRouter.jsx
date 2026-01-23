@@ -8,6 +8,7 @@ import Booking from "../guest/pages/Booking.jsx";
 import Profile from "../guest/pages/Profile.jsx";
 import MyBookings from "../guest/pages/MyBookings.jsx";
 import LikedRooms from "../guest/pages/LikedRooms.jsx";
+import GuestNotifications from "../guest/pages/Notifications.jsx";
 import RequireAuth from "../auth/RequireAuth.jsx";
 import RequireAdmin from "../auth/RequireAdmin.jsx";
 
@@ -17,6 +18,7 @@ import AdminDashboard from "../admin/pages/Dashboard.jsx";
 import AdminBookings from "../admin/pages/Bookings.jsx";
 import AdminUsers from "../admin/pages/Users.jsx";
 import AdminRooms from "../admin/pages/Rooms.jsx";
+import AdminNotifications from "../admin/pages/Notifications.jsx";
 
 export default function AppRouter() {
   return (
@@ -35,6 +37,7 @@ export default function AppRouter() {
             <Route path="/profile" element={<Profile />} />
             <Route path="/my-bookings" element={<MyBookings />} />
             <Route path="/liked-rooms" element={<LikedRooms />} />
+            <Route path="/notifications" element={<GuestNotifications />} />
           </Route>
         </Route>
         <Route element={<MainLayout />}>
@@ -46,6 +49,7 @@ export default function AppRouter() {
           <Route element={<AdminLayout />}>
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/admin/bookings" element={<AdminBookings />} />
+            <Route path="/admin/notifications" element={<AdminNotifications />} />
             <Route path="/admin/users" element={<AdminUsers />} />
             <Route path="/admin/rooms" element={<AdminRooms />} />
           </Route>

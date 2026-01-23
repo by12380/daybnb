@@ -493,6 +493,7 @@ const Booking = React.memo(() => {
         user_email: user.email ?? null,
         user_full_name: fullName?.trim() || null,
         user_phone: phone?.trim() || null,
+        status: "pending",
         total_price: totalPrice > 0 ? totalPrice : null,
         price_per_hour: pricePerHour > 0 ? pricePerHour : null,
         billable_hours: durationHours > 0 ? durationHours : null,
@@ -519,7 +520,7 @@ const Booking = React.memo(() => {
       }
 
       setSubmitting(false);
-      setSuccess("Booking submitted! Redirecting to your bookings...");
+      setSuccess("Booking request submitted (pending approval). Redirecting to your bookings...");
 
       // Navigate to My Bookings page after a short delay
       setTimeout(() => {

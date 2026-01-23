@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../../../auth/useAuth.js";
+import { useNotifications } from "../../../notifications/useNotifications.js";
 
 const NAV_ITEMS = [
   {
@@ -18,6 +19,20 @@ const NAV_ITEMS = [
     icon: (
       <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+      </svg>
+    ),
+  },
+  {
+    path: "/admin/notifications",
+    label: "Notifications",
+    icon: (
+      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={1.5}
+          d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+        />
       </svg>
     ),
   },
@@ -123,6 +138,22 @@ const Sidebar = React.memo(({ isOpen, onClose }) => {
 
 const Header = React.memo(({ onMenuClick }) => {
   const { user, signOut } = useAuth();
+  const { notifications, unreadCount, markRead, markAllRead } = useNotifications({
+    mode: "admin",
+    limit: 5,
+  });
+  const [notiOpen, setNotiOpen] = useState(false);
+  const notiRef = useRef(null);
+
+  const toggleNoti = useCallback(() => setNotiOpen((v) => !v), []);
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (notiRef.current && !notiRef.current.contains(e.target)) setNotiOpen(false);
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-white px-4 lg:px-6">
@@ -140,6 +171,91 @@ const Header = React.memo(({ onMenuClick }) => {
       </div>
 
       <div className="flex items-center gap-4">
+        <div className="relative" ref={notiRef}>
+          <button
+            onClick={toggleNoti}
+            className="relative rounded-lg p-2 text-muted hover:bg-slate-100"
+            aria-label="Notifications"
+            title="Notifications"
+          >
+            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+              />
+            </svg>
+            {unreadCount > 0 && (
+              <span className="absolute right-1 top-1 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-brand-600 px-1 text-[10px] font-bold leading-none text-white">
+                {unreadCount > 99 ? "99+" : unreadCount}
+              </span>
+            )}
+          </button>
+
+          {notiOpen && (
+            <div className="absolute right-0 mt-2 w-[360px] overflow-hidden rounded-2xl border border-border bg-white shadow-xl">
+              <div className="flex items-center justify-between border-b border-border px-4 py-3">
+                <p className="text-sm font-semibold text-ink">Notifications</p>
+                <button
+                  onClick={() => {
+                    markAllRead();
+                    setNotiOpen(false);
+                  }}
+                  className="text-xs font-medium text-brand-700 hover:text-brand-800"
+                  disabled={unreadCount === 0}
+                >
+                  Mark all read
+                </button>
+              </div>
+              <div className="max-h-[360px] overflow-auto">
+                {notifications.length === 0 ? (
+                  <div className="px-4 py-6">
+                    <p className="text-sm text-muted">No notifications yet.</p>
+                  </div>
+                ) : (
+                  <ul className="divide-y divide-border">
+                    {notifications.map((n) => (
+                      <li key={n.id} className="px-4 py-3 hover:bg-slate-50">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium text-ink">
+                              {n.title}
+                              {!n.is_read ? (
+                                <span className="ml-2 rounded-full bg-brand-600 px-2 py-0.5 text-[10px] font-bold text-white">
+                                  New
+                                </span>
+                              ) : null}
+                            </p>
+                            {n.body ? <p className="mt-1 line-clamp-2 text-xs text-muted">{n.body}</p> : null}
+                          </div>
+                          {!n.is_read && (
+                            <button
+                              onClick={() => markRead(n.id)}
+                              className="shrink-0 rounded-lg border border-border px-2 py-1 text-xs text-muted hover:bg-white hover:text-ink"
+                            >
+                              Read
+                            </button>
+                          )}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              <div className="border-t border-border px-4 py-3">
+                <Link
+                  to="/admin/notifications"
+                  onClick={() => setNotiOpen(false)}
+                  className="text-sm font-medium text-brand-700 hover:text-brand-800"
+                >
+                  View all notifications
+                </Link>
+              </div>
+            </div>
+          )}
+        </div>
+
         <div className="text-right">
           <p className="text-sm font-medium text-ink">{user?.email || "Admin"}</p>
           <p className="text-xs text-muted">Administrator</p>
