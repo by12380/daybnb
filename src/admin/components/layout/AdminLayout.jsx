@@ -138,7 +138,7 @@ const Sidebar = React.memo(({ isOpen, onClose }) => {
 
 const Header = React.memo(({ onMenuClick }) => {
   const { user, signOut } = useAuth();
-  const { notifications, unreadCount, markRead, markAllRead } = useNotifications({
+  const { notifications, unreadCount, deleteNotification, clearAllNotifications } = useNotifications({
     mode: "admin",
     limit: 5,
   });
@@ -199,13 +199,13 @@ const Header = React.memo(({ onMenuClick }) => {
                 <p className="text-sm font-semibold text-ink">Notifications</p>
                 <button
                   onClick={() => {
-                    markAllRead();
+                    clearAllNotifications();
                     setNotiOpen(false);
                   }}
                   className="text-xs font-medium text-brand-700 hover:text-brand-800"
-                  disabled={unreadCount === 0}
+                  disabled={notifications.length === 0}
                 >
-                  Mark all read
+                  Clear all
                 </button>
               </div>
               <div className="max-h-[360px] overflow-auto">
@@ -229,14 +229,12 @@ const Header = React.memo(({ onMenuClick }) => {
                             </p>
                             {n.body ? <p className="mt-1 line-clamp-2 text-xs text-muted">{n.body}</p> : null}
                           </div>
-                          {!n.is_read && (
-                            <button
-                              onClick={() => markRead(n.id)}
-                              className="shrink-0 rounded-lg border border-border px-2 py-1 text-xs text-muted hover:bg-white hover:text-ink"
-                            >
-                              Read
-                            </button>
-                          )}
+                          <button
+                            onClick={() => deleteNotification(n.id)}
+                            className="shrink-0 rounded-lg border border-border px-2 py-1 text-xs text-muted hover:bg-white hover:text-ink"
+                          >
+                            Dismiss
+                          </button>
                         </div>
                       </li>
                     ))}

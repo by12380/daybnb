@@ -15,6 +15,7 @@ export function useNotifications({ mode, userId, limit = 20 }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const lastFetchKeyRef = useRef("");
+  const isMountedRef = useRef(true);
 
   const enabled = useMemo(() => {
     if (!supabase) return false;
@@ -25,16 +26,20 @@ export function useNotifications({ mode, userId, limit = 20 }) {
 
   const fetchNotifications = useCallback(async () => {
     if (!enabled) {
-      setNotifications([]);
-      setLoading(false);
+      if (isMountedRef.current) {
+        setNotifications([]);
+        setLoading(false);
+      }
       return;
     }
 
     const key = `${mode}:${userId || ""}:${limit}`;
     lastFetchKeyRef.current = key;
 
-    setLoading(true);
-    setError("");
+    if (isMountedRef.current) {
+      setLoading(true);
+      setError("");
+    }
 
     const { data, error: fetchError } = await buildBaseQuery({ mode, userId }).limit(limit);
 
@@ -42,14 +47,18 @@ export function useNotifications({ mode, userId, limit = 20 }) {
     if (lastFetchKeyRef.current !== key) return;
 
     if (fetchError) {
-      setError(fetchError.message || "Failed to load notifications.");
-      setNotifications([]);
-      setLoading(false);
+      if (isMountedRef.current) {
+        setError(fetchError.message || "Failed to load notifications.");
+        setNotifications([]);
+        setLoading(false);
+      }
       return;
     }
 
-    setNotifications(data || []);
-    setLoading(false);
+    if (isMountedRef.current) {
+      setNotifications(data || []);
+      setLoading(false);
+    }
   }, [enabled, limit, mode, userId]);
 
   const markRead = useCallback(
@@ -73,9 +82,47 @@ export function useNotifications({ mode, userId, limit = 20 }) {
     if (!updateError) fetchNotifications();
   }, [enabled, fetchNotifications, mode, userId]);
 
+  const deleteNotification = useCallback(
+    async (id) => {
+      if (!enabled || !id) return;
+
+      // Optimistic UI removal
+      if (isMountedRef.current) {
+        setNotifications((prev) => (prev || []).filter((n) => n?.id !== id));
+      }
+
+      const { error: deleteError } = await supabase.from(NOTIFICATIONS_TABLE).delete().eq("id", id);
+
+      // If delete fails, fall back to a refetch to keep UI consistent
+      if (deleteError) fetchNotifications();
+    },
+    [enabled, fetchNotifications]
+  );
+
+  const clearAllNotifications = useCallback(async () => {
+    if (!enabled) return;
+
+    // Optimistic UI clear
+    if (isMountedRef.current) setNotifications([]);
+
+    let q = supabase.from(NOTIFICATIONS_TABLE).delete();
+    if (mode === "admin") q = q.eq("recipient_role", "admin");
+    if (mode === "user") q = q.eq("recipient_user_id", userId);
+
+    const { error: deleteError } = await q;
+    if (deleteError) fetchNotifications();
+  }, [enabled, fetchNotifications, mode, userId]);
+
   useEffect(() => {
     fetchNotifications();
   }, [fetchNotifications]);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!enabled) return;
@@ -113,6 +160,8 @@ export function useNotifications({ mode, userId, limit = 20 }) {
     refetch: fetchNotifications,
     markRead,
     markAllRead,
+    deleteNotification,
+    clearAllNotifications,
   };
 }
 

@@ -14,7 +14,7 @@ function formatWhen(ts) {
 }
 
 export default function AdminNotifications() {
-  const { notifications, unreadCount, loading, error, markRead, markAllRead } = useNotifications({
+  const { notifications, unreadCount, loading, error, deleteNotification, clearAllNotifications } = useNotifications({
     mode: "admin",
     limit: 100,
   });
@@ -34,8 +34,12 @@ export default function AdminNotifications() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={markAllRead} disabled={loading || unreadCount === 0}>
-            Mark all as read
+          <Button
+            variant="outline"
+            onClick={clearAllNotifications}
+            disabled={loading || notifications.length === 0}
+          >
+            Clear all
           </Button>
         </div>
       </div>
@@ -72,12 +76,10 @@ export default function AdminNotifications() {
                   <p className="mt-2 text-xs text-muted">{formatWhen(n.created_at)}</p>
                 </div>
                 <div className="flex flex-wrap gap-2 sm:justify-end">
-                  <Link to={handleViewBookings(n)}>
+                  <Link to={handleViewBookings(n)} onClick={() => deleteNotification(n.id)}>
                     <Button variant="outline">View bookings</Button>
                   </Link>
-                  {!n.is_read && (
-                    <Button onClick={() => markRead(n.id)}>Mark as read</Button>
-                  )}
+                  <Button onClick={() => deleteNotification(n.id)}>Dismiss</Button>
                 </div>
               </div>
             </Card>

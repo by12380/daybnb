@@ -50,6 +50,11 @@ create policy "notifications_update_own"
   using (recipient_user_id = auth.uid())
   with check (recipient_user_id = auth.uid());
 
+drop policy if exists "notifications_delete_own" on public.notifications;
+create policy "notifications_delete_own"
+  on public.notifications for delete
+  using (recipient_user_id = auth.uid());
+
 -- Admins can read/update admin broadcast notifications (recipient_role = 'admin')
 -- This expects you store admin role in profiles.user_type = 'admin'
 drop policy if exists "notifications_select_admin_role" on public.notifications;
@@ -74,6 +79,17 @@ create policy "notifications_update_admin_role"
     )
   )
   with check (
+    recipient_role = 'admin'
+    and exists (
+      select 1 from public.profiles p
+      where p.id = auth.uid() and p.user_type = 'admin'
+    )
+  );
+
+drop policy if exists "notifications_delete_admin_role" on public.notifications;
+create policy "notifications_delete_admin_role"
+  on public.notifications for delete
+  using (
     recipient_role = 'admin'
     and exists (
       select 1 from public.profiles p

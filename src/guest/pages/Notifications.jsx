@@ -16,7 +16,7 @@ function formatWhen(ts) {
 
 export default function GuestNotifications() {
   const { user } = useAuth();
-  const { notifications, unreadCount, loading, error, markRead, markAllRead } = useNotifications({
+  const { notifications, unreadCount, loading, error, deleteNotification, clearAllNotifications } = useNotifications({
     mode: "user",
     userId: user?.id,
     limit: 100,
@@ -38,8 +38,12 @@ export default function GuestNotifications() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={markAllRead} disabled={loading || unreadCount === 0}>
-            Mark all as read
+          <Button
+            variant="outline"
+            onClick={clearAllNotifications}
+            disabled={loading || notifications.length === 0}
+          >
+            Clear all
           </Button>
         </div>
       </div>
@@ -81,12 +85,10 @@ export default function GuestNotifications() {
                   <p className="mt-2 text-xs text-muted">{formatWhen(n.created_at)}</p>
                 </div>
                 <div className="flex flex-wrap gap-2 sm:justify-end">
-                  <Link to={viewBookingHref(n)}>
+                  <Link to={viewBookingHref(n)} onClick={() => deleteNotification(n.id)}>
                     <Button variant="outline">View booking</Button>
                   </Link>
-                  {!n.is_read && (
-                    <Button onClick={() => markRead(n.id)}>Mark as read</Button>
-                  )}
+                  <Button onClick={() => deleteNotification(n.id)}>Dismiss</Button>
                 </div>
               </div>
             </Card>
