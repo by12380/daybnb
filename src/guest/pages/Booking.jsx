@@ -496,6 +496,7 @@ const Booking = React.memo(() => {
         total_price: totalPrice > 0 ? totalPrice : null,
         price_per_hour: pricePerHour > 0 ? pricePerHour : null,
         billable_hours: durationHours > 0 ? durationHours : null,
+        status: "pending", // Booking requires admin approval
       };
 
       const { data: insertedData, error: insertError } = await supabase
@@ -519,7 +520,7 @@ const Booking = React.memo(() => {
       }
 
       setSubmitting(false);
-      setSuccess("Booking submitted! Redirecting to your bookings...");
+      setSuccess("Booking request submitted! Awaiting admin approval. Redirecting to your bookings...");
 
       // Navigate to My Bookings page after a short delay
       setTimeout(() => {

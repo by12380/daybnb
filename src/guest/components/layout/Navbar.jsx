@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../../auth/useAuth.js";
 import { useProfile } from "../../../auth/useProfile.js";
 import Button from "../ui/Button.jsx";
+import UserNotificationDropdown from "../NotificationDropdown.jsx";
 
 export default function GuestNavbar() {
   const { user, loading, signOut } = useAuth();
@@ -64,6 +65,8 @@ export default function GuestNavbar() {
           {loading ? (
             <div className="h-5 w-5 animate-spin rounded-full border-2 border-brand-200 border-t-brand-600" />
           ) : user ? (
+            <>
+            <UserNotificationDropdown />
             <div className="relative" ref={dropdownRef}>
               <button
                 onClick={toggleDropdown}
@@ -153,6 +156,7 @@ export default function GuestNavbar() {
                 </div>
               )}
             </div>
+            </>
           ) : (
             <>
               <Link to="/auth">

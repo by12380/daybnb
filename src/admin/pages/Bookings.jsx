@@ -65,15 +65,35 @@ function formatTime(timeStr) {
   return minutesToLabel(parseTimeToMinutes(timeStr));
 }
 
-const ViewBookingModal = React.memo(({ open, booking, room, userProfile, onClose }) => {
-  if (!booking) return null;
-
-  // Use local date for comparison (YYYY-MM-DD format)
+function getBookingStatusInfo(booking) {
   const now = new Date();
   const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
   const isPast = booking.booking_date < today;
-  const statusColor = isPast ? "bg-slate-100 text-slate-600" : "bg-green-50 text-green-700";
-  const statusText = isPast ? "Completed" : "Upcoming";
+
+  // Check booking status field first
+  if (booking.status === "pending") {
+    return { color: "bg-yellow-50 text-yellow-700", text: "Pending Approval" };
+  }
+  if (booking.status === "rejected") {
+    return { color: "bg-red-50 text-red-600", text: "Rejected" };
+  }
+  if (booking.status === "approved") {
+    if (isPast) {
+      return { color: "bg-slate-100 text-slate-600", text: "Completed" };
+    }
+    return { color: "bg-green-50 text-green-700", text: "Approved" };
+  }
+  // Default fallback for bookings without status field
+  if (isPast) {
+    return { color: "bg-slate-100 text-slate-600", text: "Completed" };
+  }
+  return { color: "bg-green-50 text-green-700", text: "Upcoming" };
+}
+
+const ViewBookingModal = React.memo(({ open, booking, room, userProfile, onClose }) => {
+  if (!booking) return null;
+
+  const statusInfo = getBookingStatusInfo(booking);
 
   return (
     <Modal
@@ -104,8 +124,8 @@ const ViewBookingModal = React.memo(({ open, booking, room, userProfile, onClose
         {/* Status */}
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-muted">Status:</span>
-          <span className={`rounded-full px-3 py-1 text-xs font-medium ${statusColor}`}>
-            {statusText}
+          <span className={`rounded-full px-3 py-1 text-xs font-medium ${statusInfo.color}`}>
+            {statusInfo.text}
           </span>
         </div>
 
@@ -455,6 +475,216 @@ const DeleteBookingModal = React.memo(({ open, booking, room, onClose, onConfirm
   );
 });
 
+const ApproveBookingModal = React.memo(({ open, booking, room, onClose, onConfirm }) => {
+  const [approving, setApproving] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleApprove = useCallback(async () => {
+    setError("");
+    setApproving(true);
+
+    // Update booking status to approved
+    const { error: updateError } = await supabase
+      .from(BOOKINGS_TABLE)
+      .update({ status: "approved" })
+      .eq("id", booking.id);
+
+    if (updateError) {
+      setError(updateError.message || "Failed to approve booking.");
+      setApproving(false);
+      return;
+    }
+
+    // Create notification for the user
+    const { error: notifyError } = await supabase
+      .from("notifications")
+      .insert({
+        recipient_user_id: booking.user_id,
+        type: "booking_approved",
+        title: "Booking Confirmed!",
+        body: `Your booking for ${room?.title || "the room"} on ${formatDate(booking.booking_date)} has been approved.`,
+        data: {
+          booking_id: booking.id,
+          room_id: booking.room_id,
+          booking_date: booking.booking_date,
+          start_time: booking.start_time,
+          end_time: booking.end_time,
+        },
+      });
+
+    if (notifyError) {
+      console.error("Failed to send notification:", notifyError);
+      // Don't fail the approval if notification fails
+    }
+
+    setApproving(false);
+    onConfirm();
+  }, [booking, room, onConfirm]);
+
+  return (
+    <Modal
+      title="Approve Booking"
+      open={open}
+      onCancel={onClose}
+      footer={null}
+      destroyOnClose
+    >
+      <div className="space-y-4 pt-4">
+        <p className="text-sm text-muted">
+          Are you sure you want to approve this booking? The guest will be notified.
+        </p>
+
+        {room && (
+          <div className="rounded-xl border border-green-100 bg-green-50 p-4">
+            <p className="font-medium text-ink">{room.title}</p>
+            <p className="text-sm text-muted">{room.location}</p>
+            <div className="mt-2 text-sm">
+              <span className="text-muted">Date: </span>
+              <span className="font-medium text-ink">{formatDate(booking?.booking_date)}</span>
+            </div>
+            <div className="text-sm">
+              <span className="text-muted">Time: </span>
+              <span className="font-medium text-ink">
+                {formatTime(booking?.start_time)} - {formatTime(booking?.end_time)}
+              </span>
+            </div>
+            <div className="text-sm">
+              <span className="text-muted">Guest: </span>
+              <span className="font-medium text-ink">{booking?.user_full_name || booking?.user_email || "N/A"}</span>
+            </div>
+          </div>
+        )}
+
+        {error && <p className="text-sm text-red-600">{error}</p>}
+
+        <div className="flex justify-end gap-3 pt-2">
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            className="!bg-green-600 hover:!bg-green-700"
+            onClick={handleApprove}
+            disabled={approving}
+          >
+            {approving ? "Approving..." : "Approve Booking"}
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+});
+
+const RejectBookingModal = React.memo(({ open, booking, room, onClose, onConfirm }) => {
+  const [rejecting, setRejecting] = useState(false);
+  const [error, setError] = useState("");
+  const [reason, setReason] = useState("");
+
+  const handleReject = useCallback(async () => {
+    setError("");
+    setRejecting(true);
+
+    // Update booking status to rejected
+    const { error: updateError } = await supabase
+      .from(BOOKINGS_TABLE)
+      .update({ status: "rejected" })
+      .eq("id", booking.id);
+
+    if (updateError) {
+      setError(updateError.message || "Failed to reject booking.");
+      setRejecting(false);
+      return;
+    }
+
+    // Create notification for the user
+    const reasonText = reason.trim() ? ` Reason: ${reason.trim()}` : "";
+    const { error: notifyError } = await supabase
+      .from("notifications")
+      .insert({
+        recipient_user_id: booking.user_id,
+        type: "booking_rejected",
+        title: "Booking Not Approved",
+        body: `Your booking request for ${room?.title || "the room"} on ${formatDate(booking.booking_date)} was not approved.${reasonText}`,
+        data: {
+          booking_id: booking.id,
+          room_id: booking.room_id,
+          booking_date: booking.booking_date,
+          reason: reason.trim() || null,
+        },
+      });
+
+    if (notifyError) {
+      console.error("Failed to send notification:", notifyError);
+      // Don't fail the rejection if notification fails
+    }
+
+    setRejecting(false);
+    setReason("");
+    onConfirm();
+  }, [booking, room, reason, onConfirm]);
+
+  return (
+    <Modal
+      title="Reject Booking"
+      open={open}
+      onCancel={onClose}
+      footer={null}
+      destroyOnClose
+    >
+      <div className="space-y-4 pt-4">
+        <p className="text-sm text-muted">
+          Are you sure you want to reject this booking? The guest will be notified.
+        </p>
+
+        {room && (
+          <div className="rounded-xl border border-red-100 bg-red-50 p-4">
+            <p className="font-medium text-ink">{room.title}</p>
+            <p className="text-sm text-muted">{room.location}</p>
+            <div className="mt-2 text-sm">
+              <span className="text-muted">Date: </span>
+              <span className="font-medium text-ink">{formatDate(booking?.booking_date)}</span>
+            </div>
+            <div className="text-sm">
+              <span className="text-muted">Time: </span>
+              <span className="font-medium text-ink">
+                {formatTime(booking?.start_time)} - {formatTime(booking?.end_time)}
+              </span>
+            </div>
+            <div className="text-sm">
+              <span className="text-muted">Guest: </span>
+              <span className="font-medium text-ink">{booking?.user_full_name || booking?.user_email || "N/A"}</span>
+            </div>
+          </div>
+        )}
+
+        <label className="flex flex-col gap-2">
+          <span className="text-sm font-medium text-muted">Reason (optional)</span>
+          <textarea
+            className={`${INPUT_STYLES} min-h-[80px] resize-none`}
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="Provide a reason for rejection..."
+          />
+        </label>
+
+        {error && <p className="text-sm text-red-600">{error}</p>}
+
+        <div className="flex justify-end gap-3 pt-2">
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            className="!bg-red-600 hover:!bg-red-700"
+            onClick={handleReject}
+            disabled={rejecting}
+          >
+            {rejecting ? "Rejecting..." : "Reject Booking"}
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+});
+
 export default function AdminBookings() {
   const [bookings, setBookings] = useState([]);
   const [rooms, setRooms] = useState({});
@@ -466,6 +696,8 @@ export default function AdminBookings() {
   const [viewingBooking, setViewingBooking] = useState(null);
   const [editingBooking, setEditingBooking] = useState(null);
   const [deletingBooking, setDeletingBooking] = useState(null);
+  const [approvingBooking, setApprovingBooking] = useState(null);
+  const [rejectingBooking, setRejectingBooking] = useState(null);
 
   const fetchBookings = useCallback(async () => {
     if (!supabase) return;
@@ -537,8 +769,19 @@ export default function AdminBookings() {
 
     return bookings.filter((booking) => {
       // Status filter
-      if (statusFilter === "upcoming" && booking.booking_date < today) return false;
-      if (statusFilter === "completed" && booking.booking_date >= today) return false;
+      if (statusFilter === "pending" && booking.status !== "pending") return false;
+      if (statusFilter === "approved" && booking.status !== "approved") return false;
+      if (statusFilter === "rejected" && booking.status !== "rejected") return false;
+      if (statusFilter === "upcoming") {
+        // Upcoming = confirmed bookings with future dates
+        if (booking.booking_date < today) return false;
+        if (booking.status === "rejected") return false;
+      }
+      if (statusFilter === "completed") {
+        // Completed = confirmed bookings with past dates
+        if (booking.booking_date >= today) return false;
+        if (booking.status === "rejected" || booking.status === "pending") return false;
+      }
       // Search filter
       if (searchTerm) {
         const search = searchTerm.toLowerCase();
@@ -559,6 +802,11 @@ export default function AdminBookings() {
     });
   }, [bookings, profilesById, rooms, searchTerm, statusFilter]);
 
+  // Count pending bookings for header display
+  const pendingCount = useMemo(() => {
+    return bookings.filter((b) => b.status === "pending").length;
+  }, [bookings]);
+
   const handleEditSave = useCallback(() => {
     setEditingBooking(null);
     fetchBookings();
@@ -566,6 +814,16 @@ export default function AdminBookings() {
 
   const handleDeleteConfirm = useCallback(() => {
     setDeletingBooking(null);
+    fetchBookings();
+  }, [fetchBookings]);
+
+  const handleApproveConfirm = useCallback(() => {
+    setApprovingBooking(null);
+    fetchBookings();
+  }, [fetchBookings]);
+
+  const handleRejectConfirm = useCallback(() => {
+    setRejectingBooking(null);
     fetchBookings();
   }, [fetchBookings]);
 
@@ -588,6 +846,11 @@ export default function AdminBookings() {
           <h1 className="text-2xl font-bold text-ink">Bookings</h1>
           <p className="mt-1 text-sm text-muted">
             Manage all reservations ({bookings.length} total)
+            {pendingCount > 0 && (
+              <span className="ml-2 inline-flex items-center rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-800">
+                {pendingCount} pending approval
+              </span>
+            )}
           </p>
         </div>
       </div>
@@ -609,6 +872,9 @@ export default function AdminBookings() {
           className={INPUT_STYLES}
         >
           <option value="all">All Bookings</option>
+          <option value="pending">Pending Approval</option>
+          <option value="approved">Approved</option>
+          <option value="rejected">Rejected</option>
           <option value="upcoming">Upcoming</option>
           <option value="completed">Completed</option>
         </select>
@@ -645,14 +911,8 @@ export default function AdminBookings() {
                 {filteredBookings.map((booking) => {
                   const room = booking.room || rooms[booking.room_id];
                   const profile = booking.user || profilesById[booking.user_id];
-                  // Use local date for comparison (YYYY-MM-DD format)
-                  const now = new Date();
-                  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-                  const isPast = booking.booking_date < todayStr;
-                  const statusColor = isPast ? "bg-slate-100 text-slate-600" : "bg-green-50 text-green-700";
-                  const statusText = isPast ? "Completed" : "Upcoming";
-
-                  console.log(booking.booking_date);
+                  const statusInfo = getBookingStatusInfo(booking);
+                  const isPending = booking.status === "pending";
 
                   return (
                     <tr key={booking.id} className="border-b border-border last:border-0 hover:bg-slate-50">
@@ -686,8 +946,8 @@ export default function AdminBookings() {
                         </p>
                       </td>
                       <td className="px-6 py-4">
-                        <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${statusColor}`}>
-                          {statusText}
+                        <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${statusInfo.color}`}>
+                          {statusInfo.text}
                         </span>
                       </td>
                       <td className="px-6 py-4">
@@ -695,6 +955,28 @@ export default function AdminBookings() {
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex justify-end gap-2">
+                          {isPending && (
+                            <>
+                              <button
+                                onClick={() => setApprovingBooking(booking)}
+                                className="rounded-lg p-1.5 text-muted transition-colors hover:bg-green-50 hover:text-green-600"
+                                title="Approve"
+                              >
+                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                              </button>
+                              <button
+                                onClick={() => setRejectingBooking(booking)}
+                                className="rounded-lg p-1.5 text-muted transition-colors hover:bg-red-50 hover:text-red-600"
+                                title="Reject"
+                              >
+                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              </button>
+                            </>
+                          )}
                           <button
                             onClick={() => setViewingBooking(booking)}
                             className="rounded-lg p-1.5 text-muted transition-colors hover:bg-slate-100 hover:text-ink"
@@ -757,6 +1039,22 @@ export default function AdminBookings() {
         room={deletingBooking ? (deletingBooking.room || rooms[deletingBooking.room_id]) : null}
         onClose={() => setDeletingBooking(null)}
         onConfirm={handleDeleteConfirm}
+      />
+
+      <ApproveBookingModal
+        open={!!approvingBooking}
+        booking={approvingBooking}
+        room={approvingBooking ? (approvingBooking.room || rooms[approvingBooking.room_id]) : null}
+        onClose={() => setApprovingBooking(null)}
+        onConfirm={handleApproveConfirm}
+      />
+
+      <RejectBookingModal
+        open={!!rejectingBooking}
+        booking={rejectingBooking}
+        room={rejectingBooking ? (rejectingBooking.room || rooms[rejectingBooking.room_id]) : null}
+        onClose={() => setRejectingBooking(null)}
+        onConfirm={handleRejectConfirm}
       />
     </div>
   );

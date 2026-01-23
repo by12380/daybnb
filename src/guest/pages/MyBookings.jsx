@@ -92,11 +92,32 @@ function getDisabledTimeSlots(existingBookings, excludeBookingId = null) {
   return disabled;
 }
 
-const BookingCard = React.memo(({ booking, room, onEdit, onCancel, isHighlighted }) => {
+function getBookingStatusInfo(booking) {
   const isPast = new Date(booking.booking_date) < new Date(new Date().toDateString());
-  const statusColor = isPast ? "text-muted" : "text-green-700";
-  const statusBg = isPast ? "bg-slate-100" : "bg-green-50";
-  const statusText = isPast ? "Completed" : "Upcoming";
+  
+  // Check booking status field first
+  if (booking.status === "pending") {
+    return { color: "text-yellow-700", bg: "bg-yellow-50", text: "Pending Approval", canModify: true };
+  }
+  if (booking.status === "rejected") {
+    return { color: "text-red-600", bg: "bg-red-50", text: "Rejected", canModify: false };
+  }
+  if (booking.status === "approved") {
+    if (isPast) {
+      return { color: "text-muted", bg: "bg-slate-100", text: "Completed", canModify: false };
+    }
+    return { color: "text-green-700", bg: "bg-green-50", text: "Approved", canModify: true };
+  }
+  // Default fallback for bookings without status field
+  if (isPast) {
+    return { color: "text-muted", bg: "bg-slate-100", text: "Completed", canModify: false };
+  }
+  return { color: "text-green-700", bg: "bg-green-50", text: "Upcoming", canModify: true };
+}
+
+const BookingCard = React.memo(({ booking, room, onEdit, onCancel, isHighlighted }) => {
+  const statusInfo = getBookingStatusInfo(booking);
+  const isPast = new Date(booking.booking_date) < new Date(new Date().toDateString());
 
   // Calculate duration for display
   const startMinutes = parseTimeToMinutes(booking.start_time);
@@ -119,8 +140,8 @@ const BookingCard = React.memo(({ booking, room, onEdit, onCancel, isHighlighted
               <h3 className="text-lg font-semibold text-ink">
                 {room?.title || "Room"}
               </h3>
-              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusBg} ${statusColor}`}>
-                {statusText}
+              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusInfo.bg} ${statusInfo.color}`}>
+                {statusInfo.text}
               </span>
             </div>
             <p className="mt-1 text-sm text-muted">{room?.location || "Location unavailable"}</p>
@@ -163,7 +184,7 @@ const BookingCard = React.memo(({ booking, room, onEdit, onCancel, isHighlighted
             )}
           </div>
         </div>
-        {!isPast && (
+        {statusInfo.canModify && !isPast && (
           <div className="flex gap-2 sm:flex-col">
             <Button variant="outline" onClick={() => onEdit(booking)}>
               Edit
@@ -175,6 +196,11 @@ const BookingCard = React.memo(({ booking, room, onEdit, onCancel, isHighlighted
             >
               Cancel
             </Button>
+          </div>
+        )}
+        {booking.status === "rejected" && (
+          <div className="flex items-center">
+            <span className="text-xs text-red-500">This booking was not approved</span>
           </div>
         )}
       </div>
@@ -669,12 +695,19 @@ const MyBookings = React.memo(() => {
     );
   }
 
+  // Separate bookings by status
+  const pendingBookings = bookings.filter((b) => b.status === "pending");
   const upcomingBookings = bookings.filter(
-    (b) => new Date(b.booking_date) >= new Date(new Date().toDateString())
+    (b) => 
+      new Date(b.booking_date) >= new Date(new Date().toDateString()) &&
+      b.status === "approved"
   );
   const pastBookings = bookings.filter(
-    (b) => new Date(b.booking_date) < new Date(new Date().toDateString())
+    (b) => 
+      new Date(b.booking_date) < new Date(new Date().toDateString()) &&
+      b.status === "approved"
   );
+  const rejectedBookings = bookings.filter((b) => b.status === "rejected");
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -714,10 +747,41 @@ const MyBookings = React.memo(() => {
         </Card>
       ) : (
         <>
+          {pendingBookings.length > 0 && (
+            <div className="space-y-4">
+              <h2 className="flex items-center gap-2 text-sm font-semibold text-ink">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-yellow-100">
+                  <span className="h-2 w-2 rounded-full bg-yellow-500" />
+                </span>
+                Pending Approval ({pendingBookings.length})
+              </h2>
+              <div className="rounded-xl border border-yellow-200 bg-yellow-50/50 p-3">
+                <p className="text-xs text-yellow-700">
+                  These bookings are awaiting admin approval. You'll be notified once they're confirmed.
+                </p>
+              </div>
+              {pendingBookings.map((booking) => (
+                <BookingCard
+                  key={booking.id}
+                  booking={booking}
+                  room={rooms[booking.room_id]}
+                  onEdit={handleEdit}
+                  onCancel={handleCancel}
+                  isHighlighted={booking.id === highlightedBookingId}
+                />
+              ))}
+            </div>
+          )}
+
           {upcomingBookings.length > 0 && (
             <div className="space-y-4">
-              <h2 className="text-sm font-semibold text-ink">
-                Upcoming ({upcomingBookings.length})
+              <h2 className="flex items-center gap-2 text-sm font-semibold text-ink">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-green-100">
+                  <svg className="h-3 w-3 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </span>
+                Approved ({upcomingBookings.length})
               </h2>
               {upcomingBookings.map((booking) => (
                 <BookingCard
@@ -738,6 +802,29 @@ const MyBookings = React.memo(() => {
                 Past ({pastBookings.length})
               </h2>
               {pastBookings.map((booking) => (
+                <BookingCard
+                  key={booking.id}
+                  booking={booking}
+                  room={rooms[booking.room_id]}
+                  onEdit={handleEdit}
+                  onCancel={handleCancel}
+                  isHighlighted={booking.id === highlightedBookingId}
+                />
+              ))}
+            </div>
+          )}
+
+          {rejectedBookings.length > 0 && (
+            <div className="space-y-4">
+              <h2 className="flex items-center gap-2 text-sm font-semibold text-ink">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-red-100">
+                  <svg className="h-3 w-3 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </span>
+                Not Approved ({rejectedBookings.length})
+              </h2>
+              {rejectedBookings.map((booking) => (
                 <BookingCard
                   key={booking.id}
                   booking={booking}

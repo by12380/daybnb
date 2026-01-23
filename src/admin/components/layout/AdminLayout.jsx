@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../../../auth/useAuth.js";
+import NotificationDropdown from "../NotificationDropdown.jsx";
 
 const NAV_ITEMS = [
   {
@@ -140,6 +141,7 @@ const Header = React.memo(({ onMenuClick }) => {
       </div>
 
       <div className="flex items-center gap-4">
+        <NotificationDropdown />
         <div className="text-right">
           <p className="text-sm font-medium text-ink">{user?.email || "Admin"}</p>
           <p className="text-xs text-muted">Administrator</p>
