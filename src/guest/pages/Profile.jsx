@@ -197,7 +197,7 @@ const Profile = React.memo(() => {
             {(fullName?.[0] || user.email?.[0] || "U").toUpperCase()}
           </div>
           <div className="flex-1">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-700">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-700 dark:text-brand-200">
               My Profile
             </p>
             <h1 className="mt-1 text-2xl font-semibold text-ink">
@@ -214,7 +214,7 @@ const Profile = React.memo(() => {
           {/* Account Details (Read-only) */}
           <div>
             <p className="text-sm font-semibold text-ink">Account Details</p>
-            <div className="mt-3 rounded-xl border border-border bg-slate-50 p-4">
+            <div className="mt-3 rounded-xl border border-border bg-surface/60 p-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <p className="text-xs font-medium text-muted">Email</p>

@@ -580,7 +580,7 @@ const Booking = React.memo(() => {
           loading="lazy"
         />
         <div className="p-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-700">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-700 dark:text-brand-200">
             Booking
           </p>
           <h1 className="mt-2 text-2xl font-semibold text-ink">{room.title}</h1>
@@ -591,7 +591,7 @@ const Booking = React.memo(() => {
             <StarsDisplay value={ratingSummary.avg} count={ratingSummary.count} />
           </div>
           {pricePerHour > 0 && (
-            <p className="mt-2 text-lg font-semibold text-brand-700">
+            <p className="mt-2 text-lg font-semibold text-brand-700 dark:text-brand-200">
               {formatPrice(pricePerHour)}<span className="text-sm font-normal text-muted">/hour</span>
             </p>
           )}
@@ -600,7 +600,7 @@ const Booking = React.memo(() => {
               {tags.map((tag) => (
                 <span
                   key={tag}
-                  className="rounded-full border border-border bg-white px-2 py-0.5 text-[11px] text-muted"
+                  className="rounded-full border border-border bg-surface/60 px-2 py-0.5 text-[11px] text-muted"
                 >
                   {tag}
                 </span>
@@ -740,7 +740,7 @@ const Booking = React.memo(() => {
             ) : (
               <div className="mt-4 space-y-4">
                 {reviews.map((r) => (
-                  <div key={r.id} className="rounded-2xl border border-border bg-white p-4">
+                  <div key={r.id} className="rounded-2xl border border-border bg-panel p-4">
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                       <div>
                         <p className="text-sm font-semibold text-ink">
@@ -768,7 +768,7 @@ const Booking = React.memo(() => {
             </p>
 
             <form className="mt-4 space-y-3" onSubmit={onSubmitReview}>
-              <div className="rounded-2xl border border-border bg-slate-50 p-3">
+              <div className="rounded-2xl border border-border bg-surface/60 p-3">
                 <p className="text-xs font-medium text-muted">Your rating</p>
                 <StarsInput
                   value={reviewRating}

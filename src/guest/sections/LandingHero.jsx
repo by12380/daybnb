@@ -9,13 +9,14 @@ const LandingHero = React.memo(() => {
   }, []);
 
   return (
-    <div className="relative overflow-hidden rounded-3xl border border-border bg-gradient-to-br from-brand-50 via-white to-white px-6 py-14 shadow-2xl shadow-slate-200/60">
-      <div className="absolute -right-24 -top-24 h-64 w-64 rounded-full bg-brand-200/60 blur-3xl" />
-      <div className="absolute -bottom-24 -left-24 h-64 w-64 rounded-full bg-accent-100 blur-3xl" />
+    <div className="relative overflow-hidden rounded-3xl border border-border bg-gradient-to-br from-brand-50 via-panel to-panel px-6 py-14 shadow-2xl shadow-slate-200/60 dark:from-brand-500/10 dark:shadow-black/30">
+      <div className="absolute -right-24 -top-24 h-64 w-64 rounded-full bg-brand-200/60 blur-3xl dark:bg-brand-500/20" />
+      <div className="absolute -bottom-24 -left-24 h-64 w-64 rounded-full bg-accent-100 blur-3xl dark:bg-accent-500/10" />
       <div className="relative">
         <Badge tone="brand">Day-Use Only</Badge>
-        <h1 className="mt-4 text-4xl font-bold text-ink md:text-5xl">
-          Book homes and rooms by the day — never overnight.
+        <h1 className="mt-4 text-4xl font-bold leading-tight text-ink md:text-5xl">
+          Book homes and rooms by the day —{" "}
+          <span className="text-gradient-brand">never overnight.</span>
         </h1>
         <p className="mt-4 max-w-2xl text-lg text-muted">
           Reserve stylish spaces for work, relaxation, or events during daylight

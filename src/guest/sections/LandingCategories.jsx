@@ -11,7 +11,7 @@ const CATEGORIES = [
 
 const LandingCategories = React.memo(() => (
   <div>
-    <h2 className="text-2xl font-semibold text-brand-700">Popular categories</h2>
+    <h2 className="text-2xl font-semibold text-gradient-brand">Popular categories</h2>
     <div className="mt-4 grid gap-4 md:grid-cols-2">
       {CATEGORIES.map((category) => (
         <Card

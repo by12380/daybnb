@@ -46,8 +46,8 @@ function getNotificationIcon(type) {
       );
     default:
       return (
-        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100">
-          <svg className="h-4 w-4 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-200">
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
           </svg>
         </div>
@@ -59,7 +59,7 @@ const NotificationItem = React.memo(({ notification, onMarkAsRead }) => {
   const bookingId = notification.data?.booking_id;
 
   return (
-    <div className="flex gap-3 px-4 py-3 transition hover:bg-slate-50">
+    <div className="flex gap-3 px-4 py-3 transition hover:bg-surface/60">
       {getNotificationIcon(notification.type)}
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold text-ink">
@@ -113,7 +113,7 @@ export default function NotificationDropdown() {
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={toggleDropdown}
-        className="relative rounded-lg p-2 text-muted transition-colors hover:bg-slate-100 hover:text-ink"
+        className="relative rounded-lg p-2 text-muted transition-colors hover:bg-surface/60 hover:text-ink"
         title="Notifications"
       >
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -132,7 +132,7 @@ export default function NotificationDropdown() {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 origin-top-right rounded-2xl border border-border bg-white shadow-xl sm:w-96">
+        <div className="absolute right-0 mt-2 w-80 origin-top-right rounded-2xl border border-border bg-panel shadow-xl sm:w-96">
           {/* Header */}
           <div className="flex items-center justify-between border-b border-border px-4 py-3">
             <h3 className="font-semibold text-ink">Notifications</h3>

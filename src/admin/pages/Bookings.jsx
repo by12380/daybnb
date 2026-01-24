@@ -72,22 +72,25 @@ function getBookingStatusInfo(booking) {
 
   // Check booking status field first
   if (booking.status === "pending") {
-    return { color: "bg-yellow-50 text-yellow-700", text: "Pending Approval" };
+    return {
+      color: "bg-yellow-50 text-yellow-700 dark:bg-yellow-500/10 dark:text-yellow-200",
+      text: "Pending Approval",
+    };
   }
   if (booking.status === "rejected") {
-    return { color: "bg-red-50 text-red-600", text: "Rejected" };
+    return { color: "bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-300", text: "Rejected" };
   }
   if (booking.status === "approved") {
     if (isPast) {
-      return { color: "bg-slate-100 text-slate-600", text: "Completed" };
+      return { color: "bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-200", text: "Completed" };
     }
-    return { color: "bg-green-50 text-green-700", text: "Approved" };
+    return { color: "bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-200", text: "Approved" };
   }
   // Default fallback for bookings without status field
   if (isPast) {
-    return { color: "bg-slate-100 text-slate-600", text: "Completed" };
+    return { color: "bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-200", text: "Completed" };
   }
-  return { color: "bg-green-50 text-green-700", text: "Upcoming" };
+  return { color: "bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-200", text: "Upcoming" };
 }
 
 const ViewBookingModal = React.memo(({ open, booking, room, userProfile, onClose }) => {
@@ -110,7 +113,7 @@ const ViewBookingModal = React.memo(({ open, booking, room, userProfile, onClose
       <div className="space-y-4 pt-4">
         {/* Room Info */}
         {room && (
-          <div className="flex items-center gap-4 rounded-xl border border-border bg-slate-50 p-4">
+          <div className="flex items-center gap-4 rounded-xl border border-border bg-surface/60 p-4">
             {room.image && (
               <img src={room.image} alt={room.title} className="h-16 w-16 rounded-lg object-cover" />
             )}
@@ -303,7 +306,7 @@ const EditBookingModal = React.memo(({ open, booking, room, onClose, onSave }) =
     >
       <div className="space-y-4 pt-4">
         {room && (
-          <div className="flex items-center gap-3 rounded-xl border border-border bg-slate-50 p-3">
+          <div className="flex items-center gap-3 rounded-xl border border-border bg-surface/60 p-3">
             {room.image && (
               <img src={room.image} alt={room.title} className="h-12 w-12 rounded-lg object-cover" />
             )}
@@ -881,7 +884,7 @@ export default function AdminBookings() {
       </div>
 
       {/* Bookings Table */}
-      <div className="overflow-hidden rounded-2xl border border-border bg-white shadow-sm">
+      <div className="overflow-hidden rounded-2xl border border-border bg-panel shadow-sm">
         {filteredBookings.length === 0 ? (
           <div className="py-12 text-center">
             <svg className="mx-auto h-12 w-12 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -898,7 +901,7 @@ export default function AdminBookings() {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-border bg-slate-50 text-left text-xs font-medium uppercase tracking-wider text-muted">
+                <tr className="border-b border-border bg-surface/60 text-left text-xs font-medium uppercase tracking-wider text-muted">
                   <th className="px-6 py-3">Room</th>
                   <th className="px-6 py-3">Guest</th>
                   <th className="px-6 py-3">Date & Time</th>
@@ -915,7 +918,7 @@ export default function AdminBookings() {
                   const isPending = booking.status === "pending";
 
                   return (
-                    <tr key={booking.id} className="border-b border-border last:border-0 hover:bg-slate-50">
+                    <tr key={booking.id} className="border-b border-border last:border-0 hover:bg-surface/60">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
                           {room?.image && (
@@ -959,7 +962,7 @@ export default function AdminBookings() {
                             <>
                               <button
                                 onClick={() => setApprovingBooking(booking)}
-                                className="rounded-lg p-1.5 text-muted transition-colors hover:bg-green-50 hover:text-green-600"
+                                className="rounded-lg p-1.5 text-muted transition-colors hover:bg-green-50 hover:text-green-600 dark:hover:bg-green-500/10 dark:hover:text-green-200"
                                 title="Approve"
                               >
                                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -968,7 +971,7 @@ export default function AdminBookings() {
                               </button>
                               <button
                                 onClick={() => setRejectingBooking(booking)}
-                                className="rounded-lg p-1.5 text-muted transition-colors hover:bg-red-50 hover:text-red-600"
+                                className="rounded-lg p-1.5 text-muted transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10 dark:hover:text-red-300"
                                 title="Reject"
                               >
                                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -979,7 +982,7 @@ export default function AdminBookings() {
                           )}
                           <button
                             onClick={() => setViewingBooking(booking)}
-                            className="rounded-lg p-1.5 text-muted transition-colors hover:bg-slate-100 hover:text-ink"
+                            className="rounded-lg p-1.5 text-muted transition-colors hover:bg-surface/60 hover:text-ink"
                             title="View"
                           >
                             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -989,7 +992,7 @@ export default function AdminBookings() {
                           </button>
                           <button
                             onClick={() => setEditingBooking(booking)}
-                            className="rounded-lg p-1.5 text-muted transition-colors hover:bg-blue-50 hover:text-blue-600"
+                            className="rounded-lg p-1.5 text-muted transition-colors hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-500/10 dark:hover:text-blue-200"
                             title="Edit"
                           >
                             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

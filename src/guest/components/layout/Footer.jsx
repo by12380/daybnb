@@ -1,9 +1,9 @@
 export default function GuestFooter() {
   return (
-    <footer className="border-t border-border bg-white/80 backdrop-blur">
+    <footer className="border-t border-border bg-panel/80 backdrop-blur">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-8 text-sm text-muted md:flex-row md:items-center md:justify-between">
         <div>
-          <p className="font-semibold text-ink">Daybnb</p>
+          <p className="font-semibold text-gradient-brand">Daybnb</p>
           <p className="text-muted">
             Daytime bookings only. Overnight stays are not allowed.
           </p>

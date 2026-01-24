@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../../../auth/useAuth.js";
 import NotificationDropdown from "../NotificationDropdown.jsx";
+import ThemeToggle from "../../../theme/ThemeToggle.jsx";
 
 const NAV_ITEMS = [
   {
@@ -57,7 +58,7 @@ const Sidebar = React.memo(({ isOpen, onClose }) => {
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 transform bg-white shadow-xl transition-transform duration-200 ease-in-out lg:static lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 w-64 transform bg-panel shadow-xl transition-transform duration-200 ease-in-out lg:static lg:translate-x-0 ${
           isOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -74,7 +75,7 @@ const Sidebar = React.memo(({ isOpen, onClose }) => {
             </Link>
             <button
               onClick={onClose}
-              className="rounded-lg p-1 text-muted hover:bg-slate-100 lg:hidden"
+              className="rounded-lg p-1 text-muted hover:bg-surface/60 lg:hidden"
             >
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -93,8 +94,8 @@ const Sidebar = React.memo(({ isOpen, onClose }) => {
                   onClick={onClose}
                   className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors ${
                     isActive
-                      ? "bg-brand-50 text-brand-700"
-                      : "text-muted hover:bg-slate-50 hover:text-ink"
+                      ? "bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-200"
+                      : "text-muted hover:bg-surface/60 hover:text-ink"
                   }`}
                 >
                   {item.icon}
@@ -108,7 +109,7 @@ const Sidebar = React.memo(({ isOpen, onClose }) => {
           <div className="border-t border-border p-4">
             <Link
               to="/"
-              className="flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium text-muted transition-colors hover:bg-slate-50 hover:text-ink"
+              className="flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium text-muted transition-colors hover:bg-surface/60 hover:text-ink"
             >
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -126,10 +127,10 @@ const Header = React.memo(({ onMenuClick }) => {
   const { user, signOut } = useAuth();
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-white px-4 lg:px-6">
+    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-panel/80 px-4 backdrop-blur lg:px-6">
       <button
         onClick={onMenuClick}
-        className="rounded-lg p-2 text-muted hover:bg-slate-100 lg:hidden"
+        className="rounded-lg p-2 text-muted hover:bg-surface/60 lg:hidden"
       >
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
@@ -141,6 +142,7 @@ const Header = React.memo(({ onMenuClick }) => {
       </div>
 
       <div className="flex items-center gap-4">
+        <ThemeToggle className="hidden sm:inline-flex" />
         <NotificationDropdown />
         <div className="text-right">
           <p className="text-sm font-medium text-ink">{user?.email || "Admin"}</p>
@@ -148,7 +150,7 @@ const Header = React.memo(({ onMenuClick }) => {
         </div>
         <button
           onClick={signOut}
-          className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-muted transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600"
+          className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-muted transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10 dark:hover:text-red-300"
         >
           Sign Out
         </button>

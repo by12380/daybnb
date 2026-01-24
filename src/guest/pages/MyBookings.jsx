@@ -396,7 +396,7 @@ const EditBookingModal = React.memo(({
     >
       <div className="space-y-4 pt-4">
         {room && (
-          <div className="flex items-center gap-3 rounded-xl border border-border bg-slate-50 p-3">
+          <div className="flex items-center gap-3 rounded-xl border border-border bg-surface/60 p-3">
             {room.image && (
               <img src={room.image} alt={room.title} className="h-12 w-12 rounded-lg object-cover" />
             )}

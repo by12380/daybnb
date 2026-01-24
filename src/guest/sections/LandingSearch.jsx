@@ -96,9 +96,7 @@ const LandingSearch = React.memo(({ onSearch }) => {
   return (
     <Card className="space-y-6">
       <div>
-        <h2 className="text-2xl font-semibold text-brand-700">
-          Find your daytime stay
-        </h2>
+        <h2 className="text-2xl font-semibold text-gradient-brand">Find your daytime stay</h2>
         <p className="mt-1 text-sm text-muted">
           Book hourly or choose the full daytime window. Minimum{" "}
           {MIN_BOOKING_HOURS} hours.

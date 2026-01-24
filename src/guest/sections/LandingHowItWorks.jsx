@@ -21,7 +21,7 @@ const STEPS = [
 
 const LandingHowItWorks = React.memo(() => (
   <div>
-    <h2 className="text-2xl font-semibold text-brand-700">How it works</h2>
+    <h2 className="text-2xl font-semibold text-gradient-brand">How it works</h2>
     <div className="mt-4 grid gap-4 md:grid-cols-3">
       {STEPS.map((step, index) => (
         <Card

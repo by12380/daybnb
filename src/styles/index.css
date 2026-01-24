@@ -2,20 +2,39 @@
 @tailwind components;
 @tailwind utilities;
 
-html,
-body {
-  height: 100%;
-}
+@layer base {
+  :root {
+    /* Light theme */
+    --color-surface: 248 250 252; /* slate-50 */
+    --color-panel: 255 255 255; /* white */
+    --color-ink: 15 23 42; /* slate-900 */
+    --color-muted: 100 116 139; /* slate-500 */
+    --color-border: 226 232 240; /* slate-200 */
+  }
 
-body {
-  background-color: #f8fafc;
-  color: #0f172a;
+  /* Dark theme (navy-forward) */
+  html.dark {
+    --color-surface: 7 18 38; /* deep navy */
+    --color-panel: 11 27 51; /* navy panel */
+    --color-ink: 230 237 247; /* near-white */
+    --color-muted: 154 167 189; /* muted blue/gray */
+    --color-border: 34 52 79; /* navy border */
+  }
+
+  html,
+  body {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-surface text-ink;
+  }
 }
 
 .ant-picker {
-  background-color: #ffffff;
-  border-color: #e2e8f0;
-  color: #0f172a;
+  background-color: rgb(var(--color-panel) / 1);
+  border-color: rgb(var(--color-border) / 1);
+  color: rgb(var(--color-ink) / 1);
 }
 
 .ant-picker:hover {
@@ -28,9 +47,40 @@ body {
 }
 
 .ant-picker input {
-  color: #0f172a;
+  color: rgb(var(--color-ink) / 1);
 }
 
 .ant-picker input::placeholder {
-  color: rgba(100, 116, 139, 0.7);
+  color: rgb(var(--color-muted) / 0.7);
+}
+
+/* Ant Design - basic dark-theme friendliness */
+.ant-modal-content {
+  background-color: rgb(var(--color-panel) / 1) !important;
+  color: rgb(var(--color-ink) / 1) !important;
+}
+
+.ant-modal-header {
+  background-color: rgb(var(--color-panel) / 1) !important;
+  border-bottom: 1px solid rgb(var(--color-border) / 1) !important;
+}
+
+.ant-modal-title {
+  color: rgb(var(--color-ink) / 1) !important;
+}
+
+.ant-modal-close,
+.ant-modal-close:hover {
+  color: rgb(var(--color-muted) / 1) !important;
+}
+
+.ant-modal-footer {
+  border-top: 1px solid rgb(var(--color-border) / 1) !important;
+}
+
+@layer utilities {
+  /* Nice accent for headings/brand text */
+  .text-gradient-brand {
+    @apply bg-gradient-to-r from-brand-500 via-accent-500 to-brand-700 bg-clip-text text-transparent;
+  }
 }

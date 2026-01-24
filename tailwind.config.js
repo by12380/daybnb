@@ -1,6 +1,7 @@
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ["./index.html", "./src/**/*.{js,jsx}"],
+  darkMode: "class",
   theme: {
     extend: {
       colors: {
@@ -22,11 +23,12 @@ export default {
           100: "#ffedd5",
           500: "#ff8a3d",
         },
-        surface: "#f8fafc",
-        ink: "#0f172a",
-        muted: "#64748b",
-        panel: "#ffffff",
-        border: "#e2e8f0",
+        // Theme-aware semantic colors (driven by CSS variables in `src/styles/index.css`)
+        surface: "rgb(var(--color-surface) / <alpha-value>)",
+        ink: "rgb(var(--color-ink) / <alpha-value>)",
+        muted: "rgb(var(--color-muted) / <alpha-value>)",
+        panel: "rgb(var(--color-panel) / <alpha-value>)",
+        border: "rgb(var(--color-border) / <alpha-value>)",
       },
     },
   },

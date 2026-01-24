@@ -81,7 +81,7 @@ export const StarsInput = React.memo(function StarsInput({
             onClick={() => handleSet(n)}
             disabled={disabled}
             className={`rounded-md p-1 ${
-              disabled ? "cursor-not-allowed opacity-60" : "hover:bg-amber-50"
+              disabled ? "cursor-not-allowed opacity-60" : "hover:bg-amber-500/10"
             }`}
             aria-label={`${n} star${n === 1 ? "" : "s"}`}
             aria-checked={n === v}
@@ -89,7 +89,7 @@ export const StarsInput = React.memo(function StarsInput({
           >
             <StarIcon
               filled={filled}
-              className={`${starClass} ${filled ? "text-amber-500" : "text-slate-300"}`}
+              className={`${starClass} ${filled ? "text-amber-500" : "text-muted/40"}`}
             />
           </button>
         );

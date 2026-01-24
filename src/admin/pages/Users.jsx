@@ -41,11 +41,11 @@ const ViewUserModal = React.memo(({ open, user, bookings, onClose }) => {
 
         {/* Stats */}
         <div className="grid grid-cols-3 gap-4">
-          <div className="rounded-xl border border-border bg-slate-50 p-4 text-center">
+          <div className="rounded-xl border border-border bg-surface/60 p-4 text-center">
             <p className="text-2xl font-bold text-ink">{bookings.length}</p>
             <p className="text-xs text-muted">Total Bookings</p>
           </div>
-          <div className="rounded-xl border border-border bg-slate-50 p-4 text-center">
+          <div className="rounded-xl border border-border bg-surface/60 p-4 text-center">
             <p className="text-2xl font-bold text-ink">{upcomingBookings.length}</p>
             <p className="text-xs text-muted">Upcoming</p>
           </div>
@@ -56,7 +56,7 @@ const ViewUserModal = React.memo(({ open, user, bookings, onClose }) => {
         </div>
 
         {/* Account Info */}
-        <div className="space-y-3 rounded-xl border border-border bg-slate-50 p-4">
+        <div className="space-y-3 rounded-xl border border-border bg-surface/60 p-4">
           <h4 className="font-medium text-ink">Account Information</h4>
           <div className="grid gap-2 text-sm">
             <div className="flex justify-between">
@@ -104,7 +104,7 @@ const ViewUserModal = React.memo(({ open, user, bookings, onClose }) => {
                 return (
                   <div
                     key={booking.id}
-                    className="flex items-center justify-between rounded-lg border border-border bg-white p-3"
+                    className="flex items-center justify-between rounded-lg border border-border bg-panel p-3"
                   >
                     <div>
                       <p className="text-sm font-medium text-ink">
@@ -124,7 +124,7 @@ const ViewUserModal = React.memo(({ open, user, bookings, onClose }) => {
                       </p>
                       <span
                         className={`text-xs ${
-                          isPast ? "text-slate-500" : "text-green-600"
+                          isPast ? "text-muted" : "text-green-600 dark:text-green-200"
                         }`}
                       >
                         {isPast ? "Completed" : "Upcoming"}
@@ -187,7 +187,7 @@ const EditUserModal = React.memo(({ open, user, onClose, onSave }) => {
       destroyOnClose
     >
       <div className="space-y-4 pt-4">
-        <div className="flex items-center gap-3 rounded-xl border border-border bg-slate-50 p-3">
+        <div className="flex items-center gap-3 rounded-xl border border-border bg-surface/60 p-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-100 text-lg font-bold text-brand-600">
             {(user?.full_name || user?.email || "U").charAt(0).toUpperCase()}
           </div>
@@ -402,7 +402,7 @@ export default function AdminUsers() {
 
       {/* Users Grid */}
       {filteredUsers.length === 0 ? (
-        <div className="rounded-2xl border border-border bg-white py-12 text-center shadow-sm">
+        <div className="rounded-2xl border border-border bg-panel py-12 text-center shadow-sm">
           <svg className="mx-auto h-12 w-12 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
           </svg>
@@ -420,7 +420,7 @@ export default function AdminUsers() {
             return (
               <div
                 key={user.id}
-                className="rounded-2xl border border-border bg-white p-5 shadow-sm transition-shadow hover:shadow-md"
+                className="rounded-2xl border border-border bg-panel p-5 shadow-sm transition-shadow hover:shadow-md dark:hover:shadow-black/30"
               >
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
@@ -435,8 +435,8 @@ export default function AdminUsers() {
                   <span
                     className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${
                       user.user_type === "admin"
-                        ? "bg-purple-50 text-purple-700"
-                        : "bg-slate-100 text-slate-700"
+                        ? "bg-purple-50 text-purple-700 dark:bg-purple-500/10 dark:text-purple-200"
+                        : "bg-surface/60 text-ink"
                     }`}
                     title="User role"
                   >

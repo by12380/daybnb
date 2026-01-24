@@ -165,9 +165,7 @@ const LandingGallery = React.memo(({ location = "", guests = 0 }) => {
     <div>
       <div className="flex items-end justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-semibold text-brand-700">
-            Explore day-use spaces
-          </h2>
+          <h2 className="text-2xl font-semibold text-gradient-brand">Explore day-use spaces</h2>
           <p className="mt-1 text-sm text-muted">
             A quick preview of the types of rooms guests book during the day.
           </p>

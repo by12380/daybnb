@@ -14,7 +14,7 @@ const TESTIMONIALS = [
 
 const LandingTestimonials = React.memo(() => (
   <div>
-    <h2 className="text-2xl font-semibold text-brand-700">Guest love</h2>
+    <h2 className="text-2xl font-semibold text-gradient-brand">Guest love</h2>
     <div className="mt-4 grid gap-4 md:grid-cols-2">
       {TESTIMONIALS.map((item) => (
         <Card

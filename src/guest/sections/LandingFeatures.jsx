@@ -26,9 +26,7 @@ const FEATURES = [
 
 const LandingFeatures = React.memo(() => (
   <div>
-    <h2 className="text-2xl font-semibold text-brand-700">
-      Why guests love Daybnb
-    </h2>
+    <h2 className="text-2xl font-semibold text-gradient-brand">Why guests love Daybnb</h2>
     <div className="mt-4 grid gap-4 md:grid-cols-2">
       {FEATURES.map((feature) => (
         <Card key={feature.title}>

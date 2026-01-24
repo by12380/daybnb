@@ -5,14 +5,14 @@ import { formatPrice } from "../../guest/utils/format.js";
 
 const StatCard = React.memo(({ title, value, subtitle, icon, color = "brand" }) => {
   const colorClasses = {
-    brand: "bg-brand-50 text-brand-600",
-    green: "bg-green-50 text-green-600",
-    orange: "bg-orange-50 text-orange-600",
-    purple: "bg-purple-50 text-purple-600",
+    brand: "bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-200",
+    green: "bg-green-50 text-green-600 dark:bg-green-500/10 dark:text-green-200",
+    orange: "bg-orange-50 text-orange-600 dark:bg-orange-500/10 dark:text-orange-200",
+    purple: "bg-purple-50 text-purple-600 dark:bg-purple-500/10 dark:text-purple-200",
   };
 
   return (
-    <div className="rounded-2xl border border-border bg-white p-6 shadow-sm">
+    <div className="rounded-2xl border border-border bg-panel p-6 shadow-sm">
       <div className="flex items-start justify-between">
         <div>
           <p className="text-sm font-medium text-muted">{title}</p>
@@ -29,7 +29,9 @@ const StatCard = React.memo(({ title, value, subtitle, icon, color = "brand" }) 
 
 const RecentBookingRow = React.memo(({ booking }) => {
   const isPast = new Date(booking.booking_date) < new Date(new Date().toDateString());
-  const statusColor = isPast ? "bg-slate-100 text-slate-600" : "bg-green-50 text-green-700";
+  const statusColor = isPast
+    ? "bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-200"
+    : "bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-200";
   const statusText = isPast ? "Completed" : "Upcoming";
 
   return (
@@ -256,7 +258,7 @@ export default function AdminDashboard() {
       <div className="grid gap-4 sm:grid-cols-3">
         <Link
           to="/admin/bookings"
-          className="flex items-center gap-4 rounded-2xl border border-border bg-white p-4 shadow-sm transition-colors hover:border-brand-200 hover:bg-brand-50"
+          className="flex items-center gap-4 rounded-2xl border border-border bg-panel p-4 shadow-sm transition-colors hover:border-brand-200 hover:bg-brand-50 dark:hover:bg-brand-500/10"
         >
           <div className="rounded-xl bg-brand-100 p-3 text-brand-600">
             <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -270,7 +272,7 @@ export default function AdminDashboard() {
         </Link>
         <Link
           to="/admin/users"
-          className="flex items-center gap-4 rounded-2xl border border-border bg-white p-4 shadow-sm transition-colors hover:border-purple-200 hover:bg-purple-50"
+          className="flex items-center gap-4 rounded-2xl border border-border bg-panel p-4 shadow-sm transition-colors hover:border-purple-200 hover:bg-purple-50 dark:hover:bg-purple-500/10"
         >
           <div className="rounded-xl bg-purple-100 p-3 text-purple-600">
             <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -284,7 +286,7 @@ export default function AdminDashboard() {
         </Link>
         <Link
           to="/admin/rooms"
-          className="flex items-center gap-4 rounded-2xl border border-border bg-white p-4 shadow-sm transition-colors hover:border-orange-200 hover:bg-orange-50"
+          className="flex items-center gap-4 rounded-2xl border border-border bg-panel p-4 shadow-sm transition-colors hover:border-orange-200 hover:bg-orange-50 dark:hover:bg-orange-500/10"
         >
           <div className="rounded-xl bg-orange-100 p-3 text-orange-600">
             <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -299,7 +301,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* Recent Bookings Table */}
-      <div className="rounded-2xl border border-border bg-white shadow-sm">
+      <div className="rounded-2xl border border-border bg-panel shadow-sm">
         <div className="flex items-center justify-between border-b border-border px-6 py-4">
           <h2 className="text-lg font-semibold text-ink">Recent Bookings</h2>
           <Link
@@ -317,7 +319,7 @@ export default function AdminDashboard() {
           ) : (
             <table className="w-full">
               <thead>
-                <tr className="border-b border-border bg-slate-50 text-left text-xs font-medium uppercase tracking-wider text-muted">
+                <tr className="border-b border-border bg-surface/60 text-left text-xs font-medium uppercase tracking-wider text-muted">
                   <th className="px-6 py-3">Room</th>
                   <th className="px-6 py-3">Guest</th>
                   <th className="px-6 py-3">Date</th>
@@ -363,7 +365,9 @@ export default function AdminDashboard() {
                     <td className="px-6 py-4">
                       {(() => {
                         const isPast = new Date(booking.booking_date) < new Date(new Date().toDateString());
-                        const statusColor = isPast ? "bg-slate-100 text-slate-600" : "bg-green-50 text-green-700";
+                        const statusColor = isPast
+                          ? "bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-200"
+                          : "bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-200";
                         const statusText = isPast ? "Completed" : "Upcoming";
                         return (
                           <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${statusColor}`}>

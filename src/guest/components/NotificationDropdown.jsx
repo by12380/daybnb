@@ -23,32 +23,32 @@ function getNotificationIcon(type) {
   switch (type) {
     case "booking_approved":
       return (
-        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-100">
-          <svg className="h-4 w-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-100 text-green-600 dark:bg-green-500/10 dark:text-green-200">
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
         </div>
       );
     case "booking_rejected":
       return (
-        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-red-100">
-          <svg className="h-4 w-4 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-red-100 text-red-600 dark:bg-red-500/10 dark:text-red-300">
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
           </svg>
         </div>
       );
     case "booking_created":
       return (
-        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100">
-          <svg className="h-4 w-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-blue-600 dark:bg-blue-500/10 dark:text-blue-200">
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
           </svg>
         </div>
       );
     default:
       return (
-        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100">
-          <svg className="h-4 w-4 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-surface/60 text-muted">
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
           </svg>
         </div>
@@ -60,7 +60,7 @@ const NotificationItem = React.memo(({ notification, onMarkAsRead, onClose }) =>
   const bookingId = notification.data?.booking_id;
 
   return (
-    <div className="flex gap-3 px-4 py-3 transition hover:bg-slate-50">
+    <div className="flex gap-3 px-4 py-3 transition hover:bg-surface/60">
       {getNotificationIcon(notification.type)}
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold text-ink">
@@ -122,7 +122,7 @@ export default function UserNotificationDropdown() {
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={toggleDropdown}
-        className="relative rounded-full p-2 text-muted transition-colors hover:bg-slate-100 hover:text-ink"
+        className="relative rounded-full p-2 text-muted transition-colors hover:bg-surface/60 hover:text-ink"
         title="Notifications"
       >
         <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -141,7 +141,7 @@ export default function UserNotificationDropdown() {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 origin-top-right rounded-2xl border border-border bg-white shadow-xl">
+        <div className="absolute right-0 mt-2 w-80 origin-top-right rounded-2xl border border-border bg-panel shadow-xl">
           {/* Header */}
           <div className="flex items-center justify-between border-b border-border px-4 py-3">
             <h3 className="font-semibold text-ink">Notifications</h3>

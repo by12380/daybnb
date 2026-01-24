@@ -56,8 +56,8 @@ const RoomCard = React.memo(function RoomCard({
           <button
             type="button"
             onClick={handleToggle}
-            className={`absolute right-3 top-3 rounded-full border border-border bg-white/90 p-2 shadow-sm backdrop-blur transition hover:bg-white ${
-              liked ? "text-rose-600" : "text-slate-500"
+            className={`absolute right-3 top-3 rounded-full border border-border bg-panel/85 p-2 shadow-sm backdrop-blur transition hover:bg-panel ${
+              liked ? "text-rose-600 dark:text-rose-300" : "text-muted hover:text-ink"
             }`}
             aria-label={liked ? "Unlike room" : "Like room"}
             title={liked ? "Unlike" : "Like"}
@@ -79,7 +79,7 @@ const RoomCard = React.memo(function RoomCard({
         </div>
 
         {room.price_per_hour > 0 && (
-          <p className="text-lg font-semibold text-brand-700">
+          <p className="text-lg font-semibold text-brand-700 dark:text-brand-200">
             {formatPrice(room.price_per_hour)}
             <span className="text-xs font-normal text-muted">/hour</span>
           </p>
@@ -90,7 +90,7 @@ const RoomCard = React.memo(function RoomCard({
             {tags.map((tag) => (
               <span
                 key={tag}
-                className="rounded-full border border-border bg-white px-2 py-0.5 text-[11px] text-muted"
+                className="rounded-full border border-border bg-surface/60 px-2 py-0.5 text-[11px] text-muted"
               >
                 {tag}
               </span>
