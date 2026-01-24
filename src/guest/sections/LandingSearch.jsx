@@ -96,10 +96,10 @@ const LandingSearch = React.memo(({ onSearch }) => {
   return (
     <Card className="space-y-6">
       <div>
-        <h2 className="text-2xl font-semibold text-brand-700">
+        <h2 className="text-2xl font-semibold text-brand-700 dark:text-brand-400">
           Find your daytime stay
         </h2>
-        <p className="mt-1 text-sm text-muted">
+        <p className="mt-1 text-sm text-muted dark:text-dark-muted">
           Book hourly or choose the full daytime window. Minimum{" "}
           {MIN_BOOKING_HOURS} hours.
         </p>
@@ -110,7 +110,7 @@ const LandingSearch = React.memo(({ onSearch }) => {
         noValidate
       >
         <label className="flex flex-col gap-2 md:col-span-2">
-          <span className="text-sm font-medium text-muted">Location</span>
+          <span className="text-sm font-medium text-muted dark:text-dark-muted">Location</span>
           <select
             name="location"
             value={formState.location}
@@ -132,11 +132,11 @@ const LandingSearch = React.memo(({ onSearch }) => {
             ))}
           </select>
           {citiesError ? (
-            <span className="text-xs text-red-600">{citiesError}</span>
+            <span className="text-xs text-red-600 dark:text-red-400">{citiesError}</span>
           ) : null}
         </label>
         <label className="flex flex-col gap-2 md:col-span-1">
-          <span className="text-sm font-medium text-muted">Date</span>
+          <span className="text-sm font-medium text-muted dark:text-dark-muted">Date</span>
           <DatePicker
             className={INPUT_STYLES}
             placeholder="Select date"
@@ -145,7 +145,7 @@ const LandingSearch = React.memo(({ onSearch }) => {
           />
         </label>
         <label className="flex flex-col gap-2 md:col-span-1">
-          <span className="text-sm font-medium text-muted">Booking</span>
+          <span className="text-sm font-medium text-muted dark:text-dark-muted">Booking</span>
           <select
             name="bookingType"
             value={bookingType}

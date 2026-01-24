@@ -7,11 +7,51 @@ body {
   height: 100%;
 }
 
+/* Light mode (default) */
 body {
   background-color: #f8fafc;
   color: #0f172a;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
+/* Dark mode */
+.dark body {
+  background-color: #0a1628;
+  color: #e2e8f0;
+}
+
+/* Gradient text utilities */
+@layer utilities {
+  .text-gradient {
+    background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 50%, #ec4899 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  
+  .text-gradient-dark {
+    background: linear-gradient(135deg, #60a5fa 0%, #a78bfa 50%, #f472b6 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  
+  .text-gradient-brand {
+    background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  
+  .text-gradient-accent {
+    background: linear-gradient(135deg, #ff8a3d 0%, #f472b6 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+}
+
+/* Ant Design Picker - Light mode */
 .ant-picker {
   background-color: #ffffff;
   border-color: #e2e8f0;
@@ -33,4 +73,166 @@ body {
 
 .ant-picker input::placeholder {
   color: rgba(100, 116, 139, 0.7);
+}
+
+/* Ant Design Picker - Dark mode */
+.dark .ant-picker {
+  background-color: #162236;
+  border-color: #1e3a5f;
+  color: #e2e8f0;
+}
+
+.dark .ant-picker:hover {
+  border-color: rgba(96, 165, 250, 0.7);
+}
+
+.dark .ant-picker-focused {
+  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.2);
+  border-color: rgba(96, 165, 250, 0.7);
+}
+
+.dark .ant-picker input {
+  color: #e2e8f0;
+}
+
+.dark .ant-picker input::placeholder {
+  color: rgba(148, 163, 184, 0.7);
+}
+
+/* Ant Design Dropdown - Dark mode */
+.dark .ant-picker-dropdown {
+  background-color: #162236;
+}
+
+.dark .ant-picker-panel-container {
+  background-color: #162236;
+}
+
+.dark .ant-picker-header {
+  color: #e2e8f0;
+  border-color: #1e3a5f;
+}
+
+.dark .ant-picker-header button {
+  color: #94a3b8;
+}
+
+.dark .ant-picker-header button:hover {
+  color: #e2e8f0;
+}
+
+.dark .ant-picker-content th {
+  color: #94a3b8;
+}
+
+.dark .ant-picker-cell {
+  color: #e2e8f0;
+}
+
+.dark .ant-picker-cell:hover .ant-picker-cell-inner {
+  background-color: #1e3a5f;
+}
+
+.dark .ant-picker-cell-in-view.ant-picker-cell-selected .ant-picker-cell-inner {
+  background-color: #2563eb;
+}
+
+.dark .ant-picker-time-panel-column > li.ant-picker-time-panel-cell .ant-picker-time-panel-cell-inner {
+  color: #e2e8f0;
+}
+
+.dark .ant-picker-time-panel-column > li.ant-picker-time-panel-cell .ant-picker-time-panel-cell-inner:hover {
+  background-color: #1e3a5f;
+}
+
+/* Ant Design Modal - Dark mode */
+.dark .ant-modal-content {
+  background-color: #162236;
+  border: 1px solid #1e3a5f;
+}
+
+.dark .ant-modal-header {
+  background-color: #162236;
+  border-color: #1e3a5f;
+}
+
+.dark .ant-modal-title {
+  color: #e2e8f0;
+}
+
+.dark .ant-modal-close {
+  color: #94a3b8;
+}
+
+.dark .ant-modal-close:hover {
+  color: #e2e8f0;
+  background-color: #1e3a5f;
+}
+
+.dark .ant-modal-body {
+  color: #e2e8f0;
+}
+
+.dark .ant-modal-footer {
+  border-color: #1e3a5f;
+}
+
+/* Ant Design Select - Dark mode */
+.dark .ant-select-selector {
+  background-color: #162236 !important;
+  border-color: #1e3a5f !important;
+  color: #e2e8f0 !important;
+}
+
+.dark .ant-select-arrow {
+  color: #94a3b8;
+}
+
+.dark .ant-select-dropdown {
+  background-color: #162236;
+  border: 1px solid #1e3a5f;
+}
+
+.dark .ant-select-item {
+  color: #e2e8f0;
+}
+
+.dark .ant-select-item-option-active {
+  background-color: #1e3a5f;
+}
+
+.dark .ant-select-item-option-selected {
+  background-color: #2563eb;
+  color: #ffffff;
+}
+
+/* Native select dark mode styling */
+.dark select {
+  background-color: #162236;
+  border-color: #1e3a5f;
+  color: #e2e8f0;
+}
+
+.dark select option {
+  background-color: #162236;
+  color: #e2e8f0;
+}
+
+/* Scrollbar dark mode */
+.dark ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: #0f1d32;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #1e3a5f;
+  border-radius: 4px;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #2563eb;
 }

@@ -72,22 +72,22 @@ function getBookingStatusInfo(booking) {
 
   // Check booking status field first
   if (booking.status === "pending") {
-    return { color: "bg-yellow-50 text-yellow-700", text: "Pending Approval" };
+    return { color: "bg-yellow-50 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400", text: "Pending Approval" };
   }
   if (booking.status === "rejected") {
-    return { color: "bg-red-50 text-red-600", text: "Rejected" };
+    return { color: "bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400", text: "Rejected" };
   }
   if (booking.status === "approved") {
     if (isPast) {
-      return { color: "bg-slate-100 text-slate-600", text: "Completed" };
+      return { color: "bg-slate-100 text-slate-600 dark:bg-slate-800/50 dark:text-slate-400", text: "Completed" };
     }
-    return { color: "bg-green-50 text-green-700", text: "Approved" };
+    return { color: "bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400", text: "Approved" };
   }
   // Default fallback for bookings without status field
   if (isPast) {
-    return { color: "bg-slate-100 text-slate-600", text: "Completed" };
+    return { color: "bg-slate-100 text-slate-600 dark:bg-slate-800/50 dark:text-slate-400", text: "Completed" };
   }
-  return { color: "bg-green-50 text-green-700", text: "Upcoming" };
+  return { color: "bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400", text: "Upcoming" };
 }
 
 const ViewBookingModal = React.memo(({ open, booking, room, userProfile, onClose }) => {
@@ -110,20 +110,20 @@ const ViewBookingModal = React.memo(({ open, booking, room, userProfile, onClose
       <div className="space-y-4 pt-4">
         {/* Room Info */}
         {room && (
-          <div className="flex items-center gap-4 rounded-xl border border-border bg-slate-50 p-4">
+          <div className="flex items-center gap-4 rounded-xl border border-border bg-slate-50 p-4 dark:border-dark-border dark:bg-dark-surface">
             {room.image && (
               <img src={room.image} alt={room.title} className="h-16 w-16 rounded-lg object-cover" />
             )}
             <div>
-              <p className="font-semibold text-ink">{room.title}</p>
-              <p className="text-sm text-muted">{room.location}</p>
+              <p className="font-semibold text-ink dark:text-dark-ink">{room.title}</p>
+              <p className="text-sm text-muted dark:text-dark-muted">{room.location}</p>
             </div>
           </div>
         )}
 
         {/* Status */}
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-muted">Status:</span>
+          <span className="text-sm font-medium text-muted dark:text-dark-muted">Status:</span>
           <span className={`rounded-full px-3 py-1 text-xs font-medium ${statusInfo.color}`}>
             {statusInfo.text}
           </span>
@@ -132,60 +132,60 @@ const ViewBookingModal = React.memo(({ open, booking, room, userProfile, onClose
         {/* Booking Details */}
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
-            <p className="text-xs font-medium text-muted">Date</p>
-            <p className="mt-1 text-sm font-medium text-ink">{formatDate(booking.booking_date)}</p>
+            <p className="text-xs font-medium text-muted dark:text-dark-muted">Date</p>
+            <p className="mt-1 text-sm font-medium text-ink dark:text-dark-ink">{formatDate(booking.booking_date)}</p>
           </div>
           <div>
-            <p className="text-xs font-medium text-muted">Time</p>
-            <p className="mt-1 text-sm font-medium text-ink">
+            <p className="text-xs font-medium text-muted dark:text-dark-muted">Time</p>
+            <p className="mt-1 text-sm font-medium text-ink dark:text-dark-ink">
               {formatTime(booking.start_time)} - {formatTime(booking.end_time)}
             </p>
           </div>
           <div>
-            <p className="text-xs font-medium text-muted">Guest Name</p>
-            <p className="mt-1 text-sm font-medium text-ink">
+            <p className="text-xs font-medium text-muted dark:text-dark-muted">Guest Name</p>
+            <p className="mt-1 text-sm font-medium text-ink dark:text-dark-ink">
               {booking.user_full_name || userProfile?.full_name || "N/A"}
             </p>
           </div>
           <div>
-            <p className="text-xs font-medium text-muted">Phone</p>
-            <p className="mt-1 text-sm font-medium text-ink">
+            <p className="text-xs font-medium text-muted dark:text-dark-muted">Phone</p>
+            <p className="mt-1 text-sm font-medium text-ink dark:text-dark-ink">
               {booking.user_phone || userProfile?.phone || "N/A"}
             </p>
           </div>
           <div className="sm:col-span-2">
-            <p className="text-xs font-medium text-muted">Email</p>
-            <p className="mt-1 text-sm font-medium text-ink">
+            <p className="text-xs font-medium text-muted dark:text-dark-muted">Email</p>
+            <p className="mt-1 text-sm font-medium text-ink dark:text-dark-ink">
               {userProfile?.email || booking.user_email || "N/A"}
             </p>
           </div>
         </div>
 
         {/* Price */}
-        <div className="rounded-xl border border-brand-100 bg-brand-50 p-4">
+        <div className="rounded-xl border border-brand-100 bg-brand-50 p-4 dark:border-brand-800 dark:bg-brand-900/30">
           <div className="flex items-center justify-between">
-            <span className="font-medium text-ink">Total Amount</span>
-            <span className="text-xl font-bold text-brand-700">
+            <span className="font-medium text-ink dark:text-dark-ink">Total Amount</span>
+            <span className="text-xl font-bold text-brand-700 dark:text-brand-400">
               {formatPrice(booking.total_price || 0)}
             </span>
           </div>
           {booking.price_per_hour && (
-            <p className="mt-1 text-xs text-muted">
+            <p className="mt-1 text-xs text-muted dark:text-dark-muted">
               {formatPrice(booking.price_per_hour)}/hr × {booking.billable_hours || 0} hrs
             </p>
           )}
         </div>
 
         {/* Metadata */}
-        <div className="border-t border-border pt-4">
-          <p className="text-xs text-muted">
+        <div className="border-t border-border pt-4 dark:border-dark-border">
+          <p className="text-xs text-muted dark:text-dark-muted">
             Booking ID: <span className="font-mono">{booking.id}</span>
           </p>
-          <p className="text-xs text-muted">
+          <p className="text-xs text-muted dark:text-dark-muted">
             User ID: <span className="font-mono">{booking.user_id}</span>
           </p>
           {booking.created_at && (
-            <p className="text-xs text-muted">
+            <p className="text-xs text-muted dark:text-dark-muted">
               Created: {new Date(booking.created_at).toLocaleString()}
             </p>
           )}
@@ -831,8 +831,8 @@ export default function AdminBookings() {
     return (
       <div className="flex h-64 items-center justify-center">
         <div className="text-center">
-          <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-brand-200 border-t-brand-600" />
-          <p className="mt-4 text-sm text-muted">Loading bookings...</p>
+          <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-brand-200 border-t-brand-600 dark:border-brand-700 dark:border-t-brand-400" />
+          <p className="mt-4 text-sm text-muted dark:text-dark-muted">Loading bookings...</p>
         </div>
       </div>
     );
@@ -843,11 +843,11 @@ export default function AdminBookings() {
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-ink">Bookings</h1>
-          <p className="mt-1 text-sm text-muted">
+          <h1 className="text-2xl font-bold text-ink dark:text-dark-ink">Bookings</h1>
+          <p className="mt-1 text-sm text-muted dark:text-dark-muted">
             Manage all reservations ({bookings.length} total)
             {pendingCount > 0 && (
-              <span className="ml-2 inline-flex items-center rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-800">
+              <span className="ml-2 inline-flex items-center rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-400">
                 {pendingCount} pending approval
               </span>
             )}
@@ -881,14 +881,14 @@ export default function AdminBookings() {
       </div>
 
       {/* Bookings Table */}
-      <div className="overflow-hidden rounded-2xl border border-border bg-white shadow-sm">
+      <div className="overflow-hidden rounded-2xl border border-border bg-white shadow-sm transition-colors duration-300 dark:border-dark-border dark:bg-dark-panel">
         {filteredBookings.length === 0 ? (
           <div className="py-12 text-center">
-            <svg className="mx-auto h-12 w-12 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="mx-auto h-12 w-12 text-muted dark:text-dark-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
-            <p className="mt-4 text-sm font-medium text-ink">No bookings found</p>
-            <p className="mt-1 text-sm text-muted">
+            <p className="mt-4 text-sm font-medium text-ink dark:text-dark-ink">No bookings found</p>
+            <p className="mt-1 text-sm text-muted dark:text-dark-muted">
               {searchTerm || statusFilter !== "all"
                 ? "Try adjusting your filters"
                 : "Bookings will appear here when guests make reservations"}
@@ -898,7 +898,7 @@ export default function AdminBookings() {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-border bg-slate-50 text-left text-xs font-medium uppercase tracking-wider text-muted">
+                <tr className="border-b border-border bg-slate-50 text-left text-xs font-medium uppercase tracking-wider text-muted dark:border-dark-border dark:bg-dark-surface dark:text-dark-muted">
                   <th className="px-6 py-3">Room</th>
                   <th className="px-6 py-3">Guest</th>
                   <th className="px-6 py-3">Date & Time</th>
@@ -915,7 +915,7 @@ export default function AdminBookings() {
                   const isPending = booking.status === "pending";
 
                   return (
-                    <tr key={booking.id} className="border-b border-border last:border-0 hover:bg-slate-50">
+                    <tr key={booking.id} className="border-b border-border last:border-0 hover:bg-slate-50 dark:border-dark-border dark:hover:bg-dark-surface">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
                           {room?.image && (
@@ -926,22 +926,22 @@ export default function AdminBookings() {
                             />
                           )}
                           <div>
-                            <p className="font-medium text-ink">{room?.title || "Unknown"}</p>
-                            <p className="text-xs text-muted">{room?.location || "N/A"}</p>
+                            <p className="font-medium text-ink dark:text-dark-ink">{room?.title || "Unknown"}</p>
+                            <p className="text-xs text-muted dark:text-dark-muted">{room?.location || "N/A"}</p>
                           </div>
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <p className="text-sm font-medium text-ink">
+                        <p className="text-sm font-medium text-ink dark:text-dark-ink">
                           {booking.user_full_name || profile?.full_name || "Guest"}
                         </p>
-                        <p className="text-xs text-muted">
+                        <p className="text-xs text-muted dark:text-dark-muted">
                           {profile?.email || booking.user_email || booking.user_phone || "N/A"}
                         </p>
                       </td>
                       <td className="px-6 py-4">
-                        <p className="text-sm text-ink">{formatDate(booking.booking_date)}</p>
-                        <p className="text-xs text-muted">
+                        <p className="text-sm text-ink dark:text-dark-ink">{formatDate(booking.booking_date)}</p>
+                        <p className="text-xs text-muted dark:text-dark-muted">
                           {formatTime(booking.start_time)} - {formatTime(booking.end_time)}
                         </p>
                       </td>
@@ -951,7 +951,7 @@ export default function AdminBookings() {
                         </span>
                       </td>
                       <td className="px-6 py-4">
-                        <span className="font-medium text-ink">{formatPrice(booking.total_price || 0)}</span>
+                        <span className="font-medium text-ink dark:text-dark-ink">{formatPrice(booking.total_price || 0)}</span>
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex justify-end gap-2">
@@ -959,7 +959,7 @@ export default function AdminBookings() {
                             <>
                               <button
                                 onClick={() => setApprovingBooking(booking)}
-                                className="rounded-lg p-1.5 text-muted transition-colors hover:bg-green-50 hover:text-green-600"
+                                className="rounded-lg p-1.5 text-muted transition-colors hover:bg-green-50 hover:text-green-600 dark:text-dark-muted dark:hover:bg-green-900/30 dark:hover:text-green-400"
                                 title="Approve"
                               >
                                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -968,7 +968,7 @@ export default function AdminBookings() {
                               </button>
                               <button
                                 onClick={() => setRejectingBooking(booking)}
-                                className="rounded-lg p-1.5 text-muted transition-colors hover:bg-red-50 hover:text-red-600"
+                                className="rounded-lg p-1.5 text-muted transition-colors hover:bg-red-50 hover:text-red-600 dark:text-dark-muted dark:hover:bg-red-900/30 dark:hover:text-red-400"
                                 title="Reject"
                               >
                                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -979,7 +979,7 @@ export default function AdminBookings() {
                           )}
                           <button
                             onClick={() => setViewingBooking(booking)}
-                            className="rounded-lg p-1.5 text-muted transition-colors hover:bg-slate-100 hover:text-ink"
+                            className="rounded-lg p-1.5 text-muted transition-colors hover:bg-slate-100 hover:text-ink dark:text-dark-muted dark:hover:bg-dark-surface dark:hover:text-dark-ink"
                             title="View"
                           >
                             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -989,7 +989,7 @@ export default function AdminBookings() {
                           </button>
                           <button
                             onClick={() => setEditingBooking(booking)}
-                            className="rounded-lg p-1.5 text-muted transition-colors hover:bg-blue-50 hover:text-blue-600"
+                            className="rounded-lg p-1.5 text-muted transition-colors hover:bg-blue-50 hover:text-blue-600 dark:text-dark-muted dark:hover:bg-blue-900/30 dark:hover:text-blue-400"
                             title="Edit"
                           >
                             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -998,7 +998,7 @@ export default function AdminBookings() {
                           </button>
                           <button
                             onClick={() => setDeletingBooking(booking)}
-                            className="rounded-lg p-1.5 text-muted transition-colors hover:bg-red-50 hover:text-red-600"
+                            className="rounded-lg p-1.5 text-muted transition-colors hover:bg-red-50 hover:text-red-600 dark:text-dark-muted dark:hover:bg-red-900/30 dark:hover:text-red-400"
                             title="Delete"
                           >
                             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

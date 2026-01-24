@@ -56,8 +56,8 @@ const RoomCard = React.memo(function RoomCard({
           <button
             type="button"
             onClick={handleToggle}
-            className={`absolute right-3 top-3 rounded-full border border-border bg-white/90 p-2 shadow-sm backdrop-blur transition hover:bg-white ${
-              liked ? "text-rose-600" : "text-slate-500"
+            className={`absolute right-3 top-3 rounded-full border border-border bg-white/90 p-2 shadow-sm backdrop-blur transition hover:bg-white dark:border-dark-border dark:bg-dark-panel/90 dark:hover:bg-dark-panel ${
+              liked ? "text-rose-600 dark:text-rose-400" : "text-slate-500 dark:text-slate-400"
             }`}
             aria-label={liked ? "Unlike room" : "Like room"}
             title={liked ? "Unlike" : "Like"}
@@ -68,20 +68,20 @@ const RoomCard = React.memo(function RoomCard({
       </div>
 
       <div className="space-y-2 p-4">
-        <div className="flex items-center justify-between text-xs text-muted">
+        <div className="flex items-center justify-between text-xs text-muted dark:text-dark-muted">
           <span>{room.location}</span>
           <span>{room.guests} guests</span>
         </div>
 
         <div className="flex items-start justify-between gap-3">
-          <p className="text-sm font-semibold text-ink">{room.title}</p>
+          <p className="text-sm font-semibold text-ink dark:text-dark-ink">{room.title}</p>
           <StarsDisplay value={ratingAvg} count={ratingCount} className="shrink-0" />
         </div>
 
         {room.price_per_hour > 0 && (
-          <p className="text-lg font-semibold text-brand-700">
+          <p className="text-lg font-semibold text-brand-700 dark:text-brand-400">
             {formatPrice(room.price_per_hour)}
-            <span className="text-xs font-normal text-muted">/hour</span>
+            <span className="text-xs font-normal text-muted dark:text-dark-muted">/hour</span>
           </p>
         )}
 
@@ -90,7 +90,7 @@ const RoomCard = React.memo(function RoomCard({
             {tags.map((tag) => (
               <span
                 key={tag}
-                className="rounded-full border border-border bg-white px-2 py-0.5 text-[11px] text-muted"
+                className="rounded-full border border-border bg-white px-2 py-0.5 text-[11px] text-muted dark:border-dark-border dark:bg-dark-surface dark:text-dark-muted"
               >
                 {tag}
               </span>

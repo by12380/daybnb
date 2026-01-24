@@ -117,17 +117,17 @@ const Auth = React.memo(() => {
   return (
     <div className="mx-auto grid w-full max-w-3xl gap-6 md:grid-cols-2">
       <Card className="md:col-span-1">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-700">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gradient dark:text-gradient-dark">
           Daybnb
         </p>
-        <h1 className="mt-2 text-2xl font-semibold text-ink">
+        <h1 className="mt-2 text-2xl font-semibold text-ink dark:text-dark-ink">
           {mode === "login" ? "Welcome back" : "Create your account"}
         </h1>
-        <p className="mt-2 text-sm text-muted">
+        <p className="mt-2 text-sm text-muted dark:text-dark-muted">
           Sign in to book day-use rooms. We’ll keep your session active.
         </p>
-        <div className="mt-6 space-y-2 text-sm text-muted">
-          <p className="font-medium text-ink">Email + password</p>
+        <div className="mt-6 space-y-2 text-sm text-muted dark:text-dark-muted">
+          <p className="font-medium text-ink dark:text-dark-ink">Email + password</p>
           <p>Simple and secure authentication via Supabase.</p>
         </div>
       </Card>
@@ -155,13 +155,13 @@ const Auth = React.memo(() => {
           />
 
           {error ? (
-            <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-400">
               {error}
             </div>
           ) : null}
 
           {info ? (
-            <div className="rounded-xl border border-brand-200 bg-brand-50 px-3 py-2 text-sm text-brand-700">
+            <div className="rounded-xl border border-brand-200 bg-brand-50 px-3 py-2 text-sm text-brand-700 dark:border-brand-700 dark:bg-brand-900/30 dark:text-brand-300">
               {info}
             </div>
           ) : null}
@@ -177,7 +177,7 @@ const Auth = React.memo(() => {
           <button
             type="button"
             onClick={toggleMode}
-            className="w-full rounded-full px-4 py-2 text-sm font-semibold text-brand-700 hover:text-accent-500"
+            className="w-full rounded-full px-4 py-2 text-sm font-semibold text-brand-700 hover:text-accent-500 dark:text-brand-400 dark:hover:text-accent-500"
           >
             {mode === "login"
               ? "New here? Create an account"

@@ -26,14 +26,14 @@ const FEATURES = [
 
 const LandingFeatures = React.memo(() => (
   <div>
-    <h2 className="text-2xl font-semibold text-brand-700">
+    <h2 className="text-2xl font-semibold text-brand-700 dark:text-brand-400">
       Why guests love Daybnb
     </h2>
     <div className="mt-4 grid gap-4 md:grid-cols-2">
       {FEATURES.map((feature) => (
         <Card key={feature.title}>
-          <h3 className="text-lg font-semibold text-ink">{feature.title}</h3>
-          <p className="mt-2 text-sm text-muted">{feature.description}</p>
+          <h3 className="text-lg font-semibold text-ink dark:text-dark-ink">{feature.title}</h3>
+          <p className="mt-2 text-sm text-muted dark:text-dark-muted">{feature.description}</p>
         </Card>
       ))}
     </div>

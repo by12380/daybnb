@@ -97,22 +97,22 @@ function getBookingStatusInfo(booking) {
   
   // Check booking status field first
   if (booking.status === "pending") {
-    return { color: "text-yellow-700", bg: "bg-yellow-50", text: "Pending Approval", canModify: true };
+    return { color: "text-yellow-700 dark:text-yellow-400", bg: "bg-yellow-50 dark:bg-yellow-900/30", border: "border-yellow-200 dark:border-yellow-700", text: "Pending Approval", canModify: true };
   }
   if (booking.status === "rejected") {
-    return { color: "text-red-600", bg: "bg-red-50", text: "Rejected", canModify: false };
+    return { color: "text-red-600 dark:text-red-400", bg: "bg-red-50 dark:bg-red-900/30", border: "border-red-200 dark:border-red-700", text: "Rejected", canModify: false };
   }
   if (booking.status === "approved") {
     if (isPast) {
-      return { color: "text-muted", bg: "bg-slate-100", text: "Completed", canModify: false };
+      return { color: "text-muted dark:text-dark-muted", bg: "bg-slate-100 dark:bg-slate-800/50", border: "border-slate-200 dark:border-slate-700", text: "Completed", canModify: false };
     }
-    return { color: "text-green-700", bg: "bg-green-50", text: "Approved", canModify: true };
+    return { color: "text-green-700 dark:text-green-400", bg: "bg-green-50 dark:bg-green-900/30", border: "border-green-200 dark:border-green-700", text: "Approved", canModify: true };
   }
   // Default fallback for bookings without status field
   if (isPast) {
-    return { color: "text-muted", bg: "bg-slate-100", text: "Completed", canModify: false };
+    return { color: "text-muted dark:text-dark-muted", bg: "bg-slate-100 dark:bg-slate-800/50", border: "border-slate-200 dark:border-slate-700", text: "Completed", canModify: false };
   }
-  return { color: "text-green-700", bg: "bg-green-50", text: "Upcoming", canModify: true };
+  return { color: "text-green-700 dark:text-green-400", bg: "bg-green-50 dark:bg-green-900/30", border: "border-green-200 dark:border-green-700", text: "Upcoming", canModify: true };
 }
 
 const BookingCard = React.memo(({ booking, room, onEdit, onCancel, isHighlighted }) => {
@@ -137,29 +137,29 @@ const BookingCard = React.memo(({ booking, room, onEdit, onCancel, isHighlighted
           )}
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="text-lg font-semibold text-ink">
+              <h3 className="text-lg font-semibold text-ink dark:text-dark-ink">
                 {room?.title || "Room"}
               </h3>
-              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusInfo.bg} ${statusInfo.color}`}>
+              <span className={`rounded-full border px-2 py-0.5 text-xs font-medium ${statusInfo.bg} ${statusInfo.color} ${statusInfo.border}`}>
                 {statusInfo.text}
               </span>
             </div>
-            <p className="mt-1 text-sm text-muted">{room?.location || "Location unavailable"}</p>
+            <p className="mt-1 text-sm text-muted dark:text-dark-muted">{room?.location || "Location unavailable"}</p>
             <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm">
               <div>
-                <span className="text-muted">Date: </span>
-                <span className="font-medium text-ink">{formatDate(booking.booking_date)}</span>
+                <span className="text-muted dark:text-dark-muted">Date: </span>
+                <span className="font-medium text-ink dark:text-dark-ink">{formatDate(booking.booking_date)}</span>
               </div>
               <div>
-                <span className="text-muted">Time: </span>
-                <span className="font-medium text-ink">
+                <span className="text-muted dark:text-dark-muted">Time: </span>
+                <span className="font-medium text-ink dark:text-dark-ink">
                   {formatTime(booking.start_time)} - {formatTime(booking.end_time)}
                 </span>
               </div>
               {durationHours > 0 && (
                 <div>
-                  <span className="text-muted">Duration: </span>
-                  <span className="font-medium text-ink">
+                  <span className="text-muted dark:text-dark-muted">Duration: </span>
+                  <span className="font-medium text-ink dark:text-dark-ink">
                     {durationHours % 1 === 0 ? durationHours : durationHours.toFixed(1)} hr{durationHours !== 1 ? "s" : ""}
                   </span>
                 </div>
@@ -168,16 +168,16 @@ const BookingCard = React.memo(({ booking, room, onEdit, onCancel, isHighlighted
             {/* Price Information */}
             {booking.total_price != null && booking.total_price > 0 && (
               <div className="mt-2 flex items-center gap-2">
-                <span className="text-lg font-semibold text-brand-700">{formatPrice(booking.total_price)}</span>
+                <span className="text-lg font-semibold text-brand-700 dark:text-brand-400">{formatPrice(booking.total_price)}</span>
                 {booking.price_per_hour && (
-                  <span className="text-xs text-muted">
+                  <span className="text-xs text-muted dark:text-dark-muted">
                     ({formatPrice(booking.price_per_hour)}/hr × {booking.billable_hours || durationHours} hrs)
                   </span>
                 )}
               </div>
             )}
             {(booking.user_full_name || booking.user_phone) && (
-              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted dark:text-dark-muted">
                 {booking.user_full_name && <span>Name: {booking.user_full_name}</span>}
                 {booking.user_phone && <span>Phone: {booking.user_phone}</span>}
               </div>
@@ -191,7 +191,7 @@ const BookingCard = React.memo(({ booking, room, onEdit, onCancel, isHighlighted
             </Button>
             <Button
               variant="outline"
-              className="!border-red-200 !text-red-600 hover:!border-red-400 hover:!bg-red-50"
+              className="!border-red-200 !text-red-600 hover:!border-red-400 hover:!bg-red-50 dark:!border-red-700 dark:!text-red-400 dark:hover:!border-red-600 dark:hover:!bg-red-900/30"
               onClick={() => onCancel(booking)}
             >
               Cancel
@@ -200,7 +200,7 @@ const BookingCard = React.memo(({ booking, room, onEdit, onCancel, isHighlighted
         )}
         {booking.status === "rejected" && (
           <div className="flex items-center">
-            <span className="text-xs text-red-500">This booking was not approved</span>
+            <span className="text-xs text-red-500 dark:text-red-400">This booking was not approved</span>
           </div>
         )}
       </div>
@@ -396,19 +396,19 @@ const EditBookingModal = React.memo(({
     >
       <div className="space-y-4 pt-4">
         {room && (
-          <div className="flex items-center gap-3 rounded-xl border border-border bg-slate-50 p-3">
+          <div className="flex items-center gap-3 rounded-xl border border-border bg-slate-50 p-3 dark:border-dark-border dark:bg-dark-surface">
             {room.image && (
               <img src={room.image} alt={room.title} className="h-12 w-12 rounded-lg object-cover" />
             )}
             <div>
-              <p className="font-medium text-ink">{room.title}</p>
-              <p className="text-xs text-muted">{room.location}</p>
+              <p className="font-medium text-ink dark:text-dark-ink">{room.title}</p>
+              <p className="text-xs text-muted dark:text-dark-muted">{room.location}</p>
             </div>
           </div>
         )}
 
         <label className="flex flex-col gap-2">
-          <span className="text-sm font-medium text-muted">Date</span>
+          <span className="text-sm font-medium text-muted dark:text-dark-muted">Date</span>
           <DatePicker
             className={INPUT_STYLES}
             placeholder="Select date"
@@ -422,12 +422,12 @@ const EditBookingModal = React.memo(({
         </label>
 
         {loadingBookings && (
-          <p className="text-xs text-muted">Loading available time slots...</p>
+          <p className="text-xs text-muted dark:text-dark-muted">Loading available time slots...</p>
         )}
 
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="flex flex-col gap-2">
-            <span className="text-sm font-medium text-muted">Start time</span>
+            <span className="text-sm font-medium text-muted dark:text-dark-muted">Start time</span>
             <select
               value={startTime}
               onChange={(e) => {
@@ -444,7 +444,7 @@ const EditBookingModal = React.memo(({
             </select>
           </label>
           <label className="flex flex-col gap-2">
-            <span className="text-sm font-medium text-muted">End time</span>
+            <span className="text-sm font-medium text-muted dark:text-dark-muted">End time</span>
             <select
               value={endTime}
               onChange={(e) => {
@@ -464,21 +464,21 @@ const EditBookingModal = React.memo(({
 
         {/* Price Breakdown */}
         {durationText && pricePerHour > 0 && (
-          <div className="rounded-xl border border-brand-100 bg-brand-50 p-4">
-            <p className="text-sm font-semibold text-ink">Price Breakdown</p>
+          <div className="rounded-xl border border-brand-100 bg-brand-50 p-4 dark:border-brand-800 dark:bg-brand-900/30">
+            <p className="text-sm font-semibold text-ink dark:text-dark-ink">Price Breakdown</p>
             <div className="mt-3 space-y-2">
               <div className="flex justify-between text-sm">
-                <span className="text-muted">Duration</span>
-                <span className="font-medium text-ink">{durationText}</span>
+                <span className="text-muted dark:text-dark-muted">Duration</span>
+                <span className="font-medium text-ink dark:text-dark-ink">{durationText}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-muted">Hourly Rate</span>
-                <span className="font-medium text-ink">{formatPrice(pricePerHour)}/hr</span>
+                <span className="text-muted dark:text-dark-muted">Hourly Rate</span>
+                <span className="font-medium text-ink dark:text-dark-ink">{formatPrice(pricePerHour)}/hr</span>
               </div>
-              <div className="border-t border-brand-100 pt-2">
+              <div className="border-t border-brand-100 pt-2 dark:border-brand-800">
                 <div className="flex justify-between">
-                  <span className="font-semibold text-ink">Total</span>
-                  <span className="text-lg font-bold text-brand-700">{formatPrice(totalPrice)}</span>
+                  <span className="font-semibold text-ink dark:text-dark-ink">Total</span>
+                  <span className="text-lg font-bold text-brand-700 dark:text-brand-400">{formatPrice(totalPrice)}</span>
                 </div>
               </div>
             </div>
@@ -500,7 +500,7 @@ const EditBookingModal = React.memo(({
           />
         </div>
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
         <div className="flex justify-end gap-3 pt-2">
           <Button variant="outline" onClick={onClose}>
@@ -547,28 +547,28 @@ const CancelBookingModal = React.memo(({ open, booking, room, onClose, onConfirm
       destroyOnClose
     >
       <div className="space-y-4 pt-4">
-        <p className="text-sm text-muted">
+        <p className="text-sm text-muted dark:text-dark-muted">
           Are you sure you want to cancel this booking? This action cannot be undone.
         </p>
 
         {room && (
-          <div className="rounded-xl border border-red-100 bg-red-50 p-4">
-            <p className="font-medium text-ink">{room.title}</p>
-            <p className="text-sm text-muted">{room.location}</p>
+          <div className="rounded-xl border border-red-100 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/30">
+            <p className="font-medium text-ink dark:text-dark-ink">{room.title}</p>
+            <p className="text-sm text-muted dark:text-dark-muted">{room.location}</p>
             <div className="mt-2 text-sm">
-              <span className="text-muted">Date: </span>
-              <span className="font-medium text-ink">{formatDate(booking?.booking_date)}</span>
+              <span className="text-muted dark:text-dark-muted">Date: </span>
+              <span className="font-medium text-ink dark:text-dark-ink">{formatDate(booking?.booking_date)}</span>
             </div>
             <div className="text-sm">
-              <span className="text-muted">Time: </span>
-              <span className="font-medium text-ink">
+              <span className="text-muted dark:text-dark-muted">Time: </span>
+              <span className="font-medium text-ink dark:text-dark-ink">
                 {formatTime(booking?.start_time)} - {formatTime(booking?.end_time)}
               </span>
             </div>
           </div>
         )}
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
         <div className="flex justify-end gap-3 pt-2">
           <Button variant="outline" onClick={onClose}>
@@ -663,8 +663,8 @@ const MyBookings = React.memo(() => {
   if (authLoading || loading) {
     return (
       <Card>
-        <p className="text-sm font-semibold text-ink">Loading bookings...</p>
-        <p className="mt-1 text-sm text-muted">Please wait while we fetch your reservations.</p>
+        <p className="text-sm font-semibold text-ink dark:text-dark-ink">Loading bookings...</p>
+        <p className="mt-1 text-sm text-muted dark:text-dark-muted">Please wait while we fetch your reservations.</p>
       </Card>
     );
   }
@@ -672,8 +672,8 @@ const MyBookings = React.memo(() => {
   if (!user) {
     return (
       <Card>
-        <p className="text-sm font-semibold text-ink">Not signed in</p>
-        <p className="mt-1 text-sm text-muted">Please sign in to view your bookings.</p>
+        <p className="text-sm font-semibold text-ink dark:text-dark-ink">Not signed in</p>
+        <p className="mt-1 text-sm text-muted dark:text-dark-muted">Please sign in to view your bookings.</p>
         <div className="mt-4">
           <Link to="/auth">
             <Button>Sign in</Button>
@@ -686,8 +686,8 @@ const MyBookings = React.memo(() => {
   if (error) {
     return (
       <Card>
-        <p className="text-sm font-semibold text-ink">Error loading bookings</p>
-        <p className="mt-1 text-sm text-red-600">{error}</p>
+        <p className="text-sm font-semibold text-ink dark:text-dark-ink">Error loading bookings</p>
+        <p className="mt-1 text-sm text-red-600 dark:text-red-400">{error}</p>
         <div className="mt-4">
           <Button onClick={fetchBookings}>Try Again</Button>
         </div>
@@ -713,11 +713,11 @@ const MyBookings = React.memo(() => {
     <div className="mx-auto max-w-3xl space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-700">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gradient dark:text-gradient-dark">
             My Bookings
           </p>
-          <h1 className="mt-1 text-2xl font-semibold text-ink">Your Reservations</h1>
-          <p className="mt-1 text-sm text-muted">
+          <h1 className="mt-1 text-2xl font-semibold text-ink dark:text-dark-ink">Your Reservations</h1>
+          <p className="mt-1 text-sm text-muted dark:text-dark-muted">
             Manage your daytime room bookings
           </p>
         </div>
@@ -729,13 +729,13 @@ const MyBookings = React.memo(() => {
       {bookings.length === 0 ? (
         <Card>
           <div className="py-8 text-center">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-slate-100">
-              <svg className="h-8 w-8 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 dark:bg-dark-surface">
+              <svg className="h-8 w-8 text-muted dark:text-dark-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
             </div>
-            <p className="text-lg font-semibold text-ink">No bookings yet</p>
-            <p className="mt-1 text-sm text-muted">
+            <p className="text-lg font-semibold text-ink dark:text-dark-ink">No bookings yet</p>
+            <p className="mt-1 text-sm text-muted dark:text-dark-muted">
               Start by browsing available rooms and making your first reservation.
             </p>
             <div className="mt-4">
@@ -749,14 +749,14 @@ const MyBookings = React.memo(() => {
         <>
           {pendingBookings.length > 0 && (
             <div className="space-y-4">
-              <h2 className="flex items-center gap-2 text-sm font-semibold text-ink">
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-yellow-100">
+              <h2 className="flex items-center gap-2 text-sm font-semibold text-ink dark:text-dark-ink">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-yellow-100 dark:bg-yellow-900/50">
                   <span className="h-2 w-2 rounded-full bg-yellow-500" />
                 </span>
                 Pending Approval ({pendingBookings.length})
               </h2>
-              <div className="rounded-xl border border-yellow-200 bg-yellow-50/50 p-3">
-                <p className="text-xs text-yellow-700">
+              <div className="rounded-xl border border-yellow-200 bg-yellow-50/50 p-3 dark:border-yellow-700 dark:bg-yellow-900/30">
+                <p className="text-xs text-yellow-700 dark:text-yellow-400">
                   These bookings are awaiting admin approval. You'll be notified once they're confirmed.
                 </p>
               </div>
@@ -775,9 +775,9 @@ const MyBookings = React.memo(() => {
 
           {upcomingBookings.length > 0 && (
             <div className="space-y-4">
-              <h2 className="flex items-center gap-2 text-sm font-semibold text-ink">
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-green-100">
-                  <svg className="h-3 w-3 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <h2 className="flex items-center gap-2 text-sm font-semibold text-ink dark:text-dark-ink">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/50">
+                  <svg className="h-3 w-3 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
                 </span>
@@ -798,7 +798,7 @@ const MyBookings = React.memo(() => {
 
           {pastBookings.length > 0 && (
             <div className="space-y-4">
-              <h2 className="text-sm font-semibold text-ink">
+              <h2 className="text-sm font-semibold text-ink dark:text-dark-ink">
                 Past ({pastBookings.length})
               </h2>
               {pastBookings.map((booking) => (
@@ -816,9 +816,9 @@ const MyBookings = React.memo(() => {
 
           {rejectedBookings.length > 0 && (
             <div className="space-y-4">
-              <h2 className="flex items-center gap-2 text-sm font-semibold text-ink">
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-red-100">
-                  <svg className="h-3 w-3 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <h2 className="flex items-center gap-2 text-sm font-semibold text-ink dark:text-dark-ink">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/50">
+                  <svg className="h-3 w-3 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </span>
