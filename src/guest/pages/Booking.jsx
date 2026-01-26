@@ -116,6 +116,7 @@ const Booking = React.memo(() => {
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState("");
   const [processingPayment, setProcessingPayment] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState("online"); // "online" or "cash"
 
   // Check if this is a retry payment from a cancelled checkout
   const retryBookingId = searchParams.get("retry");
@@ -549,6 +550,9 @@ const Booking = React.memo(() => {
       setSubmitting(true);
       setError("");
 
+      // Determine payment status based on payment method
+      const isOnlinePayment = paymentMethod === "online" && totalPrice > 0;
+      
       const payload = {
         room_id: roomId,
         booking_date: date,
@@ -562,7 +566,8 @@ const Booking = React.memo(() => {
         price_per_hour: pricePerHour > 0 ? pricePerHour : null,
         billable_hours: durationHours > 0 ? durationHours : null,
         status: "pending",
-        payment_status: "pending", // Payment not yet completed
+        payment_method: paymentMethod, // "online" or "cash"
+        payment_status: isOnlinePayment ? "pending" : "pay_at_property",
       };
 
       const { data: insertedData, error: insertError } = await supabase
@@ -575,7 +580,7 @@ const Booking = React.memo(() => {
         const hint =
           insertError?.message?.toLowerCase?.().includes("does not exist") ||
           insertError?.message?.toLowerCase?.().includes("not found")
-            ? `\n\nCreate a \`${BOOKINGS_TABLE}\` table with columns: room_id (text/uuid), booking_date (date), start_time (text/time), end_time (text/time), user_id (uuid/text), user_email (text), user_full_name (text), user_phone (text), payment_status (text), stripe_session_id (text).`
+            ? `\n\nCreate a \`${BOOKINGS_TABLE}\` table with columns: room_id (text/uuid), booking_date (date), start_time (text/time), end_time (text/time), user_id (uuid/text), user_email (text), user_full_name (text), user_phone (text), payment_status (text), payment_method (text), stripe_session_id (text).`
             : insertError?.message?.toLowerCase?.().includes("row level security") ||
                 insertError?.message?.toLowerCase?.().includes("rls")
               ? `\n\nIf RLS is enabled, add an INSERT policy to \`${BOOKINGS_TABLE}\` for authenticated users.`
@@ -587,20 +592,20 @@ const Booking = React.memo(() => {
 
       setSubmitting(false);
 
-      // If there's a price, redirect to payment
-      if (totalPrice > 0 && insertedData?.id) {
+      // If online payment selected and there's a price, redirect to Stripe
+      if (isOnlinePayment && insertedData?.id) {
         setSuccess("Booking created! Redirecting to payment...");
         await handlePayment(insertedData.id, insertedData);
       } else {
-        // No price or free booking - just confirm
-        setSuccess("Booking request submitted! Awaiting admin approval. Redirecting to your bookings...");
+        // Cash payment or free booking - just confirm and redirect
+        setSuccess("Booking request submitted! You'll pay at the property. Redirecting to your bookings...");
         setTimeout(() => {
           const bookingId = insertedData?.id;
           navigate(bookingId ? `/my-bookings?highlight=${bookingId}` : "/my-bookings");
         }, 1500);
       }
     },
-    [date, dateBookings, durationHours, endTime, fullName, handlePayment, navigate, phone, pricePerHour, roomId, startTime, totalPrice, user?.email, user?.id, validate]
+    [date, dateBookings, durationHours, endTime, fullName, handlePayment, navigate, paymentMethod, phone, pricePerHour, roomId, startTime, totalPrice, user?.email, user?.id, validate]
   );
 
   if (loading) {
@@ -754,6 +759,86 @@ const Booking = React.memo(() => {
             <p className="text-xs text-muted dark:text-dark-muted">Total time: {durationText}</p>
           ) : null}
 
+          {/* Payment Method Selection */}
+          {totalPrice > 0 && (
+            <div className="space-y-3">
+              <p className="text-sm font-medium text-muted dark:text-dark-muted">Payment Method</p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {/* Pay Online Option */}
+                <label
+                  className={`relative flex cursor-pointer items-start gap-3 rounded-xl border-2 p-4 transition-all ${
+                    paymentMethod === "online"
+                      ? "border-brand-500 bg-brand-50 dark:border-brand-400 dark:bg-brand-900/30"
+                      : "border-border bg-surface/40 hover:border-brand-200 dark:border-dark-border dark:bg-dark-surface/40 dark:hover:border-brand-700"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="paymentMethod"
+                    value="online"
+                    checked={paymentMethod === "online"}
+                    onChange={(e) => setPaymentMethod(e.target.value)}
+                    className="mt-1 h-4 w-4 text-brand-600 focus:ring-brand-500"
+                  />
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <svg className="h-5 w-5 text-brand-600 dark:text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                      </svg>
+                      <span className="font-semibold text-ink dark:text-dark-ink">Pay Online</span>
+                    </div>
+                    <p className="mt-1 text-xs text-muted dark:text-dark-muted">
+                      Secure payment via Stripe. Pay now with card.
+                    </p>
+                  </div>
+                  {paymentMethod === "online" && (
+                    <div className="absolute right-3 top-3">
+                      <svg className="h-5 w-5 text-brand-600 dark:text-brand-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                  )}
+                </label>
+
+                {/* Pay at Property Option */}
+                <label
+                  className={`relative flex cursor-pointer items-start gap-3 rounded-xl border-2 p-4 transition-all ${
+                    paymentMethod === "cash"
+                      ? "border-brand-500 bg-brand-50 dark:border-brand-400 dark:bg-brand-900/30"
+                      : "border-border bg-surface/40 hover:border-brand-200 dark:border-dark-border dark:bg-dark-surface/40 dark:hover:border-brand-700"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="paymentMethod"
+                    value="cash"
+                    checked={paymentMethod === "cash"}
+                    onChange={(e) => setPaymentMethod(e.target.value)}
+                    className="mt-1 h-4 w-4 text-brand-600 focus:ring-brand-500"
+                  />
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <svg className="h-5 w-5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                      </svg>
+                      <span className="font-semibold text-ink dark:text-dark-ink">Pay at Property</span>
+                    </div>
+                    <p className="mt-1 text-xs text-muted dark:text-dark-muted">
+                      Pay with cash or card when you arrive.
+                    </p>
+                  </div>
+                  {paymentMethod === "cash" && (
+                    <div className="absolute right-3 top-3">
+                      <svg className="h-5 w-5 text-brand-600 dark:text-brand-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                  )}
+                </label>
+              </div>
+            </div>
+          )}
+
           <div className="grid gap-3 sm:grid-cols-2">
             <FormInput
               label="Full name (optional)"
@@ -793,19 +878,31 @@ const Booking = React.memo(() => {
                 ? "Redirecting to payment…" 
                 : submitting 
                   ? "Creating booking…" 
-                  : totalPrice > 0 
-                    ? `Pay ${formatPrice(totalPrice)} & Book` 
-                    : "Book now"}
+                  : totalPrice > 0 && paymentMethod === "online"
+                    ? `Pay ${formatPrice(totalPrice)} & Book`
+                    : totalPrice > 0 && paymentMethod === "cash"
+                      ? "Book Now - Pay at Property"
+                      : "Book now"}
             </Button>
           </div>
 
           {/* Payment security note */}
-          {totalPrice > 0 && (
+          {totalPrice > 0 && paymentMethod === "online" && (
             <p className="flex items-center justify-center gap-1.5 text-xs text-muted dark:text-dark-muted">
               <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
               </svg>
               Secure payment powered by Stripe
+            </p>
+          )}
+
+          {/* Cash payment note */}
+          {totalPrice > 0 && paymentMethod === "cash" && (
+            <p className="flex items-center justify-center gap-1.5 text-xs text-muted dark:text-dark-muted">
+              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Payment of {formatPrice(totalPrice)} will be collected at the property
             </p>
           )}
         </form>
