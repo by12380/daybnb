@@ -659,7 +659,7 @@ const Booking = React.memo(() => {
 
           {/* Price Breakdown */}
           {durationText && pricePerHour > 0 ? (
-            <div className="rounded-xl border border-brand-100 bg-brand-50 p-4">
+            <div className="rounded-xl border border-brand-200 bg-brand-50 p-4 dark:border-brand-400/30 dark:bg-brand-500/10">
               <p className="text-sm font-semibold text-ink">Price Breakdown</p>
               <div className="mt-3 space-y-2">
                 <div className="flex justify-between text-sm">
@@ -670,10 +670,10 @@ const Booking = React.memo(() => {
                   <span className="text-muted">Hourly Rate</span>
                   <span className="font-medium text-ink">{formatPrice(pricePerHour)}/hr</span>
                 </div>
-                <div className="border-t border-brand-100 pt-2">
+                <div className="border-t border-brand-100 pt-2 dark:border-brand-400/20">
                   <div className="flex justify-between">
                     <span className="font-semibold text-ink">Total</span>
-                    <span className="text-lg font-bold text-brand-700">{formatPrice(totalPrice)}</span>
+                    <span className="text-lg font-bold text-brand-700 dark:text-brand-200">{formatPrice(totalPrice)}</span>
                   </div>
                 </div>
               </div>
