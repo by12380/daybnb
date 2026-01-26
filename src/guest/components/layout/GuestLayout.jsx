@@ -4,9 +4,9 @@ import GuestFooter from "./Footer.jsx";
 
 export default function GuestLayout() {
   return (
-    <div className="min-h-screen bg-surface text-ink transition-colors duration-300 dark:bg-dark-navy dark:text-dark-ink">
+    <div className="flex min-h-screen flex-col bg-surface text-ink transition-colors duration-300">
       <GuestNavbar />
-      <main className="mx-auto w-full max-w-6xl px-4 py-12">
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-12">
         <Outlet />
       </main>
       <GuestFooter />

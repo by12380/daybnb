@@ -600,7 +600,7 @@ const Booking = React.memo(() => {
               {tags.map((tag) => (
                 <span
                   key={tag}
-                  className="rounded-full border border-border bg-white px-2 py-0.5 text-[11px] text-muted"
+                  className="rounded-full border border-border bg-surface/60 px-2 py-0.5 text-[11px] text-muted"
                 >
                   {tag}
                 </span>
@@ -659,27 +659,27 @@ const Booking = React.memo(() => {
 
           {/* Price Breakdown */}
           {durationText && pricePerHour > 0 ? (
-            <div className="rounded-xl border border-brand-100 bg-brand-50 p-4">
-              <p className="text-sm font-semibold text-ink">Price Breakdown</p>
+            <div className="rounded-xl border border-brand-100 bg-brand-50 p-4 dark:border-brand-800 dark:bg-brand-900/30">
+              <p className="text-sm font-semibold text-ink dark:text-dark-ink">Price Breakdown</p>
               <div className="mt-3 space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted">Duration</span>
-                  <span className="font-medium text-ink">{durationText}</span>
+                  <span className="text-muted dark:text-dark-muted">Duration</span>
+                  <span className="font-medium text-ink dark:text-dark-ink">{durationText}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted">Hourly Rate</span>
-                  <span className="font-medium text-ink">{formatPrice(pricePerHour)}/hr</span>
+                  <span className="text-muted dark:text-dark-muted">Hourly Rate</span>
+                  <span className="font-medium text-ink dark:text-dark-ink">{formatPrice(pricePerHour)}/hr</span>
                 </div>
-                <div className="border-t border-brand-100 pt-2">
+                <div className="border-t border-brand-100 pt-2 dark:border-brand-800">
                   <div className="flex justify-between">
-                    <span className="font-semibold text-ink">Total</span>
-                    <span className="text-lg font-bold text-brand-700">{formatPrice(totalPrice)}</span>
+                    <span className="font-semibold text-ink dark:text-dark-ink">Total</span>
+                    <span className="text-lg font-bold text-brand-700 dark:text-brand-400">{formatPrice(totalPrice)}</span>
                   </div>
                 </div>
               </div>
             </div>
           ) : durationText ? (
-            <p className="text-xs text-muted">Total time: {durationText}</p>
+            <p className="text-xs text-muted dark:text-dark-muted">Total time: {durationText}</p>
           ) : null}
 
           <div className="grid gap-3 sm:grid-cols-2">
@@ -699,12 +699,12 @@ const Booking = React.memo(() => {
             />
           </div>
 
-          <p className="text-xs text-muted">
-            Signed in as <span className="font-medium text-ink">{user?.email}</span>
+          <p className="text-xs text-muted dark:text-dark-muted">
+            Signed in as <span className="font-medium text-ink dark:text-dark-ink">{user?.email}</span>
           </p>
 
-          {error ? <p className="text-sm text-red-600">{error}</p> : null}
-          {success ? <p className="text-sm text-green-700">{success}</p> : null}
+          {error ? <p className="text-sm text-red-600 dark:text-red-400">{error}</p> : null}
+          {success ? <p className="text-sm text-green-700 dark:text-green-400">{success}</p> : null}
 
           <div className="flex gap-3">
             <Link to="/">
@@ -722,9 +722,9 @@ const Booking = React.memo(() => {
       <Card className="md:col-span-5">
         <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
           <div className="flex-1">
-            <p className="text-sm font-semibold text-ink">Reviews</p>
-            <p className="mt-1 text-sm text-muted">
-              What guests are saying about <span className="font-medium text-ink">{room.title}</span>
+            <p className="text-sm font-semibold text-ink dark:text-dark-ink">Reviews</p>
+            <p className="mt-1 text-sm text-muted dark:text-dark-muted">
+              What guests are saying about <span className="font-medium text-ink dark:text-dark-ink">{room.title}</span>
             </p>
 
             <div className="mt-3">
@@ -732,28 +732,28 @@ const Booking = React.memo(() => {
             </div>
 
             {loadingReviews ? (
-              <p className="mt-4 text-sm text-muted">Loading reviews…</p>
+              <p className="mt-4 text-sm text-muted dark:text-dark-muted">Loading reviews…</p>
             ) : reviewsError ? (
-              <p className="mt-4 whitespace-pre-wrap text-sm text-red-600">{reviewsError}</p>
+              <p className="mt-4 whitespace-pre-wrap text-sm text-red-600 dark:text-red-400">{reviewsError}</p>
             ) : reviews.length === 0 ? (
-              <p className="mt-4 text-sm text-muted">No reviews yet. Be the first to review this room.</p>
+              <p className="mt-4 text-sm text-muted dark:text-dark-muted">No reviews yet. Be the first to review this room.</p>
             ) : (
               <div className="mt-4 space-y-4">
                 {reviews.map((r) => (
-                  <div key={r.id} className="rounded-2xl border border-border bg-white p-4">
+                  <div key={r.id} className="rounded-2xl border border-border bg-surface/40 p-4 ring-1 ring-border/40">
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                       <div>
-                        <p className="text-sm font-semibold text-ink">
+                        <p className="text-sm font-semibold text-ink dark:text-dark-ink">
                           {r.user_full_name || r.user_email || "Guest"}
                         </p>
-                        <p className="text-xs text-muted">
+                        <p className="text-xs text-muted dark:text-dark-muted">
                           {r.created_at ? new Date(r.created_at).toLocaleDateString() : ""}
                         </p>
                       </div>
                       <StarsDisplay value={Number(r.rating) || 0} className="sm:justify-end" />
                     </div>
                     {r.note ? (
-                      <p className="mt-3 whitespace-pre-wrap text-sm text-ink/90">{r.note}</p>
+                      <p className="mt-3 whitespace-pre-wrap text-sm text-ink/90 dark:text-dark-ink/90">{r.note}</p>
                     ) : null}
                   </div>
                 ))}
@@ -762,14 +762,14 @@ const Booking = React.memo(() => {
           </div>
 
           <div className="w-full md:w-[360px]">
-            <p className="text-sm font-semibold text-ink">Leave a review</p>
-            <p className="mt-1 text-sm text-muted">
+            <p className="text-sm font-semibold text-ink dark:text-dark-ink">Leave a review</p>
+            <p className="mt-1 text-sm text-muted dark:text-dark-muted">
               Rate this room and add a note.
             </p>
 
             <form className="mt-4 space-y-3" onSubmit={onSubmitReview}>
-              <div className="rounded-2xl border border-border bg-slate-50 p-3">
-                <p className="text-xs font-medium text-muted">Your rating</p>
+              <div className="rounded-2xl border border-border bg-surface/40 p-3 ring-1 ring-border/40">
+                <p className="text-xs font-medium text-muted dark:text-dark-muted">Your rating</p>
                 <StarsInput
                   value={reviewRating}
                   onChange={setReviewRating}
@@ -780,9 +780,9 @@ const Booking = React.memo(() => {
               </div>
 
               <label className="flex flex-col gap-2">
-                <span className="text-xs font-medium text-muted">Note (optional)</span>
+                <span className="text-xs font-medium text-muted dark:text-dark-muted">Note (optional)</span>
                 <textarea
-                  className={`${INPUT_STYLES} min-h-[96px] resize-none`}
+                  className={`${INPUT_STYLES} min-h-[96px] resize-none bg-surface/40 ring-1 ring-border/40`}
                   value={reviewNote}
                   onChange={(e) => setReviewNote(e.target.value)}
                   disabled={reviewSubmitting}
@@ -790,7 +790,7 @@ const Booking = React.memo(() => {
                 />
               </label>
 
-              {reviewSuccess ? <p className="text-sm text-green-700">{reviewSuccess}</p> : null}
+              {reviewSuccess ? <p className="text-sm text-green-700 dark:text-green-400">{reviewSuccess}</p> : null}
 
               <Button type="submit" disabled={reviewSubmitting}>
                 {reviewSubmitting ? "Saving…" : "Submit review"}

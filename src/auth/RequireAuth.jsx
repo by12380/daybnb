@@ -7,7 +7,7 @@ export default function RequireAuth() {
 
   if (loading) {
     return (
-      <div className="rounded-3xl border border-border bg-white p-6 text-sm text-muted">
+      <div className="rounded-3xl border border-border bg-panel p-6 text-sm text-muted">
         Loading…
       </div>
     );

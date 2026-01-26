@@ -56,8 +56,8 @@ const RoomCard = React.memo(function RoomCard({
           <button
             type="button"
             onClick={handleToggle}
-            className={`absolute right-3 top-3 rounded-full border border-border bg-white/90 p-2 shadow-sm backdrop-blur transition hover:bg-white dark:border-dark-border dark:bg-dark-panel/90 dark:hover:bg-dark-panel ${
-              liked ? "text-rose-600 dark:text-rose-400" : "text-slate-500 dark:text-slate-400"
+            className={`absolute right-3 top-3 rounded-full border border-border bg-panel/90 p-2 shadow-sm backdrop-blur transition hover:bg-panel ${
+              liked ? "text-rose-600 dark:text-rose-300" : "text-muted hover:text-ink"
             }`}
             aria-label={liked ? "Unlike room" : "Like room"}
             title={liked ? "Unlike" : "Like"}
@@ -90,7 +90,7 @@ const RoomCard = React.memo(function RoomCard({
             {tags.map((tag) => (
               <span
                 key={tag}
-                className="rounded-full border border-border bg-white px-2 py-0.5 text-[11px] text-muted dark:border-dark-border dark:bg-dark-surface dark:text-dark-muted"
+                className="rounded-full border border-border bg-surface/60 px-2 py-0.5 text-[11px] text-muted"
               >
                 {tag}
               </span>

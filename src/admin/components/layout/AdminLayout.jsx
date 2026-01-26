@@ -58,7 +58,7 @@ const Sidebar = React.memo(({ isOpen, onClose }) => {
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 transform bg-white shadow-xl transition-all duration-200 ease-in-out lg:static lg:translate-x-0 dark:bg-dark-panel dark:shadow-dark-navy/50 ${
+        className={`fixed inset-y-0 left-0 z-50 w-64 transform overflow-hidden bg-panel shadow-xl transition-all duration-200 ease-in-out lg:static lg:translate-x-0 ${
           isOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -75,7 +75,7 @@ const Sidebar = React.memo(({ isOpen, onClose }) => {
             </Link>
             <button
               onClick={onClose}
-              className="rounded-lg p-1 text-muted hover:bg-slate-100 lg:hidden dark:text-dark-muted dark:hover:bg-dark-surface"
+              className="rounded-lg p-1 text-muted hover:bg-surface/60 lg:hidden"
             >
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -84,7 +84,7 @@ const Sidebar = React.memo(({ isOpen, onClose }) => {
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 space-y-1 px-3 py-4">
+          <nav className="flex-1 space-y-1 overflow-y-auto overscroll-contain px-3 py-4">
             {NAV_ITEMS.map((item) => {
               const isActive = location.pathname === item.path;
               return (
@@ -95,7 +95,7 @@ const Sidebar = React.memo(({ isOpen, onClose }) => {
                   className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors ${
                     isActive
                       ? "bg-brand-50 text-brand-700 dark:bg-brand-900/30 dark:text-brand-300"
-                      : "text-muted hover:bg-slate-50 hover:text-ink dark:text-dark-muted dark:hover:bg-dark-surface dark:hover:text-dark-ink"
+                      : "text-muted hover:bg-surface/60 hover:text-ink"
                   }`}
                 >
                   {item.icon}
@@ -106,10 +106,10 @@ const Sidebar = React.memo(({ isOpen, onClose }) => {
           </nav>
 
           {/* Back to site */}
-          <div className="border-t border-border p-4 dark:border-dark-border">
+          <div className="mt-auto border-t border-border p-4 dark:border-dark-border">
             <Link
               to="/"
-              className="flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium text-muted transition-colors hover:bg-slate-50 hover:text-ink dark:text-dark-muted dark:hover:bg-dark-surface dark:hover:text-dark-ink"
+              className="flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium text-muted transition-colors hover:bg-surface/60 hover:text-ink"
             >
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -127,10 +127,10 @@ const Header = React.memo(({ onMenuClick }) => {
   const { user, signOut } = useAuth();
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-white px-4 transition-colors duration-300 lg:px-6 dark:border-dark-border dark:bg-dark-panel">
+    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-panel/80 px-4 backdrop-blur transition-colors duration-300 lg:px-6">
       <button
         onClick={onMenuClick}
-        className="rounded-lg p-2 text-muted hover:bg-slate-100 lg:hidden dark:text-dark-muted dark:hover:bg-dark-surface"
+        className="rounded-lg p-2 text-muted hover:bg-surface/60 lg:hidden"
       >
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />

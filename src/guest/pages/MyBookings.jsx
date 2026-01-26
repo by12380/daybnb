@@ -104,13 +104,13 @@ function getBookingStatusInfo(booking) {
   }
   if (booking.status === "approved") {
     if (isPast) {
-      return { color: "text-muted dark:text-dark-muted", bg: "bg-slate-100 dark:bg-slate-800/50", border: "border-slate-200 dark:border-slate-700", text: "Completed", canModify: false };
+      return { color: "text-muted", bg: "bg-surface/60", border: "border-border", text: "Completed", canModify: false };
     }
     return { color: "text-green-700 dark:text-green-400", bg: "bg-green-50 dark:bg-green-900/30", border: "border-green-200 dark:border-green-700", text: "Approved", canModify: true };
   }
   // Default fallback for bookings without status field
   if (isPast) {
-    return { color: "text-muted dark:text-dark-muted", bg: "bg-slate-100 dark:bg-slate-800/50", border: "border-slate-200 dark:border-slate-700", text: "Completed", canModify: false };
+    return { color: "text-muted", bg: "bg-surface/60", border: "border-border", text: "Completed", canModify: false };
   }
   return { color: "text-green-700 dark:text-green-400", bg: "bg-green-50 dark:bg-green-900/30", border: "border-green-200 dark:border-green-700", text: "Upcoming", canModify: true };
 }
@@ -396,7 +396,7 @@ const EditBookingModal = React.memo(({
     >
       <div className="space-y-4 pt-4">
         {room && (
-          <div className="flex items-center gap-3 rounded-xl border border-border bg-slate-50 p-3 dark:border-dark-border dark:bg-dark-surface">
+          <div className="flex items-center gap-3 rounded-xl border border-border bg-surface/60 p-3">
             {room.image && (
               <img src={room.image} alt={room.title} className="h-12 w-12 rounded-lg object-cover" />
             )}
@@ -729,8 +729,8 @@ const MyBookings = React.memo(() => {
       {bookings.length === 0 ? (
         <Card>
           <div className="py-8 text-center">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 dark:bg-dark-surface">
-              <svg className="h-8 w-8 text-muted dark:text-dark-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-surface/60">
+              <svg className="h-8 w-8 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
             </div>

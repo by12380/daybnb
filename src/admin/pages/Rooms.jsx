@@ -47,11 +47,11 @@ const ViewRoomModal = React.memo(({ open, room, bookingsCount, onClose }) => {
 
         {/* Stats */}
         <div className="grid grid-cols-3 gap-4">
-          <div className="rounded-xl border border-border bg-slate-50 p-4 text-center">
+          <div className="rounded-xl border border-border bg-surface/60 p-4 text-center">
             <p className="text-2xl font-bold text-ink">{room.guests || 0}</p>
             <p className="text-xs text-muted">Max Guests</p>
           </div>
-          <div className="rounded-xl border border-border bg-slate-50 p-4 text-center">
+          <div className="rounded-xl border border-border bg-surface/60 p-4 text-center">
             <p className="text-2xl font-bold text-ink">{bookingsCount}</p>
             <p className="text-xs text-muted">Total Bookings</p>
           </div>
@@ -64,7 +64,7 @@ const ViewRoomModal = React.memo(({ open, room, bookingsCount, onClose }) => {
         </div>
 
         {/* Details */}
-        <div className="space-y-3 rounded-xl border border-border bg-slate-50 p-4">
+        <div className="space-y-3 rounded-xl border border-border bg-surface/60 p-4">
           <h4 className="font-medium text-ink">Room Information</h4>
           <div className="grid gap-2 text-sm">
             <div className="flex justify-between">
@@ -506,7 +506,7 @@ export default function AdminRooms() {
 
       {/* Rooms Grid */}
       {filteredRooms.length === 0 ? (
-        <div className="rounded-2xl border border-border bg-white py-12 text-center shadow-sm">
+        <div className="rounded-2xl border border-border bg-panel py-12 text-center shadow-sm">
           <svg className="mx-auto h-12 w-12 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
           </svg>
@@ -530,7 +530,7 @@ export default function AdminRooms() {
             return (
               <div
                 key={room.id}
-                className="overflow-hidden rounded-2xl border border-border bg-white shadow-sm transition-shadow hover:shadow-md"
+                className="overflow-hidden rounded-2xl border border-border bg-panel shadow-sm transition-shadow hover:shadow-md dark:hover:shadow-black/30"
               >
                 {room.image && (
                   <img
@@ -577,13 +577,13 @@ export default function AdminRooms() {
                       {room.tags.slice(0, 3).map((tag, index) => (
                         <span
                           key={index}
-                          className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-muted"
+                          className="rounded-full bg-surface/60 px-2 py-0.5 text-xs text-muted"
                         >
                           {tag}
                         </span>
                       ))}
                       {room.tags.length > 3 && (
-                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-muted">
+                        <span className="rounded-full bg-surface/60 px-2 py-0.5 text-xs text-muted">
                           +{room.tags.length - 3}
                         </span>
                       )}

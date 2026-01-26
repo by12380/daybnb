@@ -2,22 +2,34 @@
 @tailwind components;
 @tailwind utilities;
 
-html,
-body {
-  height: 100%;
-}
+@layer base {
+  :root {
+    /* Light theme */
+    --color-surface: 248 250 252; /* slate-50 */
+    --color-panel: 255 255 255; /* white */
+    --color-ink: 15 23 42; /* slate-900 */
+    --color-muted: 100 116 139; /* slate-500 */
+    --color-border: 226 232 240; /* slate-200 */
+  }
 
-/* Light mode (default) */
-body {
-  background-color: #f8fafc;
-  color: #0f172a;
-  transition: background-color 0.3s ease, color 0.3s ease;
-}
+  html.dark {
+    /* Dark theme (navy-forward) */
+    --color-surface: 15 29 50; /* dark-surface */
+    --color-panel: 22 34 54; /* dark-panel */
+    --color-ink: 226 232 240; /* dark-ink */
+    --color-muted: 148 163 184; /* dark-muted */
+    --color-border: 30 58 95; /* dark-border */
+  }
 
-/* Dark mode */
-.dark body {
-  background-color: #0a1628;
-  color: #e2e8f0;
+  html,
+  body {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-surface text-ink;
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
 }
 
 /* Gradient text utilities */
@@ -51,11 +63,10 @@ body {
   }
 }
 
-/* Ant Design Picker - Light mode */
 .ant-picker {
-  background-color: #ffffff;
-  border-color: #e2e8f0;
-  color: #0f172a;
+  background-color: rgb(var(--color-panel) / 1);
+  border-color: rgb(var(--color-border) / 1);
+  color: rgb(var(--color-ink) / 1);
 }
 
 .ant-picker:hover {
@@ -68,171 +79,84 @@ body {
 }
 
 .ant-picker input {
-  color: #0f172a;
+  color: rgb(var(--color-ink) / 1);
 }
 
 .ant-picker input::placeholder {
-  color: rgba(100, 116, 139, 0.7);
+  color: rgb(var(--color-muted) / 0.7);
 }
 
-/* Ant Design Picker - Dark mode */
-.dark .ant-picker {
-  background-color: #162236;
-  border-color: #1e3a5f;
-  color: #e2e8f0;
+/* Ant Design panels/modals (theme-aware via CSS vars) */
+.ant-picker-dropdown,
+.ant-picker-panel-container {
+  background-color: rgb(var(--color-panel) / 1);
 }
 
-.dark .ant-picker:hover {
-  border-color: rgba(96, 165, 250, 0.7);
+.ant-picker-header {
+  color: rgb(var(--color-ink) / 1);
+  border-color: rgb(var(--color-border) / 1);
 }
 
-.dark .ant-picker-focused {
-  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.2);
-  border-color: rgba(96, 165, 250, 0.7);
+.ant-picker-header button {
+  color: rgb(var(--color-muted) / 1);
 }
 
-.dark .ant-picker input {
-  color: #e2e8f0;
+.ant-picker-content th {
+  color: rgb(var(--color-muted) / 1);
 }
 
-.dark .ant-picker input::placeholder {
-  color: rgba(148, 163, 184, 0.7);
+.ant-picker-cell {
+  color: rgb(var(--color-ink) / 1);
 }
 
-/* Ant Design Dropdown - Dark mode */
-.dark .ant-picker-dropdown {
-  background-color: #162236;
+.ant-picker-cell:hover .ant-picker-cell-inner {
+  background-color: rgb(var(--color-border) / 0.6);
 }
 
-.dark .ant-picker-panel-container {
-  background-color: #162236;
+.ant-modal-content {
+  background-color: rgb(var(--color-panel) / 1) !important;
+  border: 1px solid rgb(var(--color-border) / 1) !important;
+  color: rgb(var(--color-ink) / 1) !important;
 }
 
-.dark .ant-picker-header {
-  color: #e2e8f0;
-  border-color: #1e3a5f;
+.ant-modal-header {
+  background-color: rgb(var(--color-panel) / 1) !important;
+  border-bottom: 1px solid rgb(var(--color-border) / 1) !important;
 }
 
-.dark .ant-picker-header button {
-  color: #94a3b8;
+.ant-modal-title {
+  color: rgb(var(--color-ink) / 1) !important;
 }
 
-.dark .ant-picker-header button:hover {
-  color: #e2e8f0;
+.ant-modal-body {
+  color: rgb(var(--color-ink) / 1) !important;
 }
 
-.dark .ant-picker-content th {
-  color: #94a3b8;
+.ant-modal-close {
+  color: rgb(var(--color-muted) / 1) !important;
 }
 
-.dark .ant-picker-cell {
-  color: #e2e8f0;
+.ant-modal-footer {
+  border-top: 1px solid rgb(var(--color-border) / 1) !important;
 }
 
-.dark .ant-picker-cell:hover .ant-picker-cell-inner {
-  background-color: #1e3a5f;
+/* Native select options in dark mode (best-effort) */
+html.dark select,
+html.dark select option {
+  background-color: rgb(var(--color-panel) / 1);
+  color: rgb(var(--color-ink) / 1);
 }
 
-.dark .ant-picker-cell-in-view.ant-picker-cell-selected .ant-picker-cell-inner {
-  background-color: #2563eb;
+/* Scrollbar (dark mode) */
+html.dark ::-webkit-scrollbar-track {
+  background: rgb(var(--color-surface) / 1);
 }
 
-.dark .ant-picker-time-panel-column > li.ant-picker-time-panel-cell .ant-picker-time-panel-cell-inner {
-  color: #e2e8f0;
-}
-
-.dark .ant-picker-time-panel-column > li.ant-picker-time-panel-cell .ant-picker-time-panel-cell-inner:hover {
-  background-color: #1e3a5f;
-}
-
-/* Ant Design Modal - Dark mode */
-.dark .ant-modal-content {
-  background-color: #162236;
-  border: 1px solid #1e3a5f;
-}
-
-.dark .ant-modal-header {
-  background-color: #162236;
-  border-color: #1e3a5f;
-}
-
-.dark .ant-modal-title {
-  color: #e2e8f0;
-}
-
-.dark .ant-modal-close {
-  color: #94a3b8;
-}
-
-.dark .ant-modal-close:hover {
-  color: #e2e8f0;
-  background-color: #1e3a5f;
-}
-
-.dark .ant-modal-body {
-  color: #e2e8f0;
-}
-
-.dark .ant-modal-footer {
-  border-color: #1e3a5f;
-}
-
-/* Ant Design Select - Dark mode */
-.dark .ant-select-selector {
-  background-color: #162236 !important;
-  border-color: #1e3a5f !important;
-  color: #e2e8f0 !important;
-}
-
-.dark .ant-select-arrow {
-  color: #94a3b8;
-}
-
-.dark .ant-select-dropdown {
-  background-color: #162236;
-  border: 1px solid #1e3a5f;
-}
-
-.dark .ant-select-item {
-  color: #e2e8f0;
-}
-
-.dark .ant-select-item-option-active {
-  background-color: #1e3a5f;
-}
-
-.dark .ant-select-item-option-selected {
-  background-color: #2563eb;
-  color: #ffffff;
-}
-
-/* Native select dark mode styling */
-.dark select {
-  background-color: #162236;
-  border-color: #1e3a5f;
-  color: #e2e8f0;
-}
-
-.dark select option {
-  background-color: #162236;
-  color: #e2e8f0;
-}
-
-/* Scrollbar dark mode */
-.dark ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-.dark ::-webkit-scrollbar-track {
-  background: #0f1d32;
-}
-
-.dark ::-webkit-scrollbar-thumb {
-  background: #1e3a5f;
+html.dark ::-webkit-scrollbar-thumb {
+  background: rgb(var(--color-border) / 1);
   border-radius: 4px;
 }
 
-.dark ::-webkit-scrollbar-thumb:hover {
-  background: #2563eb;
+html.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--color-border) / 1);
 }

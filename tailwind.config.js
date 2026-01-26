@@ -23,13 +23,14 @@ export default {
           100: "#ffedd5",
           500: "#ff8a3d",
         },
-        // Light mode colors
-        surface: "#f8fafc",
-        ink: "#0f172a",
-        muted: "#64748b",
-        panel: "#ffffff",
-        border: "#e2e8f0",
-        // Dark mode specific colors
+        // Theme-aware semantic colors (driven by CSS variables in `src/styles/index.css`)
+        surface: "rgb(var(--color-surface) / <alpha-value>)",
+        panel: "rgb(var(--color-panel) / <alpha-value>)",
+        ink: "rgb(var(--color-ink) / <alpha-value>)",
+        muted: "rgb(var(--color-muted) / <alpha-value>)",
+        border: "rgb(var(--color-border) / <alpha-value>)",
+
+        // Optional explicit dark palette (usable as `dark:*` overrides)
         "dark-navy": "#0a1628",
         "dark-surface": "#0f1d32",
         "dark-panel": "#162236",

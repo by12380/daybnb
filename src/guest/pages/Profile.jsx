@@ -214,7 +214,7 @@ const Profile = React.memo(() => {
           {/* Account Details (Read-only) */}
           <div>
             <p className="text-sm font-semibold text-ink">Account Details</p>
-            <div className="mt-3 rounded-xl border border-border bg-slate-50 p-4">
+            <div className="mt-3 rounded-xl border border-border bg-surface/60 p-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <p className="text-xs font-medium text-muted">Email</p>
