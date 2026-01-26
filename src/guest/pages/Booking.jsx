@@ -483,52 +483,37 @@ const Booking = React.memo(() => {
 
       setSubmitting(true);
       setError("");
+      const { data, error: invokeError } = await supabase.functions.invoke(
+        "create-checkout-session",
+        {
+          body: {
+            roomId,
+            date,
+            startTime,
+            endTime,
+            fullName: fullName?.trim() || null,
+            phone: phone?.trim() || null,
+          },
+        }
+      );
 
-      const payload = {
-        room_id: roomId,
-        booking_date: date,
-        start_time: startTime,
-        end_time: endTime,
-        user_id: user.id,
-        user_email: user.email ?? null,
-        user_full_name: fullName?.trim() || null,
-        user_phone: phone?.trim() || null,
-        total_price: totalPrice > 0 ? totalPrice : null,
-        price_per_hour: pricePerHour > 0 ? pricePerHour : null,
-        billable_hours: durationHours > 0 ? durationHours : null,
-        status: "pending", // Booking requires admin approval
-      };
-
-      const { data: insertedData, error: insertError } = await supabase
-        .from(BOOKINGS_TABLE)
-        .insert(payload)
-        .select()
-        .single();
-
-      if (insertError) {
-        const hint =
-          insertError?.message?.toLowerCase?.().includes("does not exist") ||
-          insertError?.message?.toLowerCase?.().includes("not found")
-            ? `\n\nCreate a \`${BOOKINGS_TABLE}\` table with columns: room_id (text/uuid), booking_date (date), start_time (text/time), end_time (text/time), user_id (uuid/text), user_email (text), user_full_name (text), user_phone (text).`
-            : insertError?.message?.toLowerCase?.().includes("row level security") ||
-                insertError?.message?.toLowerCase?.().includes("rls")
-              ? `\n\nIf RLS is enabled, add an INSERT policy to \`${BOOKINGS_TABLE}\` for authenticated users.`
-              : "";
-        setError(`${insertError.message || "Failed to create booking."}${hint}`);
+      if (invokeError) {
+        setError(invokeError.message || "Failed to start checkout.");
         setSubmitting(false);
         return;
       }
 
-      setSubmitting(false);
-      setSuccess("Booking request submitted! Awaiting admin approval. Redirecting to your bookings...");
+      const url = data?.url;
+      if (!url) {
+        setError("Failed to start checkout (missing redirect URL).");
+        setSubmitting(false);
+        return;
+      }
 
-      // Navigate to My Bookings page after a short delay
-      setTimeout(() => {
-        const bookingId = insertedData?.id;
-        navigate(bookingId ? `/my-bookings?highlight=${bookingId}` : "/my-bookings");
-      }, 1500);
+      // Redirect to Stripe Checkout
+      window.location.assign(url);
     },
-    [date, dateBookings, durationHours, endTime, fullName, navigate, phone, pricePerHour, roomId, startTime, totalPrice, user?.email, user?.id, validate]
+    [date, dateBookings, endTime, fullName, phone, roomId, startTime, user?.id, validate]
   );
 
   if (loading) {

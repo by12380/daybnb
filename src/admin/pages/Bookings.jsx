@@ -71,6 +71,9 @@ function getBookingStatusInfo(booking) {
   const isPast = booking.booking_date < today;
 
   // Check booking status field first
+  if (booking.status === "payment_pending") {
+    return { color: "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400", text: "Awaiting Payment" };
+  }
   if (booking.status === "pending") {
     return { color: "bg-yellow-50 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400", text: "Pending Approval" };
   }

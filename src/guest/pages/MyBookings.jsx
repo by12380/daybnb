@@ -96,6 +96,15 @@ function getBookingStatusInfo(booking) {
   const isPast = new Date(booking.booking_date) < new Date(new Date().toDateString());
   
   // Check booking status field first
+  if (booking.status === "payment_pending") {
+    return {
+      color: "text-blue-700 dark:text-blue-400",
+      bg: "bg-blue-50 dark:bg-blue-900/30",
+      border: "border-blue-200 dark:border-blue-700",
+      text: "Payment Required",
+      canModify: true,
+    };
+  }
   if (booking.status === "pending") {
     return { color: "text-yellow-700 dark:text-yellow-400", bg: "bg-yellow-50 dark:bg-yellow-900/30", border: "border-yellow-200 dark:border-yellow-700", text: "Pending Approval", canModify: true };
   }
@@ -115,7 +124,7 @@ function getBookingStatusInfo(booking) {
   return { color: "text-green-700 dark:text-green-400", bg: "bg-green-50 dark:bg-green-900/30", border: "border-green-200 dark:border-green-700", text: "Upcoming", canModify: true };
 }
 
-const BookingCard = React.memo(({ booking, room, onEdit, onCancel, isHighlighted }) => {
+const BookingCard = React.memo(({ booking, room, onEdit, onCancel, onPay, isPaying, isHighlighted }) => {
   const statusInfo = getBookingStatusInfo(booking);
   const isPast = new Date(booking.booking_date) < new Date(new Date().toDateString());
 
@@ -186,9 +195,15 @@ const BookingCard = React.memo(({ booking, room, onEdit, onCancel, isHighlighted
         </div>
         {statusInfo.canModify && !isPast && (
           <div className="flex gap-2 sm:flex-col">
-            <Button variant="outline" onClick={() => onEdit(booking)}>
-              Edit
-            </Button>
+            {booking.status === "payment_pending" ? (
+              <Button onClick={() => onPay?.(booking)} disabled={isPaying}>
+                {isPaying ? "Starting…" : "Pay now"}
+              </Button>
+            ) : (
+              <Button variant="outline" onClick={() => onEdit(booking)}>
+                Edit
+              </Button>
+            )}
             <Button
               variant="outline"
               className="!border-red-200 !text-red-600 hover:!border-red-400 hover:!bg-red-50 dark:!border-red-700 dark:!text-red-400 dark:hover:!border-red-600 dark:hover:!bg-red-900/30"
@@ -599,6 +614,7 @@ const MyBookings = React.memo(() => {
 
   const [editingBooking, setEditingBooking] = useState(null);
   const [cancellingBooking, setCancellingBooking] = useState(null);
+  const [payingBookingId, setPayingBookingId] = useState(null);
 
   const fetchBookings = useCallback(async () => {
     if (!user?.id || !supabase) return;
@@ -650,6 +666,30 @@ const MyBookings = React.memo(() => {
     setCancellingBooking(booking);
   }, []);
 
+  const handlePay = useCallback(
+    async (booking) => {
+      if (!supabase) return;
+      setError("");
+      setPayingBookingId(booking?.id || null);
+      const { data, error: invokeError } = await supabase.functions.invoke(
+        "create-checkout-session",
+        { body: { bookingId: booking.id } }
+      );
+      setPayingBookingId(null);
+      if (invokeError) {
+        setError(invokeError.message || "Failed to start checkout.");
+        return;
+      }
+      const url = data?.url;
+      if (!url) {
+        setError("Failed to start checkout (missing redirect URL).");
+        return;
+      }
+      window.location.assign(url);
+    },
+    [setError]
+  );
+
   const handleEditSave = useCallback(() => {
     setEditingBooking(null);
     fetchBookings();
@@ -696,6 +736,7 @@ const MyBookings = React.memo(() => {
   }
 
   // Separate bookings by status
+  const paymentPendingBookings = bookings.filter((b) => b.status === "payment_pending");
   const pendingBookings = bookings.filter((b) => b.status === "pending");
   const upcomingBookings = bookings.filter(
     (b) => 
@@ -747,6 +788,34 @@ const MyBookings = React.memo(() => {
         </Card>
       ) : (
         <>
+          {paymentPendingBookings.length > 0 && (
+            <div className="space-y-4">
+              <h2 className="flex items-center gap-2 text-sm font-semibold text-ink dark:text-dark-ink">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/50">
+                  <span className="h-2 w-2 rounded-full bg-blue-500" />
+                </span>
+                Payment Required ({paymentPendingBookings.length})
+              </h2>
+              <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-3 dark:border-blue-700 dark:bg-blue-900/30">
+                <p className="text-xs text-blue-700 dark:text-blue-400">
+                  Complete payment to submit your booking for admin approval.
+                </p>
+              </div>
+              {paymentPendingBookings.map((booking) => (
+                <BookingCard
+                  key={booking.id}
+                  booking={booking}
+                  room={rooms[booking.room_id]}
+                  onEdit={handleEdit}
+                  onCancel={handleCancel}
+                  onPay={handlePay}
+                  isPaying={payingBookingId === booking.id}
+                  isHighlighted={booking.id === highlightedBookingId}
+                />
+              ))}
+            </div>
+          )}
+
           {pendingBookings.length > 0 && (
             <div className="space-y-4">
               <h2 className="flex items-center gap-2 text-sm font-semibold text-ink dark:text-dark-ink">
@@ -767,6 +836,8 @@ const MyBookings = React.memo(() => {
                   room={rooms[booking.room_id]}
                   onEdit={handleEdit}
                   onCancel={handleCancel}
+                  onPay={handlePay}
+                  isPaying={payingBookingId === booking.id}
                   isHighlighted={booking.id === highlightedBookingId}
                 />
               ))}
