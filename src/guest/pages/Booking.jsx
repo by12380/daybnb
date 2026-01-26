@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { DatePicker } from "antd";
 import dayjs from "dayjs";
 import Card from "../components/ui/Card.jsx";
@@ -11,6 +11,7 @@ import { formatPrice, calculateTotalPrice } from "../utils/format.js";
 import { useAuth } from "../../auth/useAuth.js";
 import { supabase } from "../../lib/supabaseClient.js";
 import { fetchReviewsForRoom, upsertRoomReview } from "../utils/roomReviews.js";
+import { createCheckoutSession, redirectToCheckout } from "../../lib/stripe.js";
 
 const FALLBACK_IMAGE =
   "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=60";
@@ -99,6 +100,7 @@ function isTimeSlotOverlapping(existingBookings, startMinutes, endMinutes) {
 
 const Booking = React.memo(() => {
   const { roomId } = useParams();
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -113,6 +115,10 @@ const Booking = React.memo(() => {
   const [phone, setPhone] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState("");
+  const [processingPayment, setProcessingPayment] = useState(false);
+
+  // Check if this is a retry payment from a cancelled checkout
+  const retryBookingId = searchParams.get("retry");
 
   // State for existing bookings on selected date
   const [dateBookings, setDateBookings] = useState([]);
@@ -455,6 +461,65 @@ const Booking = React.memo(() => {
     return "";
   }, [date, endTime, roomId, startTime, user?.id]);
 
+  // Handle payment for existing booking (retry scenario)
+  const handlePayment = useCallback(
+    async (bookingId, bookingData) => {
+      setProcessingPayment(true);
+      setError("");
+
+      try {
+        const { sessionId, url } = await createCheckoutSession({
+          bookingId,
+          roomTitle: room?.title || "Room Booking",
+          roomId,
+          totalPrice: bookingData.total_price || totalPrice,
+          durationHours: bookingData.billable_hours || durationHours,
+          pricePerHour: bookingData.price_per_hour || pricePerHour,
+          bookingDate: bookingData.booking_date || date,
+          startTime: bookingData.start_time || startTime,
+          endTime: bookingData.end_time || endTime,
+          userEmail: user?.email,
+          userId: user?.id,
+        });
+
+        // Redirect to Stripe Checkout
+        if (url) {
+          window.location.href = url;
+        } else if (sessionId) {
+          await redirectToCheckout(sessionId);
+        }
+      } catch (err) {
+        console.error("Payment error:", err);
+        setError(err.message || "Failed to initiate payment. Please try again.");
+        setProcessingPayment(false);
+      }
+    },
+    [room?.title, roomId, totalPrice, durationHours, pricePerHour, date, startTime, endTime, user?.email, user?.id]
+  );
+
+  // Handle retry payment for existing booking
+  useEffect(() => {
+    if (retryBookingId && supabase && room) {
+      async function loadRetryBooking() {
+        const { data } = await supabase
+          .from(BOOKINGS_TABLE)
+          .select("*")
+          .eq("id", retryBookingId)
+          .maybeSingle();
+
+        if (data && data.payment_status !== "paid") {
+          // Pre-fill form with existing booking data
+          if (data.booking_date) setDate(data.booking_date);
+          if (data.start_time) setStartTime(data.start_time);
+          if (data.end_time) setEndTime(data.end_time);
+          if (data.user_full_name) setFullName(data.user_full_name);
+          if (data.user_phone) setPhone(data.user_phone);
+        }
+      }
+      loadRetryBooking();
+    }
+  }, [retryBookingId, room]);
+
   const onSubmit = useCallback(
     async (e) => {
       e.preventDefault();
@@ -496,7 +561,8 @@ const Booking = React.memo(() => {
         total_price: totalPrice > 0 ? totalPrice : null,
         price_per_hour: pricePerHour > 0 ? pricePerHour : null,
         billable_hours: durationHours > 0 ? durationHours : null,
-        status: "pending", // Booking requires admin approval
+        status: "pending",
+        payment_status: "pending", // Payment not yet completed
       };
 
       const { data: insertedData, error: insertError } = await supabase
@@ -509,7 +575,7 @@ const Booking = React.memo(() => {
         const hint =
           insertError?.message?.toLowerCase?.().includes("does not exist") ||
           insertError?.message?.toLowerCase?.().includes("not found")
-            ? `\n\nCreate a \`${BOOKINGS_TABLE}\` table with columns: room_id (text/uuid), booking_date (date), start_time (text/time), end_time (text/time), user_id (uuid/text), user_email (text), user_full_name (text), user_phone (text).`
+            ? `\n\nCreate a \`${BOOKINGS_TABLE}\` table with columns: room_id (text/uuid), booking_date (date), start_time (text/time), end_time (text/time), user_id (uuid/text), user_email (text), user_full_name (text), user_phone (text), payment_status (text), stripe_session_id (text).`
             : insertError?.message?.toLowerCase?.().includes("row level security") ||
                 insertError?.message?.toLowerCase?.().includes("rls")
               ? `\n\nIf RLS is enabled, add an INSERT policy to \`${BOOKINGS_TABLE}\` for authenticated users.`
@@ -520,15 +586,21 @@ const Booking = React.memo(() => {
       }
 
       setSubmitting(false);
-      setSuccess("Booking request submitted! Awaiting admin approval. Redirecting to your bookings...");
 
-      // Navigate to My Bookings page after a short delay
-      setTimeout(() => {
-        const bookingId = insertedData?.id;
-        navigate(bookingId ? `/my-bookings?highlight=${bookingId}` : "/my-bookings");
-      }, 1500);
+      // If there's a price, redirect to payment
+      if (totalPrice > 0 && insertedData?.id) {
+        setSuccess("Booking created! Redirecting to payment...");
+        await handlePayment(insertedData.id, insertedData);
+      } else {
+        // No price or free booking - just confirm
+        setSuccess("Booking request submitted! Awaiting admin approval. Redirecting to your bookings...");
+        setTimeout(() => {
+          const bookingId = insertedData?.id;
+          navigate(bookingId ? `/my-bookings?highlight=${bookingId}` : "/my-bookings");
+        }, 1500);
+      }
     },
-    [date, dateBookings, durationHours, endTime, fullName, navigate, phone, pricePerHour, roomId, startTime, totalPrice, user?.email, user?.id, validate]
+    [date, dateBookings, durationHours, endTime, fullName, handlePayment, navigate, phone, pricePerHour, roomId, startTime, totalPrice, user?.email, user?.id, validate]
   );
 
   if (loading) {
@@ -712,10 +784,30 @@ const Booking = React.memo(() => {
                 Back
               </Button>
             </Link>
-            <Button className="flex-1" type="submit" disabled={submitting || !date}>
-              {submitting ? "Saving…" : "Book now"}
+            <Button 
+              className="flex-1" 
+              type="submit" 
+              disabled={submitting || processingPayment || !date}
+            >
+              {processingPayment 
+                ? "Redirecting to payment…" 
+                : submitting 
+                  ? "Creating booking…" 
+                  : totalPrice > 0 
+                    ? `Pay ${formatPrice(totalPrice)} & Book` 
+                    : "Book now"}
             </Button>
           </div>
+
+          {/* Payment security note */}
+          {totalPrice > 0 && (
+            <p className="flex items-center justify-center gap-1.5 text-xs text-muted dark:text-dark-muted">
+              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+              Secure payment powered by Stripe
+            </p>
+          )}
         </form>
       </Card>
 
