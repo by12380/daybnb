@@ -1,10 +1,31 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useHits, useInstantSearch } from "react-instantsearch";
 import { useNavigate } from "react-router-dom";
 import Card from "../ui/Card.jsx";
 import Button from "../ui/Button.jsx";
 import { formatPrice } from "../../utils/format.js";
-import { StarsDisplay } from "../ui/Stars.jsx";
+import { useAuth } from "../../../auth/useAuth.js";
+import { fetchLikedRoomIds, likeRoom, unlikeRoom } from "../../utils/roomLikes.js";
+import { supabase } from "../../../lib/supabaseClient.js";
+
+function HeartIcon({ filled, className = "" }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill={filled ? "currentColor" : "none"}
+      stroke="currentColor"
+      aria-hidden="true"
+    >
+      <path
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M11.995 21s-7.5-4.35-9.77-8.78C.71 9.29 2.02 6.4 4.86 5.57c1.64-.48 3.41.02 4.65 1.27l2.49 2.52 2.49-2.52c1.24-1.25 3.01-1.75 4.65-1.27 2.84.83 4.15 3.72 2.63 6.65C19.495 16.65 11.995 21 11.995 21z"
+      />
+    </svg>
+  );
+}
 
 function DistanceBadge({ distance }) {
   if (!distance && distance !== 0) return null;
@@ -28,9 +49,8 @@ function DistanceBadge({ distance }) {
   );
 }
 
-function SearchResultCard({ hit, onBook }) {
+function SearchResultCard({ hit, onBook, liked, onToggleLike }) {
   const tags = hit.tags || [];
-  const hasGeo = hit._geoloc?.lat && hit._geoloc?.lng;
 
   return (
     <Card className="overflow-hidden p-0 transition-shadow hover:shadow-lg">
@@ -49,6 +69,18 @@ function SearchResultCard({ hit, onBook }) {
             <DistanceBadge distance={hit._rankingInfo.geoDistance} />
           </div>
         )}
+        {/* Like button */}
+        <button
+          type="button"
+          onClick={() => onToggleLike(hit)}
+          className={`absolute right-3 top-3 rounded-full border border-border bg-panel/90 p-2 shadow-sm backdrop-blur transition hover:bg-panel ${
+            liked ? "text-rose-600 dark:text-rose-300" : "text-muted hover:text-ink"
+          }`}
+          aria-label={liked ? "Unlike room" : "Like room"}
+          title={liked ? "Unlike" : "Like"}
+        >
+          <HeartIcon filled={liked} className="h-5 w-5" />
+        </button>
       </div>
 
       <div className="space-y-2 p-4">
@@ -170,18 +202,82 @@ function EmptyState({ query }) {
 
 const SearchResults = React.memo(function SearchResults() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { items: hits } = useHits();
   const { status, results } = useInstantSearch();
+
+  const [likedIds, setLikedIds] = useState(() => new Set());
 
   const isLoading = status === "loading" || status === "stalled";
   const query = results?.query || "";
   const nbHits = results?.nbHits || 0;
+
+  // Fetch current user's liked room ids
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadLikes() {
+      if (!user?.id || !supabase) {
+        setLikedIds(new Set());
+        return;
+      }
+
+      try {
+        const set = await fetchLikedRoomIds(user.id);
+        if (!cancelled) setLikedIds(set);
+      } catch (e) {
+        console.warn("Failed to load likes:", e);
+      }
+    }
+
+    loadLikes();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
 
   const handleBook = useCallback(
     (hit) => {
       navigate(`/book/${hit.objectID}`);
     },
     [navigate]
+  );
+
+  const toggleLike = useCallback(
+    async (hit) => {
+      const roomId = hit.objectID;
+      if (!roomId) return;
+      
+      if (!user?.id) {
+        navigate("/auth");
+        return;
+      }
+
+      const isLiked = likedIds.has(roomId);
+
+      // Optimistic update
+      setLikedIds((prev) => {
+        const next = new Set(prev);
+        if (isLiked) next.delete(roomId);
+        else next.add(roomId);
+        return next;
+      });
+
+      try {
+        if (isLiked) await unlikeRoom({ userId: user.id, roomId });
+        else await likeRoom({ userId: user.id, roomId });
+      } catch (e) {
+        // Revert on failure
+        setLikedIds((prev) => {
+          const next = new Set(prev);
+          if (isLiked) next.add(roomId);
+          else next.delete(roomId);
+          return next;
+        });
+        console.warn("Failed to toggle like:", e);
+      }
+    },
+    [likedIds, navigate, user?.id]
   );
 
   if (isLoading) {
@@ -211,7 +307,13 @@ const SearchResults = React.memo(function SearchResults() {
       {/* Results grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {hits.map((hit) => (
-          <SearchResultCard key={hit.objectID} hit={hit} onBook={handleBook} />
+          <SearchResultCard
+            key={hit.objectID}
+            hit={hit}
+            onBook={handleBook}
+            liked={likedIds.has(hit.objectID)}
+            onToggleLike={toggleLike}
+          />
         ))}
       </div>
     </div>

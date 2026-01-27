@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { useConfigure } from "react-instantsearch";
+import { useConfigure, useSearchBox } from "react-instantsearch";
 import { DatePicker } from "antd";
 import dayjs from "dayjs";
 import { INPUT_STYLES } from "../ui/FormInput.jsx";
@@ -128,7 +128,7 @@ function TypeFilter({ selectedTypes, onTypeToggle, availableTypes }) {
 function GuestsFilter({ minGuests, onGuestsChange }) {
   return (
     <div className="space-y-3">
-      <label className="text-sm font-medium text-ink dark:text-dark-ink">Minimum Guests</label>
+      <label className="text-sm font-medium text-ink dark:text-dark-ink">Minimum Guests</label><br/>
       <select value={minGuests} onChange={(e) => onGuestsChange(Number(e.target.value))} className={INPUT_STYLES}>
         {[1, 2, 3, 4, 5, 6, 8, 10].map((num) => (
           <option key={num} value={num}>
@@ -148,6 +148,8 @@ const SearchFilters = React.memo(function SearchFilters({
   startTime,
   endTime,
 }) {
+  const { refine: refineSearch } = useSearchBox();
+  
   const [isExpanded, setIsExpanded] = useState(true);
   const [localStartTime, setLocalStartTime] = useState(startTime || 8);
   const [localEndTime, setLocalEndTime] = useState(endTime || 17);
@@ -251,7 +253,7 @@ const SearchFilters = React.memo(function SearchFilters({
         <div className="mt-4 space-y-6">
           {/* Date Filter */}
           <div className="space-y-3">
-            <label className="text-sm font-medium text-ink dark:text-dark-ink">Date</label>
+            <label className="text-sm font-medium text-ink dark:text-dark-ink mr-2">Date</label>
             <DatePicker
               className={INPUT_STYLES}
               placeholder="Select date"
@@ -314,10 +316,31 @@ const SearchFilters = React.memo(function SearchFilters({
           />
 
           {/* Guests */}
-          <GuestsFilter
+          {/* <GuestsFilter
             minGuests={minGuests}
             onGuestsChange={setMinGuests}
-          />
+          /> */}
+
+          {/* Reset All Filters Button */}
+          <button
+            type="button"
+            onClick={() => {
+              // Clear search query
+              refineSearch("");
+              // Clear all filter states
+              setMinPrice("");
+              setMaxPrice("");
+              setMinGuests(1);
+              setSelectedTypes([]);
+              setLocalStartTime(8);
+              setLocalEndTime(17);
+              onDateChange?.(null);
+              onTimeRangeChange?.(8, 17);
+            }}
+            className="w-full rounded-xl border border-border bg-surface/60 px-4 py-2 text-sm font-medium text-muted transition hover:border-red-300 hover:bg-red-50 hover:text-red-600 dark:border-dark-border dark:bg-dark-surface/60 dark:text-dark-muted dark:hover:border-red-700 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+          >
+            Reset All Filters
+          </button>
         </div>
       )}
     </div>
