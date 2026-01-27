@@ -35,6 +35,13 @@ const RoomCard = React.memo(function RoomCard({
   const navigate = useNavigate();
 
   const tags = room?.tags || [];
+  const distanceMeters = Number(room?.distance_meters);
+  const distanceLabel =
+    Number.isFinite(distanceMeters) && distanceMeters > 0
+      ? distanceMeters >= 1000
+        ? `${(distanceMeters / 1000).toFixed(1)} km away`
+        : `${Math.round(distanceMeters)} m away`
+      : "";
 
   const handleToggle = useCallback(() => {
     onToggleLike?.(room);
@@ -70,7 +77,10 @@ const RoomCard = React.memo(function RoomCard({
       <div className="space-y-2 p-4">
         <div className="flex items-center justify-between text-xs text-muted dark:text-dark-muted">
           <span>{room.location}</span>
-          <span>{room.guests} guests</span>
+          <span className="flex items-center gap-2">
+            {distanceLabel ? <span className="rounded-full bg-surface/70 px-2 py-0.5">{distanceLabel}</span> : null}
+            <span>{room.guests} guests</span>
+          </span>
         </div>
 
         <div className="flex items-start justify-between gap-3">

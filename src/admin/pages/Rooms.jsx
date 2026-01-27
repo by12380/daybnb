@@ -119,6 +119,8 @@ const RoomFormModal = React.memo(({ open, room, onClose, onSave, isNew }) => {
   const [pricePerHour, setPricePerHour] = useState(25);
   const [image, setImage] = useState("");
   const [tags, setTags] = useState("");
+  const [latitude, setLatitude] = useState("");
+  const [longitude, setLongitude] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -132,6 +134,12 @@ const RoomFormModal = React.memo(({ open, room, onClose, onSave, isNew }) => {
         setPricePerHour(room.price_per_hour || 25);
         setImage(room.image || "");
         setTags(room.tags?.join(", ") || "");
+        setLatitude(
+          room.latitude === null || room.latitude === undefined ? "" : String(room.latitude)
+        );
+        setLongitude(
+          room.longitude === null || room.longitude === undefined ? "" : String(room.longitude)
+        );
       } else {
         setTitle("");
         setLocation("");
@@ -140,6 +148,8 @@ const RoomFormModal = React.memo(({ open, room, onClose, onSave, isNew }) => {
         setPricePerHour(25);
         setImage("");
         setTags("");
+        setLatitude("");
+        setLongitude("");
       }
       setError("");
     }
@@ -160,6 +170,9 @@ const RoomFormModal = React.memo(({ open, room, onClose, onSave, isNew }) => {
 
     setSaving(true);
 
+    const latNum = Number(latitude);
+    const lngNum = Number(longitude);
+
     const roomData = {
       title: title.trim(),
       location: location.trim(),
@@ -171,6 +184,8 @@ const RoomFormModal = React.memo(({ open, room, onClose, onSave, isNew }) => {
         .split(",")
         .map((t) => t.trim())
         .filter(Boolean),
+      latitude: Number.isFinite(latNum) ? latNum : null,
+      longitude: Number.isFinite(lngNum) ? lngNum : null,
     };
 
     let result;
@@ -195,7 +210,7 @@ const RoomFormModal = React.memo(({ open, room, onClose, onSave, isNew }) => {
     }
 
     onSave();
-  }, [title, location, type, guests, pricePerHour, image, tags, isNew, room?.id, onSave]);
+  }, [title, location, type, guests, pricePerHour, image, tags, latitude, longitude, isNew, room?.id, onSave]);
 
   return (
     <Modal
@@ -262,6 +277,25 @@ const RoomFormModal = React.memo(({ open, room, onClose, onSave, isNew }) => {
           onChange={(e) => setImage(e.target.value)}
           placeholder="https://example.com/image.jpg"
         />
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <FormInput
+            label="Latitude"
+            type="number"
+            step="0.000001"
+            value={latitude}
+            onChange={(e) => setLatitude(e.target.value)}
+            placeholder="e.g., 47.6062"
+          />
+          <FormInput
+            label="Longitude"
+            type="number"
+            step="0.000001"
+            value={longitude}
+            onChange={(e) => setLongitude(e.target.value)}
+            placeholder="e.g., -122.3321"
+          />
+        </div>
 
         {image && (
           <div className="overflow-hidden rounded-xl border border-border">
