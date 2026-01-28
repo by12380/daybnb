@@ -3,6 +3,7 @@ import MainLayout from "../layouts/MainLayout.jsx";
 import Dashboard from "../pages/Dashboard.jsx";
 import GuestLayout from "../guest/components/layout/GuestLayout.jsx";
 import Landing from "../guest/pages/Landing.jsx";
+import Contact from "../guest/pages/Contact.jsx";
 import Auth from "../pages/Auth.jsx";
 import Booking from "../guest/pages/Booking.jsx";
 import Profile from "../guest/pages/Profile.jsx";
@@ -19,6 +20,7 @@ import AdminDashboard from "../admin/pages/Dashboard.jsx";
 import AdminBookings from "../admin/pages/Bookings.jsx";
 import AdminUsers from "../admin/pages/Users.jsx";
 import AdminRooms from "../admin/pages/Rooms.jsx";
+import AdminMessages from "../admin/pages/Messages.jsx";
 
 export default function AppRouter() {
   return (
@@ -31,6 +33,7 @@ export default function AppRouter() {
       <Routes>
         <Route element={<GuestLayout />}>
           <Route path="/" element={<Landing />} />
+          <Route path="/contact" element={<Contact />} />
           <Route path="/auth" element={<Auth />} />
           <Route element={<RequireAuth />}>
             <Route path="/book/:roomId" element={<Booking />} />
@@ -50,6 +53,7 @@ export default function AppRouter() {
           <Route element={<AdminLayout />}>
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/admin/bookings" element={<AdminBookings />} />
+            <Route path="/admin/messages" element={<AdminMessages />} />
             <Route path="/admin/users" element={<AdminUsers />} />
             <Route path="/admin/rooms" element={<AdminRooms />} />
           </Route>

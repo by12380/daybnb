@@ -1,3 +1,5 @@
+import { Link } from "react-router-dom";
+
 export default function GuestFooter() {
   return (
     <footer className="border-t border-border bg-panel/80 backdrop-blur transition-colors duration-300">
@@ -9,7 +11,9 @@ export default function GuestFooter() {
           </p>
         </div>
         <div className="flex gap-4">
-          <button className="hover:text-brand-600 dark:hover:text-brand-400">Support</button>
+          <Link to="/contact" className="hover:text-brand-600 dark:hover:text-brand-400">
+            Support
+          </Link>
           <button className="hover:text-brand-600 dark:hover:text-brand-400">Safety</button>
           <button className="hover:text-brand-600 dark:hover:text-brand-400">Terms</button>
         </div>
