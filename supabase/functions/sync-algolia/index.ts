@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.46.1";
-import algoliasearch from "https://esm.sh/algoliasearch@4.22.1";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,13 +7,10 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-// Initialize Algolia client
+// Algolia configuration
 const algoliaAppId = Deno.env.get("ALGOLIA_APP_ID") as string;
 const algoliaAdminKey = Deno.env.get("ALGOLIA_ADMIN_KEY") as string;
 const algoliaIndexName = Deno.env.get("ALGOLIA_INDEX_NAME") || "daybnb_places";
-
-const algoliaClient = algoliasearch(algoliaAppId, algoliaAdminKey);
-const index = algoliaClient.initIndex(algoliaIndexName);
 
 // Initialize Supabase client
 const supabaseUrl = Deno.env.get("SUPABASE_URL") as string;
@@ -87,6 +83,61 @@ function transformToAlgoliaRecord(room: RoomRecord): AlgoliaRecord {
   return record;
 }
 
+// Algolia REST API helper
+async function algoliaRequest(
+  method: string,
+  endpoint: string,
+  body?: unknown
+): Promise<unknown> {
+  const url = `https://${algoliaAppId}-dsn.algolia.net/1/indexes/${algoliaIndexName}${endpoint}`;
+  
+  const response = await fetch(url, {
+    method,
+    headers: {
+      "X-Algolia-API-Key": algoliaAdminKey,
+      "X-Algolia-Application-Id": algoliaAppId,
+      "Content-Type": "application/json",
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Algolia API error (${response.status}): ${errorText}`);
+  }
+
+  return response.json();
+}
+
+// Save a single object to Algolia
+async function saveObject(record: AlgoliaRecord): Promise<unknown> {
+  return algoliaRequest("PUT", `/${record.objectID}`, record);
+}
+
+// Save multiple objects to Algolia
+async function saveObjects(records: AlgoliaRecord[]): Promise<unknown> {
+  const requests = records.map((record) => ({
+    action: "updateObject",
+    body: record,
+  }));
+  return algoliaRequest("POST", "/batch", { requests });
+}
+
+// Delete an object from Algolia
+async function deleteObject(objectID: string): Promise<unknown> {
+  return algoliaRequest("DELETE", `/${objectID}`);
+}
+
+// Clear all objects from the index
+async function clearObjects(): Promise<unknown> {
+  return algoliaRequest("POST", "/clear");
+}
+
+// Set index settings
+async function setSettings(settings: unknown): Promise<unknown> {
+  return algoliaRequest("PUT", "/settings", settings);
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
@@ -101,7 +152,7 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({
           error: "Algolia credentials not configured",
-          details: "Set ALGOLIA_APP_ID and ALGOLIA_ADMIN_KEY environment variables",
+          details: "Set ALGOLIA_APP_ID and ALGOLIA_ADMIN_KEY environment variables in Supabase Edge Function secrets",
         }),
         {
           status: 500,
@@ -117,7 +168,7 @@ serve(async (req) => {
         // Add new record to Algolia
         if (record) {
           const algoliaRecord = transformToAlgoliaRecord(record);
-          result = await index.saveObject(algoliaRecord);
+          result = await saveObject(algoliaRecord);
           console.log(`Added room ${record.id} to Algolia:`, result);
         }
         break;
@@ -126,7 +177,7 @@ serve(async (req) => {
         // Update existing record in Algolia
         if (record) {
           const algoliaRecord = transformToAlgoliaRecord(record);
-          result = await index.saveObject(algoliaRecord);
+          result = await saveObject(algoliaRecord);
           console.log(`Updated room ${record.id} in Algolia:`, result);
         }
         break;
@@ -135,7 +186,7 @@ serve(async (req) => {
         // Remove record from Algolia
         const recordId = old_record?.id || record?.id;
         if (recordId) {
-          result = await index.deleteObject(recordId);
+          result = await deleteObject(recordId);
           console.log(`Deleted room ${recordId} from Algolia:`, result);
         }
         break;
@@ -154,17 +205,18 @@ serve(async (req) => {
           const algoliaRecords = rooms.map(transformToAlgoliaRecord);
           
           // Clear existing index and add all records
-          await index.clearObjects();
-          result = await index.saveObjects(algoliaRecords);
+          await clearObjects();
+          result = await saveObjects(algoliaRecords);
           console.log(`Full sync completed: ${rooms.length} rooms synced to Algolia`);
+          result = { ...result, roomsCount: rooms.length };
         } else {
-          result = { message: "No rooms to sync" };
+          result = { message: "No rooms to sync", roomsCount: 0 };
         }
         break;
 
       case "CONFIGURE_INDEX":
         // Configure Algolia index settings for GeoSearch
-        result = await index.setSettings({
+        result = await setSettings({
           // Searchable attributes
           searchableAttributes: [
             "title",

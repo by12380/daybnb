@@ -4,6 +4,13 @@ import { supabase } from "../../lib/supabaseClient.js";
 import { formatPrice } from "../../guest/utils/format.js";
 import Button from "../../guest/components/ui/Button.jsx";
 import FormInput, { INPUT_STYLES } from "../../guest/components/ui/FormInput.jsx";
+import { 
+  syncRoomInsert, 
+  syncRoomUpdate, 
+  syncRoomDelete, 
+  fullSyncToAlgolia 
+} from "../../lib/algoliaSync.js";
+import { isAlgoliaConfigured } from "../../lib/algoliaClient.js";
 
 const ROOM_TYPES = [
   { value: "room", label: "Room" },
@@ -194,6 +201,21 @@ const RoomFormModal = React.memo(({ open, room, onClose, onSave, isNew }) => {
       return;
     }
 
+    // Sync to Algolia (non-blocking)
+    if (result.data) {
+      try {
+        if (isNew) {
+          await syncRoomInsert(result.data);
+        } else {
+          await syncRoomUpdate(result.data);
+        }
+        console.log("Room synced to Algolia successfully");
+      } catch (syncError) {
+        console.warn("Failed to sync room to Algolia:", syncError);
+        // Don't block the save operation if Algolia sync fails
+      }
+    }
+
     onSave();
   }, [title, location, type, guests, pricePerHour, image, tags, isNew, room?.id, onSave]);
 
@@ -306,16 +328,26 @@ const DeleteRoomModal = React.memo(({ open, room, onClose, onConfirm }) => {
     setError("");
     setDeleting(true);
 
+    const roomId = room.id;
     const { error: deleteError } = await supabase
       .from("rooms")
       .delete()
-      .eq("id", room.id);
+      .eq("id", roomId);
 
     setDeleting(false);
 
     if (deleteError) {
       setError(deleteError.message || "Failed to delete room.");
       return;
+    }
+
+    // Sync deletion to Algolia (non-blocking)
+    try {
+      await syncRoomDelete(roomId);
+      console.log("Room deleted from Algolia successfully");
+    } catch (syncError) {
+      console.warn("Failed to delete room from Algolia:", syncError);
+      // Don't block the delete operation if Algolia sync fails
     }
 
     onConfirm();
@@ -377,11 +409,27 @@ export default function AdminRooms() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
+  const [syncing, setSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState("");
 
   const [viewingRoom, setViewingRoom] = useState(null);
   const [editingRoom, setEditingRoom] = useState(null);
   const [deletingRoom, setDeletingRoom] = useState(null);
   const [isCreating, setIsCreating] = useState(false);
+
+  const handleFullSync = useCallback(async () => {
+    setSyncing(true);
+    setSyncMessage("");
+    try {
+      await fullSyncToAlgolia();
+      setSyncMessage("All rooms synced to Algolia successfully!");
+      setTimeout(() => setSyncMessage(""), 3000);
+    } catch (error) {
+      setSyncMessage(`Sync failed: ${error.message}`);
+    } finally {
+      setSyncing(false);
+    }
+  }, []);
 
   const fetchRooms = useCallback(async () => {
     if (!supabase) return;
@@ -471,13 +519,38 @@ export default function AdminRooms() {
             Manage your property listings ({rooms.length} total)
           </p>
         </div>
-        <Button onClick={() => setIsCreating(true)}>
-          <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-          </svg>
-          Add Room
-        </Button>
+        <div className="flex gap-3">
+          {isAlgoliaConfigured && (
+            <Button 
+              variant="outline" 
+              onClick={handleFullSync}
+              disabled={syncing}
+            >
+              <svg className={`mr-2 h-4 w-4 ${syncing ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              {syncing ? "Syncing..." : "Sync to Algolia"}
+            </Button>
+          )}
+          <Button onClick={() => setIsCreating(true)}>
+            <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+            </svg>
+            Add Room
+          </Button>
+        </div>
       </div>
+
+      {/* Sync Message */}
+      {syncMessage && (
+        <div className={`rounded-xl p-3 text-sm ${
+          syncMessage.includes("failed") 
+            ? "bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400" 
+            : "bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+        }`}>
+          {syncMessage}
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex flex-col gap-4 sm:flex-row">

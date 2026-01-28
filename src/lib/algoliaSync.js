@@ -2,6 +2,7 @@ import { supabase } from "./supabaseClient.js";
 
 // Get the Supabase functions URL
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "";
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
 const FUNCTIONS_URL = SUPABASE_URL ? `${SUPABASE_URL}/functions/v1` : "";
 
 /**
@@ -17,23 +18,35 @@ export async function syncToAlgolia({ type, record, old_record }) {
     return null;
   }
 
+  if (!supabase) {
+    console.warn("Supabase client not configured, skipping Algolia sync");
+    return null;
+  }
+
   try {
     // Get current session for auth
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    
+    if (sessionError) {
+      console.warn("Failed to get session:", sessionError);
+    }
+
+    // Use the access token if available, otherwise use anon key
+    const authToken = session?.access_token || SUPABASE_ANON_KEY;
     
     const response = await fetch(`${FUNCTIONS_URL}/sync-algolia`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: session?.access_token ? `Bearer ${session.access_token}` : "",
-        apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || "",
+        "Authorization": `Bearer ${authToken}`,
+        "apikey": SUPABASE_ANON_KEY,
       },
       body: JSON.stringify({ type, record, old_record }),
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || "Algolia sync failed");
+      const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
+      throw new Error(errorData.error || errorData.message || `Algolia sync failed (${response.status})`);
     }
 
     return await response.json();
