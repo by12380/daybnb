@@ -87,10 +87,14 @@ const GeoSearch = React.memo(function GeoSearch({ className = "" }) {
 
   return (
     <div className={`space-y-6 ${className}`}>
-      <InstantSearch searchClient={searchClient} indexName={indexName}>
+      <InstantSearch
+        searchClient={searchClient}
+        indexName={indexName}
+        future={{ preserveSharedStateOnUnmount: true }}
+      >
         {/* Configure search parameters */}
         <Configure
-          hitsPerPage={20}
+          hitsPerPage={10}
           getRankingInfo={true}
           aroundLatLng={aroundLatLng}
           aroundRadius={userLocation ? searchRadius : undefined}

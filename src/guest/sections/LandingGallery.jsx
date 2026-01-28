@@ -1,21 +1,85 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Card from "../components/ui/Card.jsx";
+import Button from "../components/ui/Button.jsx";
 import { supabase } from "../../lib/supabaseClient.js";
 import { useAuth } from "../../auth/useAuth.js";
 import RoomCard from "../components/RoomCard.jsx";
 import { fetchLikedRoomIds, likeRoom, unlikeRoom } from "../utils/roomLikes.js";
 import { fetchRatingsForRooms } from "../utils/roomReviews.js";
 
+const PAGE_SIZE = 10;
+
+function escapePostgrestOrValue(value) {
+  // PostgREST `.or(...)` uses commas as separators, so escape commas.
+  // Keep it conservative; this is only for UX search input.
+  return String(value || "").replaceAll(",", "\\,");
+}
+
+function GalleryLoadingState() {
+  return (
+    <div className="grid gap-4 md:grid-cols-2">
+      {[1, 2, 3, 4].map((i) => (
+        <Card key={i} className="animate-pulse overflow-hidden p-0">
+          <div className="h-48 bg-surface dark:bg-dark-surface" />
+          <div className="space-y-3 p-4">
+            <div className="h-4 w-3/4 rounded bg-surface dark:bg-dark-surface" />
+            <div className="h-3 w-1/2 rounded bg-surface dark:bg-dark-surface" />
+            <div className="h-6 w-1/3 rounded bg-surface dark:bg-dark-surface" />
+            <div className="h-10 rounded bg-surface dark:bg-dark-surface" />
+          </div>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
 const LandingGallery = React.memo(({ location = "", guests = 0 }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
+
+  const topRef = useRef(null);
 
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [likedIds, setLikedIds] = useState(() => new Set());
   const [ratingsByRoomId, setRatingsByRoomId] = useState({});
+  const [page, setPage] = useState(0);
+  const [totalCount, setTotalCount] = useState(null);
+
+  const pageCacheRef = useRef(new Map());
+  const likedIdsRef = useRef(likedIds);
+
+  useEffect(() => {
+    likedIdsRef.current = likedIds;
+  }, [likedIds]);
+
+  const locationQuery = useMemo(() => String(location || "").toLowerCase().trim(), [location]);
+  const guestsQuery = useMemo(() => Number(guests) || 0, [guests]);
+
+  // Reset paging + cache when filters change
+  useEffect(() => {
+    pageCacheRef.current.clear();
+    setPage(0);
+  }, [locationQuery, guestsQuery]);
+
+  // When paging changes, scroll back to the top of the gallery so the new
+  // page's first items are immediately visible.
+  useEffect(() => {
+    const el = topRef.current;
+    if (!el) return;
+
+    const reduceMotion =
+      typeof window !== "undefined" &&
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    // Defer until after layout updates to avoid jank.
+    requestAnimationFrame(() => {
+      el.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
+    });
+  }, [page]);
 
   // Fetch rooms from Supabase
   useEffect(() => {
@@ -31,22 +95,65 @@ const LandingGallery = React.memo(({ location = "", guests = 0 }) => {
       }
 
       try {
-        const { data, error: fetchError } = await supabase
+        setLoading(true);
+        setError(null);
+
+        const cacheKey = JSON.stringify({
+          locationQuery,
+          guestsQuery,
+          page,
+          pageSize: PAGE_SIZE,
+        });
+        const cached = pageCacheRef.current.get(cacheKey);
+        if (cached) {
+          if (!isMounted) return;
+          setRooms(cached.rooms || []);
+          setTotalCount(
+            typeof cached.totalCount === "number" ? cached.totalCount : cached.totalCount ?? null
+          );
+          setLoading(false);
+          return;
+        }
+
+        const from = page * PAGE_SIZE;
+        const to = from + PAGE_SIZE - 1;
+
+        let query = supabase
           .from("rooms")
-          .select("*");
+          .select("*", { count: "exact" })
+          .order("id", { ascending: true })
+          .range(from, to);
+
+        if (locationQuery) {
+          const safe = escapePostgrestOrValue(locationQuery);
+          const pattern = `%${safe}%`;
+          query = query.or(`location.ilike.${pattern},title.ilike.${pattern}`);
+        }
+        if (guestsQuery) {
+          query = query.gte("guests", guestsQuery);
+        }
+
+        const { data, error: fetchError, count } = await query;
 
         if (!isMounted) return;
 
         if (fetchError) {
           console.error("Error fetching rooms:", fetchError);
           setError(fetchError.message);
+          setRooms([]);
         } else {
           setRooms(data || []);
+          setTotalCount(typeof count === "number" ? count : null);
+          pageCacheRef.current.set(cacheKey, {
+            rooms: data || [],
+            totalCount: typeof count === "number" ? count : null,
+          });
         }
       } catch (err) {
         if (isMounted) {
           console.error("Unexpected error:", err);
           setError(err.message);
+          setRooms([]);
         }
       } finally {
         if (isMounted) {
@@ -60,7 +167,7 @@ const LandingGallery = React.memo(({ location = "", guests = 0 }) => {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [locationQuery, guestsQuery, page]);
 
   // Fetch current user's liked room ids
   useEffect(() => {
@@ -114,55 +221,76 @@ const LandingGallery = React.memo(({ location = "", guests = 0 }) => {
     };
   }, [rooms]);
 
-  // Filter rooms based on search params
-  const items = useMemo(() => {
-    const locationQuery = location.toLowerCase().trim();
-    const guestsQuery = Number(guests);
+  const items = rooms;
 
-    return rooms.filter((room) => {
-      const matchesLocation =
-        !locationQuery ||
-        room.location?.toLowerCase().includes(locationQuery) ||
-        room.title?.toLowerCase().includes(locationQuery);
-      const matchesGuests = !guestsQuery || room.guests >= guestsQuery;
-      return matchesLocation && matchesGuests;
-    });
-  }, [rooms, location, guests]);
+  console.log("items--------------------------------->", items);
 
-  const toggleLike = async (room) => {
-    if (!room?.id) return;
-    if (!user?.id) {
-      navigate("/auth");
-      return;
-    }
+  const toggleLike = useCallback(
+    async (room) => {
+      if (!room?.id) return;
+      if (!user?.id) {
+        navigate("/auth");
+        return;
+      }
 
-    const isLiked = likedIds.has(room.id);
+      const isLiked = likedIdsRef.current.has(room.id);
 
-    // optimistic update
-    setLikedIds((prev) => {
-      const next = new Set(prev);
-      if (isLiked) next.delete(room.id);
-      else next.add(room.id);
-      return next;
-    });
-
-    try {
-      if (isLiked) await unlikeRoom({ userId: user.id, roomId: room.id });
-      else await likeRoom({ userId: user.id, roomId: room.id });
-    } catch (e) {
-      // revert on failure
+      // optimistic update
       setLikedIds((prev) => {
         const next = new Set(prev);
-        if (isLiked) next.add(room.id);
-        else next.delete(room.id);
+        if (isLiked) next.delete(room.id);
+        else next.add(room.id);
         return next;
       });
-      console.warn("Failed to toggle like:", e);
-    }
-  };
+
+      try {
+        if (isLiked) await unlikeRoom({ userId: user.id, roomId: room.id });
+        else await likeRoom({ userId: user.id, roomId: room.id });
+      } catch (e) {
+        // revert on failure
+        setLikedIds((prev) => {
+          const next = new Set(prev);
+          if (isLiked) next.add(room.id);
+          else next.delete(room.id);
+          return next;
+        });
+        console.warn("Failed to toggle like:", e);
+      }
+    },
+    [navigate, user?.id]
+  );
+
+  const totalPages = useMemo(() => {
+    if (typeof totalCount !== "number") return null;
+    return Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+  }, [totalCount]);
+
+  const canPrev = page > 0 && !loading;
+  const canNext =
+    !loading &&
+    (totalPages ? page + 1 < totalPages : items.length === PAGE_SIZE && !error);
+
+  const rangeLabel = useMemo(() => {
+    if (!items.length) return null;
+    const start = page * PAGE_SIZE + 1;
+    const end = page * PAGE_SIZE + items.length;
+    if (typeof totalCount === "number") return `Showing ${start}–${end} of ${totalCount}`;
+    return `Showing ${start}–${end}`;
+  }, [items.length, page, totalCount]);
+
+  const handlePrev = useCallback(() => {
+    if (!canPrev) return;
+    setPage((p) => Math.max(0, p - 1));
+  }, [canPrev]);
+
+  const handleNext = useCallback(() => {
+    if (!canNext) return;
+    setPage((p) => p + 1);
+  }, [canNext]);
 
   return (
     <div>
+      <div ref={topRef} className="scroll-mt-24" />
       <div className="flex items-end justify-between gap-4">
         <div>
           <h2 className="text-2xl font-semibold text-brand-700">
@@ -173,42 +301,69 @@ const LandingGallery = React.memo(({ location = "", guests = 0 }) => {
           </p>
         </div>
       </div>
-      <div className="mt-4 grid gap-4 md:grid-cols-2">
+      <div className="mt-4">
         {loading ? (
-          <Card className="md:col-span-2">
-            <p className="text-sm text-muted">Loading rooms...</p>
-          </Card>
+          <GalleryLoadingState />
         ) : error ? (
-          <Card className="md:col-span-2">
-            <p className="text-sm font-medium text-red-600">
-              Failed to load rooms
-            </p>
+          <Card>
+            <p className="text-sm font-medium text-red-600">Failed to load rooms</p>
             <p className="mt-1 text-xs text-muted">{error}</p>
           </Card>
         ) : items.length === 0 ? (
-          <Card className="md:col-span-2">
-            <p className="text-sm font-medium text-ink">
-              No rooms match your search.
-            </p>
-            <p className="mt-1 text-xs text-muted">
-              Try a different location or fewer guests.
-            </p>
+          <Card>
+            <p className="text-sm font-medium text-ink">No rooms match your search.</p>
+            <p className="mt-1 text-xs text-muted">Try a different location or fewer guests.</p>
           </Card>
         ) : (
-          items.map((room) => {
-            const rating = ratingsByRoomId?.[room.id] || { avg: 0, count: 0 };
-            return (
-              <RoomCard
-                key={room.id}
-                room={room}
-                liked={likedIds.has(room.id)}
-                onToggleLike={toggleLike}
-                ratingAvg={rating.avg}
-                ratingCount={rating.count}
-                showLike
-              />
-            );
-          })
+          <>
+            <div className="grid gap-4 md:grid-cols-2">
+              {items.map((room) => {
+                const rating = ratingsByRoomId?.[room.id] || { avg: 0, count: 0 };
+                return (
+                  <RoomCard
+                    key={room.id}
+                    room={room}
+                    liked={likedIds.has(room.id)}
+                    onToggleLike={toggleLike}
+                    ratingAvg={rating.avg}
+                    ratingCount={rating.count}
+                    showLike
+                  />
+                );
+              })}
+            </div>
+
+            <div className="mt-6 flex flex-col items-center justify-between gap-3 sm:flex-row">
+              <p className="text-xs text-muted">{rangeLabel}</p>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  onClick={handlePrev}
+                  disabled={!canPrev}
+                  className="px-4 py-2 text-xs"
+                >
+                  Prev
+                </Button>
+                <div className="min-w-[7rem] text-center text-xs text-muted">
+                  Page <span className="font-semibold text-ink">{page + 1}</span>
+                  {totalPages ? (
+                    <>
+                      {" "}
+                      of <span className="font-semibold text-ink">{totalPages}</span>
+                    </>
+                  ) : null}
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={handleNext}
+                  disabled={!canNext}
+                  className="px-4 py-2 text-xs"
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          </>
         )}
       </div>
     </div>

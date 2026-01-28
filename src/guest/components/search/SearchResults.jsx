@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useState } from "react";
-import { useHits, useInstantSearch } from "react-instantsearch";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Pagination, useHits, useInstantSearch } from "react-instantsearch";
 import { useNavigate } from "react-router-dom";
 import Card from "../ui/Card.jsx";
 import Button from "../ui/Button.jsx";
@@ -206,11 +206,42 @@ const SearchResults = React.memo(function SearchResults() {
   const { items: hits } = useHits();
   const { status, results } = useInstantSearch();
 
+  const topRef = useRef(null);
+  const prevPageRef = useRef(null);
+
   const [likedIds, setLikedIds] = useState(() => new Set());
+  const likedIdsRef = useRef(likedIds);
+
+  useEffect(() => {
+    likedIdsRef.current = likedIds;
+  }, [likedIds]);
 
   const isLoading = status === "loading" || status === "stalled";
   const query = results?.query || "";
   const nbHits = results?.nbHits || 0;
+  const nbPages = results?.nbPages || 0;
+  const currentPage = typeof results?.page === "number" ? results.page : null;
+
+  // Scroll to top of the results component when changing pages.
+  useEffect(() => {
+    if (currentPage === null) return;
+
+    const prev = prevPageRef.current;
+    prevPageRef.current = currentPage;
+    if (prev === null || prev === currentPage) return;
+
+    const el = topRef.current;
+    if (!el) return;
+
+    const reduceMotion =
+      typeof window !== "undefined" &&
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    requestAnimationFrame(() => {
+      el.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
+    });
+  }, [currentPage]);
 
   // Fetch current user's liked room ids
   useEffect(() => {
@@ -253,7 +284,7 @@ const SearchResults = React.memo(function SearchResults() {
         return;
       }
 
-      const isLiked = likedIds.has(roomId);
+      const isLiked = likedIdsRef.current.has(roomId);
 
       // Optimistic update
       setLikedIds((prev) => {
@@ -277,19 +308,28 @@ const SearchResults = React.memo(function SearchResults() {
         console.warn("Failed to toggle like:", e);
       }
     },
-    [likedIds, navigate, user?.id]
+    [navigate, user?.id]
   );
 
-  if (isLoading) {
-    return <LoadingState />;
-  }
+  const paginationClassNames = useMemo(
+    () => ({
+      root: "flex items-center justify-center",
+      list: "inline-flex items-center gap-2",
+      item:
+        "min-w-9 h-9 rounded-full border border-border bg-panel/70 text-sm text-muted transition hover:bg-panel hover:text-ink dark:bg-dark-panel/50 dark:hover:bg-dark-panel",
+      link: "inline-flex h-9 min-w-9 items-center justify-center px-3",
+      selectedItem:
+        "border-brand-300 bg-brand-50 text-brand-700 hover:bg-brand-50 hover:text-brand-700 dark:border-brand-700/60 dark:bg-brand-900/30 dark:text-brand-300",
+      disabledItem: "opacity-50 pointer-events-none",
+    }),
+    []
+  );
 
-  if (hits.length === 0) {
-    return <EmptyState query={query} />;
-  }
+  const hasHits = hits.length > 0;
 
   return (
     <div className="space-y-4">
+      <div ref={topRef} className="scroll-mt-24" />
       {/* Results count */}
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted dark:text-dark-muted">
@@ -302,20 +342,44 @@ const SearchResults = React.memo(function SearchResults() {
             </>
           )}
         </p>
+        {isLoading && (
+          <span className="inline-flex items-center gap-2 text-xs text-muted dark:text-dark-muted">
+            <span className="h-3 w-3 animate-spin rounded-full border-2 border-brand-200 border-t-brand-600" />
+            Updating…
+          </span>
+        )}
       </div>
 
-      {/* Results grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {hits.map((hit) => (
-          <SearchResultCard
-            key={hit.objectID}
-            hit={hit}
-            onBook={handleBook}
-            liked={likedIds.has(hit.objectID)}
-            onToggleLike={toggleLike}
+      {/* Results */}
+      {!hasHits && isLoading ? (
+        <LoadingState />
+      ) : !hasHits ? (
+        <EmptyState query={query} />
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {hits.map((hit) => (
+            <SearchResultCard
+              key={hit.objectID}
+              hit={hit}
+              onBook={handleBook}
+              liked={likedIds.has(hit.objectID)}
+              onToggleLike={toggleLike}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {nbPages > 1 && (
+        <div className="pt-2">
+          <Pagination
+            padding={2}
+            classNames={paginationClassNames}
+            showFirst={false}
+            showLast={false}
           />
-        ))}
-      </div>
+        </div>
+      )}
     </div>
   );
 });
