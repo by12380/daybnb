@@ -1,66 +1,48 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Card from "../components/ui/Card.jsx";
 import { supabase } from "../../lib/supabaseClient.js";
 import { useAuth } from "../../auth/useAuth.js";
 import RoomCard from "../components/RoomCard.jsx";
+import Pagination from "../components/ui/Pagination.jsx";
+import { usePagination } from "../hooks/usePagination.js";
 import { fetchLikedRoomIds, likeRoom, unlikeRoom } from "../utils/roomLikes.js";
 import { fetchRatingsForRooms } from "../utils/roomReviews.js";
+
+const PAGE_SIZE = 10;
 
 const LandingGallery = React.memo(({ location = "", guests = 0 }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  const [rooms, setRooms] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [likedIds, setLikedIds] = useState(() => new Set());
   const [ratingsByRoomId, setRatingsByRoomId] = useState({});
 
-  // Fetch rooms from Supabase
-  useEffect(() => {
-    let isMounted = true;
+  // Use pagination hook for fetching rooms
+  const {
+    data: rooms,
+    loading,
+    error,
+    currentPage,
+    totalPages,
+    totalCount,
+    goToPage,
+  } = usePagination({
+    table: "rooms",
+    pageSize: PAGE_SIZE,
+    orderBy: "created_at",
+    orderAsc: false,
+  });
 
-    const fetchRooms = async () => {
-      if (!supabase) {
-        if (isMounted) {
-          setError("Supabase not configured");
-          setLoading(false);
-        }
-        return;
-      }
-
-      try {
-        const { data, error: fetchError } = await supabase
-          .from("rooms")
-          .select("*");
-
-        if (!isMounted) return;
-
-        if (fetchError) {
-          console.error("Error fetching rooms:", fetchError);
-          setError(fetchError.message);
-        } else {
-          setRooms(data || []);
-        }
-      } catch (err) {
-        if (isMounted) {
-          console.error("Unexpected error:", err);
-          setError(err.message);
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    fetchRooms();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+  // Handle page change - memoized to prevent unnecessary re-renders
+  const handlePageChange = useCallback(
+    (page) => {
+      goToPage(page);
+      // Scroll to top of gallery smoothly
+      document.getElementById("gallery")?.scrollIntoView({ behavior: "smooth" });
+    },
+    [goToPage]
+  );
 
   // Fetch current user's liked room ids
   useEffect(() => {
@@ -87,7 +69,7 @@ const LandingGallery = React.memo(({ location = "", guests = 0 }) => {
     };
   }, [user?.id]);
 
-  // Fetch ratings summaries for the rooms we display
+  // Fetch ratings summaries for the rooms we display (only when rooms change)
   useEffect(() => {
     let cancelled = false;
 
@@ -165,32 +147,48 @@ const LandingGallery = React.memo(({ location = "", guests = 0 }) => {
     <div>
       <div className="flex items-end justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-semibold text-brand-700">
+          <h2 className="text-2xl font-semibold text-brand-700 dark:text-brand-400">
             Explore day-use spaces
           </h2>
-          <p className="mt-1 text-sm text-muted">
+          <p className="mt-1 text-sm text-muted dark:text-dark-muted">
             A quick preview of the types of rooms guests book during the day.
           </p>
         </div>
       </div>
+
+      {/* Room Grid */}
       <div className="mt-4 grid gap-4 md:grid-cols-2">
         {loading ? (
-          <Card className="md:col-span-2">
-            <p className="text-sm text-muted">Loading rooms...</p>
-          </Card>
+          // Loading skeleton cards
+          <>
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Card key={i} className="overflow-hidden p-0">
+                <div className="h-48 w-full animate-pulse bg-slate-200 dark:bg-slate-700" />
+                <div className="space-y-3 p-4">
+                  <div className="flex justify-between">
+                    <div className="h-3 w-20 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
+                    <div className="h-3 w-16 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
+                  </div>
+                  <div className="h-4 w-3/4 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
+                  <div className="h-6 w-24 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
+                  <div className="h-10 w-full animate-pulse rounded-full bg-slate-200 dark:bg-slate-700" />
+                </div>
+              </Card>
+            ))}
+          </>
         ) : error ? (
           <Card className="md:col-span-2">
-            <p className="text-sm font-medium text-red-600">
+            <p className="text-sm font-medium text-red-600 dark:text-red-400">
               Failed to load rooms
             </p>
-            <p className="mt-1 text-xs text-muted">{error}</p>
+            <p className="mt-1 text-xs text-muted dark:text-dark-muted">{error}</p>
           </Card>
         ) : items.length === 0 ? (
           <Card className="md:col-span-2">
-            <p className="text-sm font-medium text-ink">
+            <p className="text-sm font-medium text-ink dark:text-dark-ink">
               No rooms match your search.
             </p>
-            <p className="mt-1 text-xs text-muted">
+            <p className="mt-1 text-xs text-muted dark:text-dark-muted">
               Try a different location or fewer guests.
             </p>
           </Card>
@@ -211,6 +209,20 @@ const LandingGallery = React.memo(({ location = "", guests = 0 }) => {
           })
         )}
       </div>
+
+      {/* Pagination */}
+      {!loading && !error && totalPages > 1 && (
+        <div className="mt-8">
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalCount={totalCount}
+            pageSize={PAGE_SIZE}
+            onPageChange={handlePageChange}
+            loading={loading}
+          />
+        </div>
+      )}
     </div>
   );
 });

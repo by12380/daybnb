@@ -51,7 +51,7 @@ function AlgoliaNotConfigured() {
   );
 }
 
-const GeoSearch = React.memo(function GeoSearch({ className = "" }) {
+function GeoSearch({ className = "" }) {
   const [userLocation, setUserLocation] = useState(null);
   const [searchRadius, setSearchRadius] = useState(DEFAULT_SEARCH_RADIUS);
   const [selectedDate, setSelectedDate] = useState(null);
@@ -90,7 +90,7 @@ const GeoSearch = React.memo(function GeoSearch({ className = "" }) {
       <InstantSearch searchClient={searchClient} indexName={indexName}>
         {/* Configure search parameters */}
         <Configure
-          hitsPerPage={20}
+          hitsPerPage={10}
           getRankingInfo={true}
           aroundLatLng={aroundLatLng}
           aroundRadius={userLocation ? searchRadius : undefined}
@@ -137,6 +137,6 @@ const GeoSearch = React.memo(function GeoSearch({ className = "" }) {
       </InstantSearch>
     </div>
   );
-});
+}
 
 export default GeoSearch;

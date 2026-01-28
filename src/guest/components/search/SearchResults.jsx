@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useState } from "react";
-import { useHits, useInstantSearch } from "react-instantsearch";
+import React, { useCallback, useEffect, useState, useMemo } from "react";
+import { useHits, usePagination } from "react-instantsearch";
 import { useNavigate } from "react-router-dom";
 import Card from "../ui/Card.jsx";
 import Button from "../ui/Button.jsx";
@@ -7,6 +7,8 @@ import { formatPrice } from "../../utils/format.js";
 import { useAuth } from "../../../auth/useAuth.js";
 import { fetchLikedRoomIds, likeRoom, unlikeRoom } from "../../utils/roomLikes.js";
 import { supabase } from "../../../lib/supabaseClient.js";
+
+const HITS_PER_PAGE = 10;
 
 function HeartIcon({ filled, className = "" }) {
   return (
@@ -200,17 +202,197 @@ function EmptyState({ query }) {
   );
 }
 
-const SearchResults = React.memo(function SearchResults() {
+function ChevronLeftIcon({ className }) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={2}
+      aria-hidden="true"
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+    </svg>
+  );
+}
+
+function ChevronRightIcon({ className }) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={2}
+      aria-hidden="true"
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+    </svg>
+  );
+}
+
+// Custom Pagination UI Component for Algolia
+function PaginationUI({ nbHits }) {
+  const {
+    currentRefinement,
+    nbPages,
+    isFirstPage,
+    isLastPage,
+    refine,
+  } = usePagination();
+
+  // Generate page numbers to display with ellipsis
+  const pageNumbers = useMemo(() => {
+    if (nbPages <= 7) {
+      return Array.from({ length: nbPages }, (_, i) => i);
+    }
+
+    const current = currentRefinement;
+    const pagesArr = [];
+
+    // Always show first page
+    pagesArr.push(0);
+
+    // Calculate visible range around current page
+    let start = Math.max(1, current - 1);
+    let end = Math.min(nbPages - 2, current + 1);
+
+    // Adjust if at the beginning
+    if (current <= 2) {
+      end = Math.min(4, nbPages - 2);
+    }
+    // Adjust if at the end
+    if (current >= nbPages - 3) {
+      start = Math.max(1, nbPages - 5);
+    }
+
+    // Add ellipsis before if needed
+    if (start > 1) {
+      pagesArr.push("...");
+    }
+
+    // Add visible page numbers
+    for (let i = start; i <= end; i++) {
+      pagesArr.push(i);
+    }
+
+    // Add ellipsis after if needed
+    if (end < nbPages - 2) {
+      pagesArr.push("...");
+    }
+
+    // Always show last page
+    if (nbPages > 1) {
+      pagesArr.push(nbPages - 1);
+    }
+
+    return pagesArr;
+  }, [currentRefinement, nbPages]);
+
+  if (nbPages <= 1) {
+    return null;
+  }
+
+  const startItem = currentRefinement * HITS_PER_PAGE + 1;
+  const endItem = Math.min((currentRefinement + 1) * HITS_PER_PAGE, nbHits);
+
+  const handlePageClick = (page) => {
+    console.log("Pagination: Clicking page", page, "Current:", currentRefinement);
+    refine(page);
+    // Scroll to top of results smoothly
+    document.getElementById("geosearch")?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  return (
+    <div className="flex flex-col items-center gap-4 pt-6">
+      {/* Page info */}
+      <p className="text-sm text-muted dark:text-dark-muted">
+        Showing{" "}
+        <span className="font-medium text-ink dark:text-dark-ink">
+          {startItem}-{endItem}
+        </span>{" "}
+        of{" "}
+        <span className="font-medium text-ink dark:text-dark-ink">
+          {nbHits}
+        </span>{" "}
+        places
+      </p>
+
+      {/* Pagination controls */}
+      <nav className="flex items-center gap-1" aria-label="Pagination">
+        {/* Previous button */}
+        <button
+          type="button"
+          onClick={() => handlePageClick(currentRefinement - 1)}
+          disabled={isFirstPage}
+          className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-panel text-muted transition hover:border-brand-300 hover:bg-brand-50 hover:text-brand-600 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-border disabled:hover:bg-panel disabled:hover:text-muted dark:hover:border-brand-600 dark:hover:bg-brand-900/30 dark:hover:text-brand-400"
+          aria-label="Previous page"
+        >
+          <ChevronLeftIcon className="h-5 w-5" />
+        </button>
+
+        {/* Page numbers */}
+        <div className="flex items-center gap-1">
+          {pageNumbers.map((page, index) =>
+            page === "..." ? (
+              <span
+                key={`ellipsis-${index}`}
+                className="flex h-10 w-10 items-center justify-center text-muted dark:text-dark-muted"
+              >
+                ...
+              </span>
+            ) : (
+              <button
+                key={page}
+                type="button"
+                onClick={() => handlePageClick(page)}
+                className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-medium transition ${
+                  page === currentRefinement
+                    ? "bg-brand-600 text-white shadow-lg shadow-brand-500/20 dark:bg-brand-500 dark:shadow-black/25"
+                    : "border border-border bg-panel text-ink hover:border-brand-300 hover:bg-brand-50 hover:text-brand-600 dark:text-dark-ink dark:hover:border-brand-600 dark:hover:bg-brand-900/30 dark:hover:text-brand-400"
+                }`}
+                aria-label={`Page ${page + 1}`}
+                aria-current={page === currentRefinement ? "page" : undefined}
+              >
+                {page + 1}
+              </button>
+            )
+          )}
+        </div>
+
+        {/* Next button */}
+        <button
+          type="button"
+          onClick={() => handlePageClick(currentRefinement + 1)}
+          disabled={isLastPage}
+          className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-panel text-muted transition hover:border-brand-300 hover:bg-brand-50 hover:text-brand-600 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-border disabled:hover:bg-panel disabled:hover:text-muted dark:hover:border-brand-600 dark:hover:bg-brand-900/30 dark:hover:text-brand-400"
+          aria-label="Next page"
+        >
+          <ChevronRightIcon className="h-5 w-5" />
+        </button>
+      </nav>
+    </div>
+  );
+}
+
+function SearchResults() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { items: hits } = useHits();
-  const { status, results } = useInstantSearch();
+  
+  // useHits returns the hits for the current page - it automatically updates when pagination changes
+  // In react-instantsearch v7, the property is called "items" not "hits"
+  const { items, results } = useHits();
 
   const [likedIds, setLikedIds] = useState(() => new Set());
 
-  const isLoading = status === "loading" || status === "stalled";
+  // Get search state from results
+  const isLoading = !results;
   const query = results?.query || "";
   const nbHits = results?.nbHits || 0;
+  
+  // Debug: Log when items change
+  console.log("Current page items:", items?.length, "Total:", nbHits);
 
   // Fetch current user's liked room ids
   useEffect(() => {
@@ -284,7 +466,7 @@ const SearchResults = React.memo(function SearchResults() {
     return <LoadingState />;
   }
 
-  if (hits.length === 0) {
+  if (!items || items.length === 0) {
     return <EmptyState query={query} />;
   }
 
@@ -306,7 +488,7 @@ const SearchResults = React.memo(function SearchResults() {
 
       {/* Results grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {hits.map((hit) => (
+        {items.map((hit) => (
           <SearchResultCard
             key={hit.objectID}
             hit={hit}
@@ -316,8 +498,11 @@ const SearchResults = React.memo(function SearchResults() {
           />
         ))}
       </div>
+
+      {/* Pagination */}
+      <PaginationUI nbHits={nbHits} />
     </div>
   );
-});
+}
 
 export default SearchResults;
