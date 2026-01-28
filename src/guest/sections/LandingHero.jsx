@@ -23,8 +23,7 @@ const LandingHero = React.memo(() => {
           hours. Arrival and end-time reminders keep everyone on schedule.
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
-          <Button onClick={onStartSearch}>Start searching</Button>
-          <Button variant="outline">Browse categories</Button>
+          <Button onClick={onStartSearch}>Contact Us</Button>
         </div>
       </div>
     </div>

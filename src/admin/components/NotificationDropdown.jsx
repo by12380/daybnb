@@ -44,6 +44,14 @@ function getNotificationIcon(type) {
           </svg>
         </div>
       );
+    case "contact_message":
+      return (
+        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-purple-100 dark:bg-purple-900/50">
+          <svg className="h-4 w-4 text-purple-600 dark:text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+          </svg>
+        </div>
+      );
     default:
       return (
         <div className="flex h-8 w-8 items-center justify-center rounded-full bg-surface/60 text-muted">
@@ -57,6 +65,8 @@ function getNotificationIcon(type) {
 
 const NotificationItem = React.memo(({ notification, onMarkAsRead }) => {
   const bookingId = notification.data?.booking_id;
+  const messageId = notification.data?.message_id;
+  const isContactMessage = notification.type === "contact_message";
 
   return (
     <div className="flex gap-3 px-4 py-3 transition hover:bg-surface/60">
@@ -74,6 +84,14 @@ const NotificationItem = React.memo(({ notification, onMarkAsRead }) => {
               className="text-xs font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300"
             >
               View booking
+            </Link>
+          )}
+          {isContactMessage && (
+            <Link
+              to="/admin/messages"
+              className="text-xs font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300"
+            >
+              View message
             </Link>
           )}
         </div>

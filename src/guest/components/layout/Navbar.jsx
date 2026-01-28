@@ -63,6 +63,9 @@ export default function GuestNavbar() {
           <a href="#how-it-works" className="rounded-full px-3 py-1.5 hover:text-brand-600 dark:hover:text-brand-400">
             How it works
           </a>
+          <Link to="/contact" className="rounded-full px-3 py-1.5 hover:text-brand-600 dark:hover:text-brand-400">
+            Contact
+          </Link>
           <ThemeToggle />
           {loading ? (
             <div className="h-5 w-5 animate-spin rounded-full border-2 border-brand-200 border-t-brand-600 dark:border-brand-700 dark:border-t-brand-400" />
