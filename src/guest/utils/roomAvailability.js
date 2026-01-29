@@ -22,6 +22,43 @@ export async function fetchRoomBookingsForDate(roomId, date) {
 }
 
 /**
+ * Fetch bookings for a room between (inclusive) startDate and endDate
+ * Dates should be YYYY-MM-DD.
+ */
+export async function fetchRoomBookingsForDateRange(roomId, startDate, endDate) {
+  if (!supabase || !roomId || !startDate || !endDate) return [];
+
+  const { data, error } = await supabase
+    .from("bookings")
+    .select("id, booking_date, start_time, end_time, status")
+    .eq("room_id", roomId)
+    .gte("booking_date", startDate)
+    .lte("booking_date", endDate)
+    .in("status", ["pending", "approved", "confirmed"]);
+
+  if (error) {
+    console.error("Error fetching room bookings range:", error);
+    return [];
+  }
+
+  return data || [];
+}
+
+/**
+ * Group bookings by booking_date (YYYY-MM-DD)
+ */
+export function groupBookingsByDate(bookings) {
+  const out = {};
+  (bookings || []).forEach((b) => {
+    const key = b?.booking_date;
+    if (!key) return;
+    if (!out[key]) out[key] = [];
+    out[key].push(b);
+  });
+  return out;
+}
+
+/**
  * Fetch bookings for multiple rooms on a specific date
  */
 export async function fetchMultipleRoomsBookingsForDate(roomIds, date) {
