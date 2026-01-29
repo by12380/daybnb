@@ -131,7 +131,11 @@ function GeoSearch({ className = "" }) {
 
           {/* Results */}
           <div className="lg:col-span-3">
-            <SearchResults />
+            <SearchResults 
+              selectedDate={selectedDate}
+              startTime={startTime}
+              endTime={endTime}
+            />
           </div>
         </div>
       </InstantSearch>

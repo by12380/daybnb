@@ -7,6 +7,10 @@ import { formatPrice } from "../../utils/format.js";
 import { useAuth } from "../../../auth/useAuth.js";
 import { fetchLikedRoomIds, likeRoom, unlikeRoom } from "../../utils/roomLikes.js";
 import { supabase } from "../../../lib/supabaseClient.js";
+import {
+  fetchMultipleRoomsBookingsForDate,
+  getRoomAvailabilityStatus,
+} from "../../utils/roomAvailability.js";
 
 const HITS_PER_PAGE = 10;
 
@@ -51,17 +55,53 @@ function DistanceBadge({ distance }) {
   );
 }
 
-function SearchResultCard({ hit, onBook, liked, onToggleLike }) {
-  const tags = hit.tags || [];
+function AvailabilityBadge({ status, message }) {
+  if (!status) return null;
+
+  const styles = {
+    available: "bg-green-50 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800",
+    partially_booked: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800",
+    fully_booked: "bg-red-50 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800",
+  };
+
+  const icons = {
+    available: (
+      <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+      </svg>
+    ),
+    partially_booked: (
+      <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
+    fully_booked: (
+      <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+      </svg>
+    ),
+  };
 
   return (
-    <Card className="overflow-hidden p-0 transition-shadow hover:shadow-lg">
+    <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium ${styles[status]}`}>
+      {icons[status]}
+      {message}
+    </span>
+  );
+}
+
+function SearchResultCard({ hit, onBook, liked, onToggleLike, availability }) {
+  const tags = hit.tags || [];
+  const isFullyBooked = availability?.status === "fully_booked";
+
+  return (
+    <Card className={`overflow-hidden p-0 transition-shadow hover:shadow-lg ${isFullyBooked ? "opacity-75" : ""}`}>
       <div className="relative">
         {hit.image && (
           <img
             src={hit.image}
             alt={hit.title}
-            className="h-48 w-full object-cover"
+            className={`h-48 w-full object-cover ${isFullyBooked ? "grayscale-[30%]" : ""}`}
             loading="lazy"
           />
         )}
@@ -69,6 +109,14 @@ function SearchResultCard({ hit, onBook, liked, onToggleLike }) {
         {hit._rankingInfo?.geoDistance !== undefined && (
           <div className="absolute left-3 top-3">
             <DistanceBadge distance={hit._rankingInfo.geoDistance} />
+          </div>
+        )}
+        {/* Fully booked overlay */}
+        {isFullyBooked && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+            <span className="rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-lg">
+              Fully Booked
+            </span>
           </div>
         )}
         {/* Like button */}
@@ -120,6 +168,11 @@ function SearchResultCard({ hit, onBook, liked, onToggleLike }) {
           )}
         </div>
 
+        {/* Availability Badge */}
+        {availability && (
+          <AvailabilityBadge status={availability.status} message={availability.message} />
+        )}
+
         {hit.price_per_hour > 0 && (
           <p className="text-lg font-semibold text-brand-700 dark:text-brand-400">
             {formatPrice(hit.price_per_hour)}
@@ -145,8 +198,12 @@ function SearchResultCard({ hit, onBook, liked, onToggleLike }) {
           </div>
         )}
 
-        <Button onClick={() => onBook(hit)} className="mt-2 w-full">
-          Book Now
+        <Button 
+          onClick={() => onBook(hit)} 
+          className="mt-2 w-full"
+          disabled={isFullyBooked}
+        >
+          {isFullyBooked ? "Not Available" : "Book Now"}
         </Button>
       </div>
     </Card>
@@ -376,7 +433,7 @@ function PaginationUI({ nbHits }) {
   );
 }
 
-function SearchResults() {
+function SearchResults({ selectedDate, startTime = 8, endTime = 17 }) {
   const navigate = useNavigate();
   const { user } = useAuth();
   
@@ -385,14 +442,13 @@ function SearchResults() {
   const { items, results } = useHits();
 
   const [likedIds, setLikedIds] = useState(() => new Set());
+  const [roomAvailability, setRoomAvailability] = useState({});
+  const [loadingAvailability, setLoadingAvailability] = useState(false);
 
   // Get search state from results
   const isLoading = !results;
   const query = results?.query || "";
   const nbHits = results?.nbHits || 0;
-  
-  // Debug: Log when items change
-  console.log("Current page items:", items?.length, "Total:", nbHits);
 
   // Fetch current user's liked room ids
   useEffect(() => {
@@ -417,6 +473,40 @@ function SearchResults() {
       cancelled = true;
     };
   }, [user?.id]);
+
+  // Fetch availability for all rooms when date is selected
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadAvailability() {
+      if (!selectedDate || !items || items.length === 0) {
+        setRoomAvailability({});
+        return;
+      }
+
+      setLoadingAvailability(true);
+      
+      const roomIds = items.map((hit) => hit.objectID).filter(Boolean);
+      const bookingsByRoom = await fetchMultipleRoomsBookingsForDate(roomIds, selectedDate);
+
+      if (cancelled) return;
+
+      // Calculate availability status for each room
+      const availability = {};
+      for (const roomId of roomIds) {
+        const bookings = bookingsByRoom[roomId] || [];
+        availability[roomId] = getRoomAvailabilityStatus(bookings, startTime, endTime);
+      }
+
+      setRoomAvailability(availability);
+      setLoadingAvailability(false);
+    }
+
+    loadAvailability();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedDate, startTime, endTime, items]);
 
   const handleBook = useCallback(
     (hit) => {
@@ -486,6 +576,24 @@ function SearchResults() {
         </p>
       </div>
 
+      {/* Availability loading indicator */}
+      {selectedDate && loadingAvailability && (
+        <div className="flex items-center gap-2 rounded-lg bg-brand-50 px-4 py-2 text-sm text-brand-700 dark:bg-brand-900/30 dark:text-brand-300">
+          <div className="h-4 w-4 animate-spin rounded-full border-2 border-brand-300 border-t-brand-600" />
+          Checking availability for {selectedDate}...
+        </div>
+      )}
+
+      {/* Date filter active indicator */}
+      {selectedDate && !loadingAvailability && (
+        <div className="flex items-center gap-2 rounded-lg bg-blue-50 px-4 py-2 text-sm text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+          Showing availability for {selectedDate} ({startTime > 12 ? startTime - 12 : startTime}:00 {startTime >= 12 ? "PM" : "AM"} - {endTime > 12 ? endTime - 12 : endTime}:00 {endTime >= 12 ? "PM" : "AM"})
+        </div>
+      )}
+
       {/* Results grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {items.map((hit) => (
@@ -495,6 +603,7 @@ function SearchResults() {
             onBook={handleBook}
             liked={likedIds.has(hit.objectID)}
             onToggleLike={toggleLike}
+            availability={selectedDate ? roomAvailability[hit.objectID] : null}
           />
         ))}
       </div>
