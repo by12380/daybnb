@@ -60,9 +60,6 @@ export default function GuestNavbar() {
           <Link to="/" className="rounded-full px-3 py-1.5 hover:text-brand-600 dark:hover:text-brand-400">
             Browse
           </Link>
-          <a href="#how-it-works" className="rounded-full px-3 py-1.5 hover:text-brand-600 dark:hover:text-brand-400">
-            How it works
-          </a>
           <Link to="/contact" className="rounded-full px-3 py-1.5 hover:text-brand-600 dark:hover:text-brand-400">
             Contact
           </Link>
