@@ -9,6 +9,7 @@ import LandingCategories from "../sections/LandingCategories.jsx";
 import LandingHowItWorks from "../sections/LandingHowItWorks.jsx";
 import LandingTestimonials from "../sections/LandingTestimonials.jsx";
 import LandingCTA from "../sections/LandingCTA.jsx";
+import WelcomeOfferBanner from "../components/WelcomeOfferBanner.jsx";
 import { useProfile } from "../../auth/useProfile.js";
 import { isAlgoliaConfigured } from "../../lib/algoliaClient.js";
 
@@ -46,6 +47,9 @@ const Landing = React.memo(() => {
 
   return (
     <>
+      {/* Welcome Offer Banner for new users */}
+      <WelcomeOfferBanner className="mb-4" />
+
       <section id="hero" className="py-8">
         <LandingHero />
       </section>

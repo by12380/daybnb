@@ -12,6 +12,8 @@ import { useAuth } from "../../auth/useAuth.js";
 import { supabase } from "../../lib/supabaseClient.js";
 import { fetchReviewsForRoom, upsertRoomReview } from "../utils/roomReviews.js";
 import { createCheckoutSession, redirectToCheckout } from "../../lib/stripe.js";
+import AvailabilityCalendar from "../components/AvailabilityCalendar.jsx";
+import { useWelcomeOffer } from "../../hooks/useWelcomeOffer.js";
 
 const FALLBACK_IMAGE =
   "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=60";
@@ -124,6 +126,17 @@ const Booking = React.memo(() => {
   // State for existing bookings on selected date
   const [dateBookings, setDateBookings] = useState([]);
   const [loadingBookings, setLoadingBookings] = useState(false);
+
+  // Calendar visibility state
+  const [showCalendar, setShowCalendar] = useState(false);
+
+  // Welcome offer hook
+  const { 
+    isEligible: isWelcomeOfferEligible, 
+    loading: welcomeOfferLoading,
+    calculateDiscountedPrice,
+    discountPercent: welcomeDiscountPercent,
+  } = useWelcomeOffer();
 
   // Reviews state
   const [reviews, setReviews] = useState([]);
@@ -350,17 +363,45 @@ const Booking = React.memo(() => {
     return `${durationHours % 1 === 0 ? String(durationHours) : durationHours.toFixed(1)} hour${durationHours === 1 ? "" : "s"}`;
   }, [durationHours]);
 
-  // Price calculation
+  // Price calculation with welcome offer discount
   const pricePerHour = room?.price_per_hour ?? 0;
-  const totalPrice = useMemo(() => {
+  const originalTotalPrice = useMemo(() => {
     if (!Number.isFinite(durationHours) || durationHours <= 0) return 0;
     return calculateTotalPrice(durationHours, pricePerHour);
   }, [durationHours, pricePerHour]);
+
+  // Apply welcome offer discount if eligible
+  const priceInfo = useMemo(() => {
+    return calculateDiscountedPrice(originalTotalPrice);
+  }, [calculateDiscountedPrice, originalTotalPrice]);
+
+  const totalPrice = priceInfo.discountedPrice;
 
   const onDateChange = useCallback((_, dateString) => {
     setDate(dateString || "");
     setSuccess("");
     setError("");
+  }, []);
+
+  // Calendar handlers
+  const handleCalendarDateSelect = useCallback((dateString) => {
+    setDate(dateString);
+    setSuccess("");
+    setError("");
+  }, []);
+
+  const handleTimeSlotSelect = useCallback((slot) => {
+    // Set start time to selected slot
+    const startMinutes = slot.minutes;
+    const endMinutes = Math.min(startMinutes + 60, parseTimeToMinutes(DAYTIME_END)); // Default 1 hour duration
+    setStartTime(minutesToTimeValue(startMinutes));
+    setEndTime(minutesToTimeValue(endMinutes));
+    setSuccess("");
+    setError("");
+  }, []);
+
+  const toggleCalendar = useCallback(() => {
+    setShowCalendar((prev) => !prev);
   }, []);
 
   const onStartChange = useCallback((e) => {
@@ -474,6 +515,9 @@ const Booking = React.memo(() => {
           roomTitle: room?.title || "Room Booking",
           roomId,
           totalPrice: bookingData.total_price || totalPrice,
+          originalPrice: bookingData.original_price || priceInfo.originalPrice,
+          discountAmount: bookingData.discount_amount || priceInfo.discountAmount,
+          discountApplied: bookingData.discount_applied || (priceInfo.hasDiscount ? "welcome_offer" : null),
           durationHours: bookingData.billable_hours || durationHours,
           pricePerHour: bookingData.price_per_hour || pricePerHour,
           bookingDate: bookingData.booking_date || date,
@@ -495,7 +539,7 @@ const Booking = React.memo(() => {
         setProcessingPayment(false);
       }
     },
-    [room?.title, roomId, totalPrice, durationHours, pricePerHour, date, startTime, endTime, user?.email, user?.id]
+    [room?.title, roomId, totalPrice, priceInfo, durationHours, pricePerHour, date, startTime, endTime, user?.email, user?.id]
   );
 
   // Handle retry payment for existing booking
@@ -562,7 +606,7 @@ const Booking = React.memo(() => {
         user_email: user.email ?? null,
         user_full_name: fullName?.trim() || null,
         user_phone: phone?.trim() || null,
-        total_price: totalPrice > 0 ? totalPrice : null,
+        total_price: totalPrice > 0 ? totalPrice : null, // Already includes discount if applicable
         price_per_hour: pricePerHour > 0 ? pricePerHour : null,
         billable_hours: durationHours > 0 ? durationHours : null,
         status: "pending",
@@ -688,12 +732,69 @@ const Booking = React.memo(() => {
       </Card>
 
       <Card className="md:col-span-2">
+        {/* Welcome Offer Banner */}
+        {isWelcomeOfferEligible && !welcomeOfferLoading && (
+          <div className="mb-4 rounded-xl border border-green-200 bg-gradient-to-r from-green-50 to-emerald-50 p-4 dark:border-green-800 dark:from-green-900/30 dark:to-emerald-900/30">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-green-100 dark:bg-green-800">
+                <svg className="h-5 w-5 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
+                </svg>
+              </div>
+              <div>
+                <p className="font-semibold text-green-800 dark:text-green-200">
+                  Welcome Offer: {welcomeDiscountPercent}% Off!
+                </p>
+                <p className="mt-0.5 text-sm text-green-700 dark:text-green-300">
+                  As a new user, enjoy {welcomeDiscountPercent}% off your first booking. This offer is automatically applied!
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         <p className="text-sm font-semibold text-ink">Book your daytime stay</p>
         <p className="mt-1 text-sm text-muted">
           Pick <span className="font-medium text-ink">one date</span> and a time window between{" "}
           <span className="font-medium text-ink">8:00 AM</span> and{" "}
           <span className="font-medium text-ink">5:00 PM</span>.
         </p>
+
+        {/* Calendar Toggle Button */}
+        <button
+          type="button"
+          onClick={toggleCalendar}
+          className="mt-3 flex w-full items-center justify-between rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-left transition hover:bg-brand-100 dark:border-brand-800 dark:bg-brand-900/30 dark:hover:bg-brand-900/50"
+        >
+          <div className="flex items-center gap-2">
+            <svg className="h-5 w-5 text-brand-600 dark:text-brand-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            <span className="text-sm font-medium text-brand-700 dark:text-brand-300">
+              {showCalendar ? "Hide Availability Calendar" : "View Availability Calendar"}
+            </span>
+          </div>
+          <svg
+            className={`h-5 w-5 text-brand-600 transition-transform dark:text-brand-400 ${showCalendar ? "rotate-180" : ""}`}
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+
+        {/* Availability Calendar */}
+        {showCalendar && (
+          <div className="mt-4 rounded-xl border border-border bg-panel p-4 dark:border-dark-border dark:bg-dark-panel">
+            <AvailabilityCalendar
+              roomId={roomId}
+              selectedDate={date}
+              onDateSelect={handleCalendarDateSelect}
+              onTimeSlotSelect={handleTimeSlotSelect}
+            />
+          </div>
+        )}
 
         <form className="mt-4 space-y-4" onSubmit={onSubmit} noValidate>
           <label className="flex flex-col gap-2">
@@ -767,10 +868,39 @@ const Booking = React.memo(() => {
                   <span className="text-muted dark:text-dark-muted">Hourly Rate</span>
                   <span className="font-medium text-ink dark:text-dark-ink">{formatPrice(pricePerHour)}/hr</span>
                 </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted dark:text-dark-muted">Subtotal</span>
+                  <span className="font-medium text-ink dark:text-dark-ink">{formatPrice(priceInfo.originalPrice)}</span>
+                </div>
+                
+                {/* Welcome Offer Discount */}
+                {priceInfo.hasDiscount && (
+                  <div className="flex justify-between text-sm">
+                    <span className="flex items-center gap-1.5 text-green-600 dark:text-green-400">
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                      </svg>
+                      Welcome Offer ({priceInfo.discountPercent}% off)
+                    </span>
+                    <span className="font-medium text-green-600 dark:text-green-400">
+                      -{formatPrice(priceInfo.discountAmount)}
+                    </span>
+                  </div>
+                )}
+                
                 <div className="border-t border-brand-100 pt-2 dark:border-brand-800">
                   <div className="flex justify-between">
                     <span className="font-semibold text-ink dark:text-dark-ink">Total</span>
-                    <span className="text-lg font-bold text-brand-700 dark:text-brand-400">{formatPrice(totalPrice)}</span>
+                    <div className="text-right">
+                      {priceInfo.hasDiscount && (
+                        <span className="mr-2 text-sm text-muted line-through dark:text-dark-muted">
+                          {formatPrice(priceInfo.originalPrice)}
+                        </span>
+                      )}
+                      <span className="text-lg font-bold text-brand-700 dark:text-brand-400">
+                        {formatPrice(totalPrice)}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>

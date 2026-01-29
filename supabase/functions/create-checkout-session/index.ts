@@ -24,6 +24,9 @@ serve(async (req) => {
       roomTitle,
       roomId,
       totalPrice,
+      originalPrice,
+      discountAmount,
+      discountApplied,
       durationHours,
       pricePerHour,
       bookingDate,
@@ -47,6 +50,12 @@ serve(async (req) => {
     // Get the origin for redirect URLs
     const origin = req.headers.get("origin") || "http://localhost:5173";
 
+    // Build description with discount info if applicable
+    let description = `Booking for ${bookingDate} from ${startTime} to ${endTime} (${durationHours} hours)`;
+    if (discountApplied && discountAmount > 0) {
+      description += ` - ${discountApplied === "welcome_offer" ? "Welcome Offer" : discountApplied} discount applied`;
+    }
+
     // Create Stripe Checkout Session
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
@@ -59,7 +68,7 @@ serve(async (req) => {
             currency: "usd",
             product_data: {
               name: roomTitle,
-              description: `Booking for ${bookingDate} from ${startTime} to ${endTime} (${durationHours} hours)`,
+              description,
             },
             unit_amount: Math.round(totalPrice * 100), // Stripe expects cents
           },
@@ -75,6 +84,9 @@ serve(async (req) => {
         end_time: endTime,
         duration_hours: String(durationHours),
         price_per_hour: String(pricePerHour),
+        original_price: originalPrice ? String(originalPrice) : "",
+        discount_amount: discountAmount ? String(discountAmount) : "",
+        discount_applied: discountApplied || "",
       },
       success_url: `${origin}/payment-success?session_id={CHECKOUT_SESSION_ID}&booking_id=${bookingId}`,
       cancel_url: `${origin}/payment-cancel?booking_id=${bookingId}`,
