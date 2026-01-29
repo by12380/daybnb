@@ -64,9 +64,9 @@ const ViewRoomModal = React.memo(({ open, room, bookingsCount, onClose }) => {
           </div>
           <div className="rounded-xl border border-brand-100 bg-brand-50 p-4 text-center">
             <p className="text-2xl font-bold text-brand-700">
-              {formatPrice(room.price_per_hour || 0)}
+              {formatPrice(room.price_per_day || room.price_per_hour || 0)}
             </p>
-            <p className="text-xs text-muted">Per Hour</p>
+            <p className="text-xs text-muted">Per Day</p>
           </div>
         </div>
 
@@ -123,7 +123,7 @@ const RoomFormModal = React.memo(({ open, room, onClose, onSave, isNew }) => {
   const [location, setLocation] = useState("");
   const [type, setType] = useState("room");
   const [guests, setGuests] = useState(2);
-  const [pricePerHour, setPricePerHour] = useState(25);
+  const [pricePerDay, setPricePerDay] = useState(100);
   const [image, setImage] = useState("");
   const [tags, setTags] = useState("");
   const [saving, setSaving] = useState(false);
@@ -136,7 +136,7 @@ const RoomFormModal = React.memo(({ open, room, onClose, onSave, isNew }) => {
         setLocation(room.location || "");
         setType(room.type || "room");
         setGuests(room.guests || 2);
-        setPricePerHour(room.price_per_hour || 25);
+        setPricePerDay(room.price_per_day || room.price_per_hour || 100);
         setImage(room.image || "");
         setTags(room.tags?.join(", ") || "");
       } else {
@@ -144,7 +144,7 @@ const RoomFormModal = React.memo(({ open, room, onClose, onSave, isNew }) => {
         setLocation("");
         setType("room");
         setGuests(2);
-        setPricePerHour(25);
+        setPricePerDay(100);
         setImage("");
         setTags("");
       }
@@ -172,7 +172,7 @@ const RoomFormModal = React.memo(({ open, room, onClose, onSave, isNew }) => {
       location: location.trim(),
       type,
       guests: Number(guests) || 2,
-      price_per_hour: Number(pricePerHour) || 0,
+      price_per_day: Number(pricePerDay) || 0,
       image: image.trim() || null,
       tags: tags
         .split(",")
@@ -217,7 +217,7 @@ const RoomFormModal = React.memo(({ open, room, onClose, onSave, isNew }) => {
     }
 
     onSave();
-  }, [title, location, type, guests, pricePerHour, image, tags, isNew, room?.id, onSave]);
+  }, [title, location, type, guests, pricePerDay, image, tags, isNew, room?.id, onSave]);
 
   return (
     <Modal
@@ -270,12 +270,12 @@ const RoomFormModal = React.memo(({ open, room, onClose, onSave, isNew }) => {
         </div>
 
         <FormInput
-          label="Price per Hour ($)"
+          label="Price per Day ($)"
           type="number"
           min={0}
           step={0.01}
-          value={pricePerHour}
-          onChange={(e) => setPricePerHour(e.target.value)}
+          value={pricePerDay}
+          onChange={(e) => setPricePerDay(e.target.value)}
         />
 
         <FormInput
@@ -640,9 +640,9 @@ export default function AdminRooms() {
 
                   <div className="mt-3">
                     <span className="text-lg font-bold text-brand-600">
-                      {formatPrice(room.price_per_hour || 0)}
+                      {formatPrice(room.price_per_day || room.price_per_hour || 0)}
                     </span>
-                    <span className="text-sm text-muted">/hr</span>
+                    <span className="text-sm text-muted">/day</span>
                   </div>
 
                   {room.tags && room.tags.length > 0 && (

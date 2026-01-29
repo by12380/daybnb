@@ -4,21 +4,6 @@ import { DatePicker } from "antd";
 import dayjs from "dayjs";
 import { INPUT_STYLES } from "../ui/FormInput.jsx";
 
-// Time options for 8am-5pm range
-function buildTimeOptions() {
-  const options = [];
-  for (let hour = 8; hour <= 17; hour++) {
-    const h12 = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
-    const suffix = hour >= 12 ? "PM" : "AM";
-    options.push({
-      value: hour,
-      label: `${h12}:00 ${suffix}`,
-    });
-  }
-  return options;
-}
-
-const TIME_OPTIONS = buildTimeOptions();
 
 function FilterIcon({ className = "" }) {
   return (
@@ -47,7 +32,7 @@ function PriceRangeFilter({ minPrice, maxPrice, onMinChange, onMaxChange }) {
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <label className="text-xs font-medium text-ink dark:text-dark-ink">
-          Price/hour
+          Price/day
         </label>
         {(minPrice || maxPrice) && (
           <button
@@ -142,17 +127,12 @@ function GuestsFilter({ minGuests, onGuestsChange }) {
 
 const SearchFilters = React.memo(function SearchFilters({
   onDateChange,
-  onTimeRangeChange,
   onFiltersChange,
   selectedDate,
-  startTime,
-  endTime,
 }) {
   const { refine: refineSearch } = useSearchBox();
   
   const [isExpanded, setIsExpanded] = useState(true);
-  const [localStartTime, setLocalStartTime] = useState(startTime || 8);
-  const [localEndTime, setLocalEndTime] = useState(endTime || 17);
   const [minPrice, setMinPrice] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
   const [minGuests, setMinGuests] = useState(1);
@@ -165,10 +145,10 @@ const SearchFilters = React.memo(function SearchFilters({
     const parts = [];
     
     if (minPrice && Number(minPrice) > 0) {
-      parts.push(`price_per_hour >= ${Number(minPrice)}`);
+      parts.push(`price_per_day >= ${Number(minPrice)}`);
     }
     if (maxPrice && Number(maxPrice) > 0) {
-      parts.push(`price_per_hour <= ${Number(maxPrice)}`);
+      parts.push(`price_per_day <= ${Number(maxPrice)}`);
     }
     if (minGuests > 1) {
       parts.push(`guests >= ${minGuests}`);
@@ -184,41 +164,11 @@ const SearchFilters = React.memo(function SearchFilters({
   // Apply filters to Algolia via Configure
   useConfigure({ filters: filters || undefined });
 
-  // Filter end time options based on start time
-  const endTimeOptions = useMemo(() => {
-    return TIME_OPTIONS.filter((opt) => opt.value > localStartTime);
-  }, [localStartTime]);
-
   const handleDateChange = useCallback(
     (_, dateString) => {
       onDateChange?.(dateString || null);
     },
     [onDateChange]
-  );
-
-  const handleStartTimeChange = useCallback(
-    (e) => {
-      const value = Number(e.target.value);
-      setLocalStartTime(value);
-      // Ensure end time is after start time
-      if (localEndTime <= value) {
-        const newEndTime = Math.min(value + 1, 17);
-        setLocalEndTime(newEndTime);
-        onTimeRangeChange?.(value, newEndTime);
-      } else {
-        onTimeRangeChange?.(value, localEndTime);
-      }
-    },
-    [localEndTime, onTimeRangeChange]
-  );
-
-  const handleEndTimeChange = useCallback(
-    (e) => {
-      const value = Number(e.target.value);
-      setLocalEndTime(value);
-      onTimeRangeChange?.(localStartTime, value);
-    },
-    [localStartTime, onTimeRangeChange]
   );
 
   const handleTypeToggle = useCallback((type) => {
@@ -263,43 +213,6 @@ const SearchFilters = React.memo(function SearchFilters({
             />
           </div>
 
-          {/* Time Range Filter */}
-          <div className="space-y-3">
-            <label className="text-sm font-medium text-ink dark:text-dark-ink">
-              Time Range (8 AM – 5 PM)
-            </label>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <span className="mb-1 block text-xs text-muted dark:text-dark-muted">From</span>
-                <select
-                  value={localStartTime}
-                  onChange={handleStartTimeChange}
-                  className={INPUT_STYLES}
-                >
-                  {TIME_OPTIONS.filter((opt) => opt.value < 17).map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <span className="mb-1 block text-xs text-muted dark:text-dark-muted">To</span>
-                <select
-                  value={localEndTime}
-                  onChange={handleEndTimeChange}
-                  className={INPUT_STYLES}
-                >
-                  {endTimeOptions.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </div>
-
           {/* Price Range */}
           <PriceRangeFilter
             minPrice={minPrice}
@@ -332,10 +245,7 @@ const SearchFilters = React.memo(function SearchFilters({
               setMaxPrice("");
               setMinGuests(1);
               setSelectedTypes([]);
-              setLocalStartTime(8);
-              setLocalEndTime(17);
               onDateChange?.(null);
-              onTimeRangeChange?.(8, 17);
             }}
             className="w-full rounded-xl border border-border bg-surface/60 px-4 py-2 text-sm font-medium text-muted transition hover:border-red-300 hover:bg-red-50 hover:text-red-600 dark:border-dark-border dark:bg-dark-surface/60 dark:text-dark-muted dark:hover:border-red-700 dark:hover:bg-red-900/20 dark:hover:text-red-400"
           >

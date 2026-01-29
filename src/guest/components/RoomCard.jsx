@@ -78,10 +78,10 @@ const RoomCard = React.memo(function RoomCard({
           <StarsDisplay value={ratingAvg} count={ratingCount} className="shrink-0" />
         </div>
 
-        {room.price_per_hour > 0 && (
+        {(room.price_per_day || room.price_per_hour) > 0 && (
           <p className="text-lg font-semibold text-brand-700 dark:text-brand-400">
-            {formatPrice(room.price_per_hour)}
-            <span className="text-xs font-normal text-muted dark:text-dark-muted">/hour</span>
+            {formatPrice(room.price_per_day || room.price_per_hour)}
+            <span className="text-xs font-normal text-muted dark:text-dark-muted">/day</span>
           </p>
         )}
 

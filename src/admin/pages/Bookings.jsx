@@ -5,47 +5,8 @@ import { supabase } from "../../lib/supabaseClient.js";
 import { formatPrice } from "../../guest/utils/format.js";
 import Button from "../../guest/components/ui/Button.jsx";
 import FormInput, { INPUT_STYLES } from "../../guest/components/ui/FormInput.jsx";
-import { DAYTIME_START, DAYTIME_END } from "../../guest/utils/constants.js";
 
 const BOOKINGS_TABLE = "bookings";
-const TIME_STEP_MINUTES = 30;
-
-function pad2(n) {
-  return String(n).padStart(2, "0");
-}
-
-function parseTimeToMinutes(value) {
-  const [h, m] = String(value || "0:0")
-    .split(":")
-    .map((v) => Number(v));
-  if (!Number.isFinite(h) || !Number.isFinite(m)) return 0;
-  return Math.min(23, Math.max(0, h)) * 60 + Math.min(59, Math.max(0, m));
-}
-
-function minutesToTimeValue(totalMinutes) {
-  const h = Math.floor(totalMinutes / 60);
-  const m = totalMinutes % 60;
-  return `${pad2(h)}:${pad2(m)}`;
-}
-
-function minutesToLabel(totalMinutes) {
-  const h24 = Math.floor(totalMinutes / 60);
-  const m = totalMinutes % 60;
-  const suffix = h24 >= 12 ? "PM" : "AM";
-  const h12 = ((h24 + 11) % 12) + 1;
-  return `${h12}:${pad2(m)} ${suffix}`;
-}
-
-function buildTimeOptions({ start, end, stepMinutes }) {
-  const startM = parseTimeToMinutes(start);
-  const endM = parseTimeToMinutes(end);
-  const step = Math.max(5, Number(stepMinutes) || 30);
-  const out = [];
-  for (let m = startM; m <= endM; m += step) {
-    out.push({ value: minutesToTimeValue(m), label: minutesToLabel(m), minutes: m });
-  }
-  return out;
-}
 
 function formatDate(dateStr) {
   if (!dateStr) return "N/A";
@@ -58,11 +19,6 @@ function formatDate(dateStr) {
     month: "short",
     day: "numeric",
   });
-}
-
-function formatTime(timeStr) {
-  if (!timeStr) return "N/A";
-  return minutesToLabel(parseTimeToMinutes(timeStr));
 }
 
 function getBookingStatusInfo(booking) {
@@ -131,15 +87,9 @@ const ViewBookingModal = React.memo(({ open, booking, room, userProfile, onClose
 
         {/* Booking Details */}
         <div className="grid gap-3 sm:grid-cols-2">
-          <div>
+          <div className="sm:col-span-2">
             <p className="text-xs font-medium text-muted dark:text-dark-muted">Date</p>
             <p className="mt-1 text-sm font-medium text-ink dark:text-dark-ink">{formatDate(booking.booking_date)}</p>
-          </div>
-          <div>
-            <p className="text-xs font-medium text-muted dark:text-dark-muted">Time</p>
-            <p className="mt-1 text-sm font-medium text-ink dark:text-dark-ink">
-              {formatTime(booking.start_time)} - {formatTime(booking.end_time)}
-            </p>
           </div>
           <div>
             <p className="text-xs font-medium text-muted dark:text-dark-muted">Guest Name</p>
@@ -169,9 +119,9 @@ const ViewBookingModal = React.memo(({ open, booking, room, userProfile, onClose
               {formatPrice(booking.total_price || 0)}
             </span>
           </div>
-          {booking.price_per_hour && (
+          {booking.price_per_day && (
             <p className="mt-1 text-xs text-muted dark:text-dark-muted">
-              {formatPrice(booking.price_per_hour)}/hr × {booking.billable_hours || 0} hrs
+              {formatPrice(booking.price_per_day)}/day
             </p>
           )}
         </div>
@@ -197,59 +147,66 @@ const ViewBookingModal = React.memo(({ open, booking, room, userProfile, onClose
 
 const EditBookingModal = React.memo(({ open, booking, room, onClose, onSave }) => {
   const [date, setDate] = useState("");
-  const [startTime, setStartTime] = useState(DAYTIME_START);
-  const [endTime, setEndTime] = useState(DAYTIME_END);
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [isDateBooked, setIsDateBooked] = useState(false);
+  const [checkingDate, setCheckingDate] = useState(false);
+
+  const pricePerDay = room?.price_per_day ?? room?.price_per_hour ?? 0;
+  const totalPrice = pricePerDay;
 
   useEffect(() => {
     if (booking && open) {
       setDate(booking.booking_date || "");
-      setStartTime(booking.start_time || DAYTIME_START);
-      setEndTime(booking.end_time || DAYTIME_END);
       setFullName(booking.user_full_name || "");
       setPhone(booking.user_phone || "");
       setError("");
+      setIsDateBooked(false);
     }
   }, [booking, open]);
 
-  const allTimes = useMemo(
-    () => buildTimeOptions({ start: DAYTIME_START, end: DAYTIME_END, stepMinutes: TIME_STEP_MINUTES }),
-    []
-  );
-
-  const daytimeStartMinutes = useMemo(() => parseTimeToMinutes(DAYTIME_START), []);
-  const daytimeEndMinutes = useMemo(() => parseTimeToMinutes(DAYTIME_END), []);
-  const startMinutes = useMemo(() => parseTimeToMinutes(startTime), [startTime]);
-  const endMinutes = useMemo(() => parseTimeToMinutes(endTime), [endTime]);
-
-  const startOptions = useMemo(() => {
-    const lastStart = daytimeEndMinutes - TIME_STEP_MINUTES;
-    return allTimes.filter((t) => t.minutes >= daytimeStartMinutes && t.minutes <= lastStart);
-  }, [allTimes, daytimeEndMinutes, daytimeStartMinutes]);
-
-  const endOptions = useMemo(() => {
-    const minEnd = startMinutes + TIME_STEP_MINUTES;
-    return allTimes.filter((t) => t.minutes >= minEnd && t.minutes <= daytimeEndMinutes);
-  }, [allTimes, daytimeEndMinutes, startMinutes]);
-
+  // Check if selected date is already booked (excluding current booking)
   useEffect(() => {
-    const minEnd = startMinutes + TIME_STEP_MINUTES;
-    if (endMinutes < minEnd) {
-      const next = minutesToTimeValue(Math.min(minEnd, daytimeEndMinutes));
-      setEndTime(next);
+    if (!date || !room?.id || !open) {
+      setIsDateBooked(false);
+      return;
     }
-  }, [daytimeEndMinutes, endMinutes, startMinutes]);
 
-  const durationHours = useMemo(() => {
-    const minutes = Math.max(0, endMinutes - startMinutes);
-    return minutes / 60;
-  }, [endMinutes, startMinutes]);
+    // If date hasn't changed from original, it's available
+    if (date === booking?.booking_date) {
+      setIsDateBooked(false);
+      return;
+    }
 
-  const pricePerHour = room?.price_per_hour ?? 0;
-  const totalPrice = durationHours * pricePerHour;
+    let cancelled = false;
+
+    async function checkDateAvailability() {
+      setCheckingDate(true);
+      const { data, error: fetchError } = await supabase
+        .from(BOOKINGS_TABLE)
+        .select("id")
+        .eq("room_id", room.id)
+        .eq("booking_date", date)
+        .in("status", ["pending", "approved", "confirmed"])
+        .neq("id", booking?.id)
+        .limit(1);
+
+      if (cancelled) return;
+
+      if (fetchError) {
+        console.error("Error checking date availability:", fetchError);
+        setIsDateBooked(false);
+      } else {
+        setIsDateBooked((data || []).length > 0);
+      }
+      setCheckingDate(false);
+    }
+
+    checkDateAvailability();
+    return () => { cancelled = true; };
+  }, [date, room?.id, open, booking?.id, booking?.booking_date]);
 
   const handleSave = useCallback(async () => {
     setError("");
@@ -259,11 +216,8 @@ const EditBookingModal = React.memo(({ open, booking, room, onClose, onSave }) =
       return;
     }
 
-    const s = parseTimeToMinutes(startTime);
-    const e = parseTimeToMinutes(endTime);
-
-    if (e <= s) {
-      setError("End time must be after start time.");
+    if (isDateBooked) {
+      setError("This date is already booked. Please select another date.");
       return;
     }
 
@@ -273,13 +227,10 @@ const EditBookingModal = React.memo(({ open, booking, room, onClose, onSave }) =
       .from(BOOKINGS_TABLE)
       .update({
         booking_date: date,
-        start_time: startTime,
-        end_time: endTime,
         user_full_name: fullName.trim() || null,
         user_phone: phone.trim() || null,
         total_price: totalPrice > 0 ? totalPrice : null,
-        price_per_hour: pricePerHour > 0 ? pricePerHour : null,
-        billable_hours: durationHours > 0 ? durationHours : null,
+        price_per_day: pricePerDay > 0 ? pricePerDay : null,
       })
       .eq("id", booking.id);
 
@@ -291,7 +242,7 @@ const EditBookingModal = React.memo(({ open, booking, room, onClose, onSave }) =
     }
 
     onSave();
-  }, [booking?.id, date, durationHours, endTime, fullName, onSave, phone, pricePerHour, startTime, totalPrice]);
+  }, [booking?.id, date, fullName, onSave, phone, pricePerDay, totalPrice, isDateBooked]);
 
   return (
     <Modal
@@ -327,42 +278,33 @@ const EditBookingModal = React.memo(({ open, booking, room, onClose, onSave }) =
           />
         </label>
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="flex flex-col gap-2">
-            <span className="text-sm font-medium text-muted dark:text-dark-muted">Start time</span>
-            <select
-              value={startTime}
-              onChange={(e) => {
-                setStartTime(e.target.value);
-                setError("");
-              }}
-              className={INPUT_STYLES}
-            >
-              {startOptions.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="flex flex-col gap-2">
-            <span className="text-sm font-medium text-muted dark:text-dark-muted">End time</span>
-            <select
-              value={endTime}
-              onChange={(e) => {
-                setEndTime(e.target.value);
-                setError("");
-              }}
-              className={INPUT_STYLES}
-            >
-              {endOptions.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
+        {checkingDate && (
+          <p className="text-xs text-muted dark:text-dark-muted">Checking availability...</p>
+        )}
+
+        {/* Date already booked warning */}
+        {date && isDateBooked && !checkingDate && (
+          <div className="rounded-xl border border-red-200 bg-red-50 p-3 dark:border-red-800 dark:bg-red-900/20">
+            <p className="text-sm font-medium text-red-800 dark:text-red-200">
+              This date is already booked
+            </p>
+            <p className="mt-1 text-xs text-red-700 dark:text-red-300">
+              Please select a different date.
+            </p>
+          </div>
+        )}
+
+        {/* Date available confirmation */}
+        {date && !isDateBooked && !checkingDate && (
+          <div className="rounded-xl border border-green-200 bg-green-50 p-3 dark:border-green-800 dark:bg-green-900/20">
+            <p className="text-sm font-medium text-green-800 dark:text-green-200">
+              Date is available
+            </p>
+            <p className="mt-1 text-xs text-green-700 dark:text-green-300">
+              {dayjs(date).format("dddd, MMMM D, YYYY")}
+            </p>
+          </div>
+        )}
 
         <div className="grid gap-3 sm:grid-cols-2">
           <FormInput
@@ -379,11 +321,11 @@ const EditBookingModal = React.memo(({ open, booking, room, onClose, onSave }) =
           />
         </div>
 
-        {durationHours > 0 && pricePerHour > 0 && (
+        {pricePerDay > 0 && (
           <div className="rounded-xl border border-brand-100 bg-brand-50 p-4 dark:border-brand-800 dark:bg-brand-900/30">
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted dark:text-dark-muted">
-                {durationHours} hr{durationHours !== 1 ? "s" : ""} × {formatPrice(pricePerHour)}/hr
+                Day rate
               </span>
               <span className="text-lg font-bold text-brand-700 dark:text-brand-400">{formatPrice(totalPrice)}</span>
             </div>
@@ -396,7 +338,7 @@ const EditBookingModal = React.memo(({ open, booking, room, onClose, onSave }) =
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={saving}>
+          <Button onClick={handleSave} disabled={saving || isDateBooked}>
             {saving ? "Saving..." : "Save Changes"}
           </Button>
         </div>
@@ -507,8 +449,6 @@ const ApproveBookingModal = React.memo(({ open, booking, room, onClose, onConfir
           booking_id: booking.id,
           room_id: booking.room_id,
           booking_date: booking.booking_date,
-          start_time: booking.start_time,
-          end_time: booking.end_time,
         },
       });
 
@@ -541,12 +481,6 @@ const ApproveBookingModal = React.memo(({ open, booking, room, onClose, onConfir
             <div className="mt-2 text-sm">
               <span className="text-muted dark:text-dark-muted">Date: </span>
               <span className="font-medium text-ink dark:text-dark-ink">{formatDate(booking?.booking_date)}</span>
-            </div>
-            <div className="text-sm">
-              <span className="text-muted dark:text-dark-muted">Time: </span>
-              <span className="font-medium text-ink dark:text-dark-ink">
-                {formatTime(booking?.start_time)} - {formatTime(booking?.end_time)}
-              </span>
             </div>
             <div className="text-sm">
               <span className="text-muted dark:text-dark-muted">Guest: </span>
@@ -642,12 +576,6 @@ const RejectBookingModal = React.memo(({ open, booking, room, onClose, onConfirm
             <div className="mt-2 text-sm">
               <span className="text-muted dark:text-dark-muted">Date: </span>
               <span className="font-medium text-ink dark:text-dark-ink">{formatDate(booking?.booking_date)}</span>
-            </div>
-            <div className="text-sm">
-              <span className="text-muted dark:text-dark-muted">Time: </span>
-              <span className="font-medium text-ink dark:text-dark-ink">
-                {formatTime(booking?.start_time)} - {formatTime(booking?.end_time)}
-              </span>
             </div>
             <div className="text-sm">
               <span className="text-muted dark:text-dark-muted">Guest: </span>
@@ -901,7 +829,7 @@ export default function AdminBookings() {
                 <tr className="border-b border-border bg-surface/60 text-left text-xs font-medium uppercase tracking-wider text-muted">
                   <th className="px-6 py-3">Room</th>
                   <th className="px-6 py-3">Guest</th>
-                  <th className="px-6 py-3">Date & Time</th>
+                  <th className="px-6 py-3">Date</th>
                   <th className="px-6 py-3">Status</th>
                   <th className="px-6 py-3">Amount</th>
                   <th className="px-6 py-3 text-right">Actions</th>
@@ -941,9 +869,6 @@ export default function AdminBookings() {
                       </td>
                       <td className="px-6 py-4">
                         <p className="text-sm text-ink dark:text-dark-ink">{formatDate(booking.booking_date)}</p>
-                        <p className="text-xs text-muted dark:text-dark-muted">
-                          {formatTime(booking.start_time)} - {formatTime(booking.end_time)}
-                        </p>
                       </td>
                       <td className="px-6 py-4">
                         <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${statusInfo.color}`}>

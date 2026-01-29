@@ -4,10 +4,7 @@ import dayjs from "dayjs";
 import Button from "../components/ui/Button.jsx";
 import Card from "../components/ui/Card.jsx";
 import FormInput, { INPUT_STYLES } from "../components/ui/FormInput.jsx";
-import {
-  BOOKING_TYPES,
-  MIN_BOOKING_HOURS,
-} from "../utils/constants.js";
+import { BOOKING_TYPES } from "../utils/constants.js";
 import { supabase } from "../../lib/supabaseClient.js";
 
 const LandingSearch = React.memo(({ onSearch }) => {
@@ -100,8 +97,7 @@ const LandingSearch = React.memo(({ onSearch }) => {
           Find your daytime stay
         </h2>
         <p className="mt-1 text-sm text-muted dark:text-dark-muted">
-          Book hourly or choose the full daytime window. Minimum{" "}
-          {MIN_BOOKING_HOURS} hours.
+          Book a room for the day. Select your preferred date and location.
         </p>
       </div>
       <form

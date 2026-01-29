@@ -70,10 +70,10 @@ export function buildFilters({ minPrice, maxPrice, availableDate, startHour, end
 
   // Price range filter
   if (minPrice !== undefined && minPrice !== null && minPrice > 0) {
-    filters.push(`price_per_hour >= ${minPrice}`);
+    filters.push(`price_per_day >= ${minPrice}`);
   }
   if (maxPrice !== undefined && maxPrice !== null && maxPrice > 0) {
-    filters.push(`price_per_hour <= ${maxPrice}`);
+    filters.push(`price_per_day <= ${maxPrice}`);
   }
 
   // Note: Date availability would typically be handled by:

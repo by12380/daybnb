@@ -6,8 +6,7 @@ import Card from "../components/ui/Card.jsx";
 import Button from "../components/ui/Button.jsx";
 import FormInput, { INPUT_STYLES } from "../components/ui/FormInput.jsx";
 import { StarsDisplay, StarsInput } from "../components/ui/Stars.jsx";
-import { DAYTIME_END, DAYTIME_START } from "../utils/constants.js";
-import { formatPrice, calculateTotalPrice } from "../utils/format.js";
+import { formatPrice } from "../utils/format.js";
 import { useAuth } from "../../auth/useAuth.js";
 import { supabase } from "../../lib/supabaseClient.js";
 import { fetchReviewsForRoom, upsertRoomReview } from "../utils/roomReviews.js";
@@ -18,7 +17,6 @@ import { useWelcomeOffer } from "../../hooks/useWelcomeOffer.js";
 const FALLBACK_IMAGE =
   "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=60";
 
-const TIME_STEP_MINUTES = 30;
 const BOOKINGS_TABLE = "bookings";
 const ROOM_REVIEWS_TABLE = "room_reviews";
 
@@ -33,73 +31,6 @@ function normalizeTags(value, type) {
   return type ? [String(type)] : [];
 }
 
-function clamp(n, min, max) {
-  return Math.min(max, Math.max(min, n));
-}
-
-function parseTimeToMinutes(value) {
-  const [h, m] = String(value || "0:0")
-    .split(":")
-    .map((v) => Number(v));
-  if (!Number.isFinite(h) || !Number.isFinite(m)) return 0;
-  return clamp(h, 0, 23) * 60 + clamp(m, 0, 59);
-}
-
-function pad2(n) {
-  return String(n).padStart(2, "0");
-}
-
-function minutesToTimeValue(totalMinutes) {
-  const h = Math.floor(totalMinutes / 60);
-  const m = totalMinutes % 60;
-  return `${pad2(h)}:${pad2(m)}`;
-}
-
-function minutesToLabel(totalMinutes) {
-  const h24 = Math.floor(totalMinutes / 60);
-  const m = totalMinutes % 60;
-  const suffix = h24 >= 12 ? "PM" : "AM";
-  const h12 = ((h24 + 11) % 12) + 1;
-  const mm = pad2(m);
-  return `${h12}:${mm} ${suffix}`;
-}
-
-function buildTimeOptions({ start, end, stepMinutes }) {
-  const startM = parseTimeToMinutes(start);
-  const endM = parseTimeToMinutes(end);
-  const step = Math.max(5, Number(stepMinutes) || 30);
-  const out = [];
-  for (let m = startM; m <= endM; m += step) {
-    out.push({ value: minutesToTimeValue(m), label: minutesToLabel(m), minutes: m });
-  }
-  return out;
-}
-
-function getDisabledTimeSlots(existingBookings) {
-  const disabled = new Set();
-  for (const booking of existingBookings) {
-    const bookingStart = parseTimeToMinutes(booking.start_time);
-    const bookingEnd = parseTimeToMinutes(booking.end_time);
-    // Mark all slots within this booking as disabled
-    for (let m = bookingStart; m < bookingEnd; m += TIME_STEP_MINUTES) {
-      disabled.add(m);
-    }
-  }
-  return disabled;
-}
-
-function isTimeSlotOverlapping(existingBookings, startMinutes, endMinutes) {
-  for (const booking of existingBookings) {
-    const bookingStart = parseTimeToMinutes(booking.start_time);
-    const bookingEnd = parseTimeToMinutes(booking.end_time);
-    // Check for overlap: two ranges overlap if start1 < end2 AND start2 < end1
-    if (startMinutes < bookingEnd && bookingStart < endMinutes) {
-      return true;
-    }
-  }
-  return false;
-}
-
 const Booking = React.memo(() => {
   const { roomId } = useParams();
   const [searchParams] = useSearchParams();
@@ -111,8 +42,6 @@ const Booking = React.memo(() => {
   const [error, setError] = useState("");
 
   const [date, setDate] = useState("");
-  const [startTime, setStartTime] = useState(DAYTIME_START);
-  const [endTime, setEndTime] = useState(DAYTIME_END);
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -123,9 +52,9 @@ const Booking = React.memo(() => {
   // Check if this is a retry payment from a cancelled checkout
   const retryBookingId = searchParams.get("retry");
 
-  // State for existing bookings on selected date
-  const [dateBookings, setDateBookings] = useState([]);
-  const [loadingBookings, setLoadingBookings] = useState(false);
+  // State for checking if date is already booked
+  const [isDateBooked, setIsDateBooked] = useState(false);
+  const [checkingDate, setCheckingDate] = useState(false);
 
   // Calendar visibility state
   const [showCalendar, setShowCalendar] = useState(false);
@@ -262,113 +191,45 @@ const Booking = React.memo(() => {
     setPhone((prev) => (prev ? prev : String(phoneFromMeta || "")));
   }, [user]);
 
-  // Fetch existing bookings for the selected date and room
+  // Check if selected date is already booked
   useEffect(() => {
     if (!date || !roomId || !supabase) {
-      setDateBookings([]);
+      setIsDateBooked(false);
       return;
     }
 
     let cancelled = false;
 
-    async function fetchDateBookings() {
-      setLoadingBookings(true);
+    async function checkDateAvailability() {
+      setCheckingDate(true);
       const { data, error: fetchError } = await supabase
         .from(BOOKINGS_TABLE)
-        .select("*")
+        .select("id")
         .eq("room_id", roomId)
-        .eq("booking_date", date);
+        .eq("booking_date", date)
+        .in("status", ["pending", "approved", "confirmed"])
+        .limit(1);
 
       if (cancelled) return;
 
       if (fetchError) {
-        console.error("Error fetching bookings for date:", fetchError);
-        setDateBookings([]);
+        console.error("Error checking date availability:", fetchError);
+        setIsDateBooked(false);
       } else {
-        setDateBookings(data || []);
+        setIsDateBooked((data || []).length > 0);
       }
-      setLoadingBookings(false);
+      setCheckingDate(false);
     }
 
-    fetchDateBookings();
+    checkDateAvailability();
     return () => { cancelled = true; };
   }, [date, roomId]);
 
   const tags = useMemo(() => normalizeTags(room?.tags, room?.type), [room?.tags, room?.type]);
 
-  const allTimes = useMemo(
-    () =>
-      buildTimeOptions({
-        start: DAYTIME_START,
-        end: DAYTIME_END,
-        stepMinutes: TIME_STEP_MINUTES,
-      }),
-    []
-  );
-
-  const daytimeStartMinutes = useMemo(() => parseTimeToMinutes(DAYTIME_START), []);
-  const daytimeEndMinutes = useMemo(() => parseTimeToMinutes(DAYTIME_END), []);
-
-  const startMinutes = useMemo(() => parseTimeToMinutes(startTime), [startTime]);
-  const endMinutes = useMemo(() => parseTimeToMinutes(endTime), [endTime]);
-
-  const disabledSlots = useMemo(
-    () => getDisabledTimeSlots(dateBookings),
-    [dateBookings]
-  );
-
-  const startOptions = useMemo(() => {
-    const lastStart = daytimeEndMinutes - TIME_STEP_MINUTES;
-    return allTimes
-      .filter((t) => t.minutes >= daytimeStartMinutes && t.minutes <= lastStart)
-      .map((t) => ({
-        ...t,
-        disabled: disabledSlots.has(t.minutes),
-      }));
-  }, [allTimes, daytimeEndMinutes, daytimeStartMinutes, disabledSlots]);
-
-  const endOptions = useMemo(() => {
-    const minEnd = startMinutes + TIME_STEP_MINUTES;
-    return allTimes
-      .filter((t) => t.minutes >= minEnd && t.minutes <= daytimeEndMinutes)
-      .map((t) => {
-        // End time is disabled if any slot between start and this end is booked
-        let isDisabled = false;
-        for (let m = startMinutes; m < t.minutes; m += TIME_STEP_MINUTES) {
-          if (disabledSlots.has(m)) {
-            isDisabled = true;
-            break;
-          }
-        }
-        return { ...t, disabled: isDisabled };
-      });
-  }, [allTimes, daytimeEndMinutes, startMinutes, disabledSlots]);
-
-  useEffect(() => {
-    // Keep end time valid if start time changes.
-    const minEnd = startMinutes + TIME_STEP_MINUTES;
-    if (endMinutes < minEnd) {
-      const next = minutesToTimeValue(clamp(minEnd, daytimeStartMinutes, daytimeEndMinutes));
-      setEndTime(next);
-    }
-  }, [daytimeEndMinutes, daytimeStartMinutes, endMinutes, startMinutes]);
-
-  const durationHours = useMemo(() => {
-    const minutes = Math.max(0, endMinutes - startMinutes);
-    return minutes / 60;
-  }, [endMinutes, startMinutes]);
-
-  const durationText = useMemo(() => {
-    if (!Number.isFinite(durationHours) || durationHours <= 0) return "";
-    return `${durationHours % 1 === 0 ? String(durationHours) : durationHours.toFixed(1)} hour${durationHours === 1 ? "" : "s"}`;
-  }, [durationHours]);
-
-  // Price calculation with welcome offer discount
-  const pricePerHour = room?.price_per_hour ?? 0;
-  const originalTotalPrice = useMemo(() => {
-    if (!Number.isFinite(durationHours) || durationHours <= 0) return 0;
-    return calculateTotalPrice(durationHours, pricePerHour);
-  }, [durationHours, pricePerHour]);
+  // Price calculation - full day price
+  const pricePerDay = room?.price_per_day ?? room?.price_per_hour ?? 0;
+  const originalTotalPrice = pricePerDay;
 
   // Apply welcome offer discount if eligible
   const priceInfo = useMemo(() => {
@@ -390,30 +251,8 @@ const Booking = React.memo(() => {
     setError("");
   }, []);
 
-  const handleTimeSlotSelect = useCallback((slot) => {
-    // Set start time to selected slot
-    const startMinutes = slot.minutes;
-    const endMinutes = Math.min(startMinutes + 60, parseTimeToMinutes(DAYTIME_END)); // Default 1 hour duration
-    setStartTime(minutesToTimeValue(startMinutes));
-    setEndTime(minutesToTimeValue(endMinutes));
-    setSuccess("");
-    setError("");
-  }, []);
-
   const toggleCalendar = useCallback(() => {
     setShowCalendar((prev) => !prev);
-  }, []);
-
-  const onStartChange = useCallback((e) => {
-    setStartTime(e.target.value);
-    setSuccess("");
-    setError("");
-  }, []);
-
-  const onEndChange = useCallback((e) => {
-    setEndTime(e.target.value);
-    setSuccess("");
-    setError("");
   }, []);
 
   const onFullNameChange = useCallback((e) => setFullName(e.target.value), []);
@@ -493,15 +332,9 @@ const Booking = React.memo(() => {
     if (!roomId) return "Missing room id.";
     if (!user?.id) return "You must be signed in to book.";
     if (!date) return "Please select a date.";
-    const s = parseTimeToMinutes(startTime);
-    const e = parseTimeToMinutes(endTime);
-    const min = parseTimeToMinutes(DAYTIME_START);
-    const max = parseTimeToMinutes(DAYTIME_END);
-    if (s < min || s >= max) return "Start time must be between 8:00 AM and 5:00 PM.";
-    if (e <= min || e > max) return "End time must be between 8:00 AM and 5:00 PM.";
-    if (e <= s) return "End time must be after start time.";
+    if (isDateBooked) return "This date is already booked. Please select another date.";
     return "";
-  }, [date, endTime, roomId, startTime, user?.id]);
+  }, [date, roomId, user?.id, isDateBooked]);
 
   // Handle payment for existing booking (retry scenario)
   const handlePayment = useCallback(
@@ -518,11 +351,8 @@ const Booking = React.memo(() => {
           originalPrice: bookingData.original_price || priceInfo.originalPrice,
           discountAmount: bookingData.discount_amount || priceInfo.discountAmount,
           discountApplied: bookingData.discount_applied || (priceInfo.hasDiscount ? "welcome_offer" : null),
-          durationHours: bookingData.billable_hours || durationHours,
-          pricePerHour: bookingData.price_per_hour || pricePerHour,
+          pricePerDay: bookingData.price_per_day || pricePerDay,
           bookingDate: bookingData.booking_date || date,
-          startTime: bookingData.start_time || startTime,
-          endTime: bookingData.end_time || endTime,
           userEmail: user?.email,
           userId: user?.id,
         });
@@ -539,7 +369,7 @@ const Booking = React.memo(() => {
         setProcessingPayment(false);
       }
     },
-    [room?.title, roomId, totalPrice, priceInfo, durationHours, pricePerHour, date, startTime, endTime, user?.email, user?.id]
+    [room?.title, roomId, totalPrice, priceInfo, pricePerDay, date, user?.email, user?.id]
   );
 
   // Handle retry payment for existing booking
@@ -555,8 +385,6 @@ const Booking = React.memo(() => {
         if (data && data.payment_status !== "paid") {
           // Pre-fill form with existing booking data
           if (data.booking_date) setDate(data.booking_date);
-          if (data.start_time) setStartTime(data.start_time);
-          if (data.end_time) setEndTime(data.end_time);
           if (data.user_full_name) setFullName(data.user_full_name);
           if (data.user_phone) setPhone(data.user_phone);
         }
@@ -583,14 +411,6 @@ const Booking = React.memo(() => {
         return;
       }
 
-      // Check for overlapping bookings
-      const s = parseTimeToMinutes(startTime);
-      const en = parseTimeToMinutes(endTime);
-      if (isTimeSlotOverlapping(dateBookings, s, en)) {
-        setError("This time slot overlaps with an existing booking. Please choose a different time.");
-        return;
-      }
-
       setSubmitting(true);
       setError("");
 
@@ -600,17 +420,14 @@ const Booking = React.memo(() => {
       const payload = {
         room_id: roomId,
         booking_date: date,
-        start_time: startTime,
-        end_time: endTime,
         user_id: user.id,
         user_email: user.email ?? null,
         user_full_name: fullName?.trim() || null,
         user_phone: phone?.trim() || null,
-        total_price: totalPrice > 0 ? totalPrice : null, // Already includes discount if applicable
-        price_per_hour: pricePerHour > 0 ? pricePerHour : null,
-        billable_hours: durationHours > 0 ? durationHours : null,
+        total_price: totalPrice > 0 ? totalPrice : null,
+        price_per_day: pricePerDay > 0 ? pricePerDay : null,
         status: "pending",
-        payment_method: paymentMethod, // "online" or "cash"
+        payment_method: paymentMethod,
         payment_status: isOnlinePayment ? "pending" : "pay_at_property",
       };
 
@@ -624,7 +441,7 @@ const Booking = React.memo(() => {
         const hint =
           insertError?.message?.toLowerCase?.().includes("does not exist") ||
           insertError?.message?.toLowerCase?.().includes("not found")
-            ? `\n\nCreate a \`${BOOKINGS_TABLE}\` table with columns: room_id (text/uuid), booking_date (date), start_time (text/time), end_time (text/time), user_id (uuid/text), user_email (text), user_full_name (text), user_phone (text), payment_status (text), payment_method (text), stripe_session_id (text).`
+            ? `\n\nCreate a \`${BOOKINGS_TABLE}\` table with columns: room_id (text/uuid), booking_date (date), user_id (uuid/text), user_email (text), user_full_name (text), user_phone (text), payment_status (text), payment_method (text), stripe_session_id (text).`
             : insertError?.message?.toLowerCase?.().includes("row level security") ||
                 insertError?.message?.toLowerCase?.().includes("rls")
               ? `\n\nIf RLS is enabled, add an INSERT policy to \`${BOOKINGS_TABLE}\` for authenticated users.`
@@ -649,7 +466,7 @@ const Booking = React.memo(() => {
         }, 1500);
       }
     },
-    [date, dateBookings, durationHours, endTime, fullName, handlePayment, navigate, paymentMethod, phone, pricePerHour, roomId, startTime, totalPrice, user?.email, user?.id, validate]
+    [date, fullName, handlePayment, navigate, paymentMethod, phone, pricePerDay, roomId, totalPrice, user?.email, user?.id, validate]
   );
 
   if (loading) {
@@ -661,7 +478,7 @@ const Booking = React.memo(() => {
     );
   }
 
-  if (error) {
+  if (error && !room) {
     return (
       <Card>
         <p className="text-sm font-semibold text-ink">Unable to load room</p>
@@ -680,7 +497,7 @@ const Booking = React.memo(() => {
       <Card>
         <p className="text-sm font-semibold text-ink">Room not found</p>
         <p className="mt-1 text-sm text-muted">
-          That room doesn’t exist. Go back to the homepage and pick another one.
+          That room doesn't exist. Go back to the homepage and pick another one.
         </p>
         <div className="mt-4">
           <Link to="/">
@@ -711,9 +528,9 @@ const Booking = React.memo(() => {
           <div className="mt-3">
             <StarsDisplay value={ratingSummary.avg} count={ratingSummary.count} />
           </div>
-          {pricePerHour > 0 && (
+          {pricePerDay > 0 && (
             <p className="mt-2 text-lg font-semibold text-brand-700">
-              {formatPrice(pricePerHour)}<span className="text-sm font-normal text-muted">/hour</span>
+              {formatPrice(pricePerDay)}<span className="text-sm font-normal text-muted">/day</span>
             </p>
           )}
           {tags.length ? (
@@ -755,9 +572,7 @@ const Booking = React.memo(() => {
 
         <p className="text-sm font-semibold text-ink">Book your daytime stay</p>
         <p className="mt-1 text-sm text-muted">
-          Pick <span className="font-medium text-ink">one date</span> and a time window between{" "}
-          <span className="font-medium text-ink">8:00 AM</span> and{" "}
-          <span className="font-medium text-ink">5:00 PM</span>.
+          Select a <span className="font-medium text-ink">date</span> for your booking.
         </p>
 
         {/* Calendar Toggle Button */}
@@ -791,7 +606,6 @@ const Booking = React.memo(() => {
               roomId={roomId}
               selectedDate={date}
               onDateSelect={handleCalendarDateSelect}
-              onTimeSlotSelect={handleTimeSlotSelect}
             />
           </div>
         )}
@@ -808,69 +622,56 @@ const Booking = React.memo(() => {
             />
           </label>
 
-          {loadingBookings && (
-            <p className="text-xs text-muted">Loading available time slots...</p>
+          {checkingDate && (
+            <p className="text-xs text-muted">Checking availability...</p>
           )}
 
-          {/* Booked slots warning */}
-          {date && dateBookings.length > 0 && !loadingBookings && (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-900/20">
+          {/* Date already booked warning */}
+          {date && isDateBooked && !checkingDate && (
+            <div className="rounded-xl border border-red-200 bg-red-50 p-3 dark:border-red-800 dark:bg-red-900/20">
               <div className="flex items-start gap-2">
-                <svg className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="mt-0.5 h-4 w-4 shrink-0 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
                 <div>
-                  <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
-                    Some time slots are already booked
+                  <p className="text-sm font-medium text-red-800 dark:text-red-200">
+                    This date is already booked
                   </p>
-                  <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
-                    {dateBookings.length} booking{dateBookings.length > 1 ? "s" : ""} on this date. 
-                    Unavailable times are marked in the dropdowns below.
+                  <p className="mt-1 text-xs text-red-700 dark:text-red-300">
+                    Please select a different date from the calendar.
                   </p>
                 </div>
               </div>
             </div>
           )}
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="flex flex-col gap-2">
-              <span className="text-sm font-medium text-muted">Start time</span>
-              <select value={startTime} onChange={onStartChange} className={INPUT_STYLES}>
-                {startOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value} disabled={opt.disabled}>
-                    {opt.label}{opt.disabled ? " (Booked)" : ""}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex flex-col gap-2">
-              <span className="text-sm font-medium text-muted">End time</span>
-              <select value={endTime} onChange={onEndChange} className={INPUT_STYLES}>
-                {endOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value} disabled={opt.disabled}>
-                    {opt.label}{opt.disabled ? " (Unavailable)" : ""}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
+          {/* Date available confirmation */}
+          {date && !isDateBooked && !checkingDate && (
+            <div className="rounded-xl border border-green-200 bg-green-50 p-3 dark:border-green-800 dark:bg-green-900/20">
+              <div className="flex items-start gap-2">
+                <svg className="mt-0.5 h-4 w-4 shrink-0 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                <div>
+                  <p className="text-sm font-medium text-green-800 dark:text-green-200">
+                    Date is available
+                  </p>
+                  <p className="mt-1 text-xs text-green-700 dark:text-green-300">
+                    {dayjs(date).format("dddd, MMMM D, YYYY")}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Price Breakdown */}
-          {durationText && pricePerHour > 0 ? (
+          {date && !isDateBooked && pricePerDay > 0 ? (
             <div className="rounded-xl border border-brand-100 bg-brand-50 p-4 dark:border-brand-800 dark:bg-brand-900/30">
               <p className="text-sm font-semibold text-ink dark:text-dark-ink">Price Breakdown</p>
               <div className="mt-3 space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted dark:text-dark-muted">Duration</span>
-                  <span className="font-medium text-ink dark:text-dark-ink">{durationText}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted dark:text-dark-muted">Hourly Rate</span>
-                  <span className="font-medium text-ink dark:text-dark-ink">{formatPrice(pricePerHour)}/hr</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted dark:text-dark-muted">Subtotal</span>
-                  <span className="font-medium text-ink dark:text-dark-ink">{formatPrice(priceInfo.originalPrice)}</span>
+                  <span className="text-muted dark:text-dark-muted">Day Rate</span>
+                  <span className="font-medium text-ink dark:text-dark-ink">{formatPrice(pricePerDay)}</span>
                 </div>
                 
                 {/* Welcome Offer Discount */}
@@ -905,12 +706,10 @@ const Booking = React.memo(() => {
                 </div>
               </div>
             </div>
-          ) : durationText ? (
-            <p className="text-xs text-muted dark:text-dark-muted">Total time: {durationText}</p>
           ) : null}
 
           {/* Payment Method Selection */}
-          {totalPrice > 0 && (
+          {totalPrice > 0 && date && !isDateBooked && (
             <div className="space-y-3">
               <p className="text-sm font-medium text-muted dark:text-dark-muted">Payment Method</p>
               <div className="grid gap-3 sm:grid-cols-2">
@@ -1022,7 +821,7 @@ const Booking = React.memo(() => {
             <Button 
               className="flex-1" 
               type="submit" 
-              disabled={submitting || processingPayment || !date}
+              disabled={submitting || processingPayment || !date || isDateBooked}
             >
               {processingPayment 
                 ? "Redirecting to payment…" 
@@ -1143,4 +942,3 @@ const Booking = React.memo(() => {
 });
 
 export default Booking;
-

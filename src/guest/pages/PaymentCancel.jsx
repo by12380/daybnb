@@ -108,14 +108,6 @@ const PaymentCancel = () => {
                   </span>
                 </div>
               )}
-              {booking.start_time && booking.end_time && (
-                <div className="flex justify-between">
-                  <span className="text-muted dark:text-dark-muted">Time</span>
-                  <span className="font-medium text-ink dark:text-dark-ink">
-                    {booking.start_time} - {booking.end_time}
-                  </span>
-                </div>
-              )}
               <div className="flex justify-between border-t border-border pt-2 dark:border-dark-border">
                 <span className="text-muted dark:text-dark-muted">Status</span>
                 <span className="font-medium text-amber-600 dark:text-amber-400">

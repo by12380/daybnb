@@ -173,10 +173,10 @@ function SearchResultCard({ hit, onBook, liked, onToggleLike, availability }) {
           <AvailabilityBadge status={availability.status} message={availability.message} />
         )}
 
-        {hit.price_per_hour > 0 && (
+        {(hit.price_per_day || hit.price_per_hour) > 0 && (
           <p className="text-lg font-semibold text-brand-700 dark:text-brand-400">
-            {formatPrice(hit.price_per_hour)}
-            <span className="text-xs font-normal text-muted dark:text-dark-muted">/hour</span>
+            {formatPrice(hit.price_per_day || hit.price_per_hour)}
+            <span className="text-xs font-normal text-muted dark:text-dark-muted">/day</span>
           </p>
         )}
 
@@ -433,7 +433,7 @@ function PaginationUI({ nbHits }) {
   );
 }
 
-function SearchResults({ selectedDate, startTime = 8, endTime = 17 }) {
+function SearchResults({ selectedDate }) {
   const navigate = useNavigate();
   const { user } = useAuth();
   
@@ -491,11 +491,11 @@ function SearchResults({ selectedDate, startTime = 8, endTime = 17 }) {
 
       if (cancelled) return;
 
-      // Calculate availability status for each room
+      // Calculate availability status for each room (date-based)
       const availability = {};
       for (const roomId of roomIds) {
-        const bookings = bookingsByRoom[roomId] || [];
-        availability[roomId] = getRoomAvailabilityStatus(bookings, startTime, endTime);
+        const isBooked = !!bookingsByRoom[roomId];
+        availability[roomId] = getRoomAvailabilityStatus(isBooked ? [{ id: roomId }] : []);
       }
 
       setRoomAvailability(availability);
@@ -506,7 +506,7 @@ function SearchResults({ selectedDate, startTime = 8, endTime = 17 }) {
     return () => {
       cancelled = true;
     };
-  }, [selectedDate, startTime, endTime, items]);
+  }, [selectedDate, items]);
 
   const handleBook = useCallback(
     (hit) => {
@@ -590,7 +590,7 @@ function SearchResults({ selectedDate, startTime = 8, endTime = 17 }) {
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
           </svg>
-          Showing availability for {selectedDate} ({startTime > 12 ? startTime - 12 : startTime}:00 {startTime >= 12 ? "PM" : "AM"} - {endTime > 12 ? endTime - 12 : endTime}:00 {endTime >= 12 ? "PM" : "AM"})
+          Showing availability for {selectedDate}
         </div>
       )}
 
