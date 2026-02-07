@@ -8,8 +8,8 @@ const FUNCTIONS_URL = SUPABASE_URL ? `${SUPABASE_URL}/functions/v1` : "";
 /**
  * Call the Algolia sync edge function
  * @param {Object} params - Sync parameters
- * @param {string} params.type - Operation type: INSERT, UPDATE, DELETE, FULL_SYNC, CONFIGURE_INDEX
- * @param {Object} [params.record] - The room record (for INSERT/UPDATE)
+ * @param {string} params.type - Operation type: INSERT, UPDATE, DELETE, BOOKING_INSERT, BOOKING_UPDATE, BOOKING_DELETE, FULL_SYNC, CONFIGURE_INDEX
+ * @param {Object} [params.record] - The room/booking record (for INSERT/UPDATE)
  * @param {Object} [params.old_record] - The old record (for DELETE)
  */
 export async function syncToAlgolia({ type, record, old_record }) {
@@ -89,4 +89,52 @@ export async function syncRoomUpdate(room) {
  */
 export async function syncRoomDelete(roomId) {
   return syncToAlgolia({ type: "DELETE", old_record: { id: roomId } });
+}
+
+// =============================================
+// Booking sync functions
+// =============================================
+
+/**
+ * Sync booking creation to Algolia (updates room's booked_dates)
+ * @param {Object} booking - The booking record with room_id
+ */
+export async function syncBookingInsert(booking) {
+  if (!booking?.room_id) {
+    console.warn("syncBookingInsert: No room_id in booking, skipping");
+    return null;
+  }
+  return syncToAlgolia({ type: "BOOKING_INSERT", record: booking });
+}
+
+/**
+ * Sync booking update to Algolia (updates room's booked_dates)
+ * @param {Object} booking - The updated booking record with room_id
+ * @param {Object} [oldBooking] - The old booking record (if room_id changed)
+ */
+export async function syncBookingUpdate(booking, oldBooking = null) {
+  if (!booking?.room_id) {
+    console.warn("syncBookingUpdate: No room_id in booking, skipping");
+    return null;
+  }
+  
+  // If room_id changed, we need to update both rooms
+  if (oldBooking && oldBooking.room_id && oldBooking.room_id !== booking.room_id) {
+    // Update the old room first
+    await syncToAlgolia({ type: "BOOKING_DELETE", old_record: oldBooking });
+  }
+  
+  return syncToAlgolia({ type: "BOOKING_UPDATE", record: booking });
+}
+
+/**
+ * Sync booking deletion/cancellation to Algolia (updates room's booked_dates)
+ * @param {Object} booking - The booking record with room_id
+ */
+export async function syncBookingDelete(booking) {
+  if (!booking?.room_id) {
+    console.warn("syncBookingDelete: No room_id in booking, skipping");
+    return null;
+  }
+  return syncToAlgolia({ type: "BOOKING_DELETE", old_record: booking });
 }

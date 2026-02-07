@@ -12,6 +12,7 @@ import { useAuth } from "../../auth/useAuth.js";
 import { supabase } from "../../lib/supabaseClient.js";
 import { fetchReviewsForRoom, upsertRoomReview } from "../utils/roomReviews.js";
 import { createCheckoutSession, redirectToCheckout } from "../../lib/stripe.js";
+import { syncBookingInsert } from "../../lib/algoliaSync.js";
 
 const FALLBACK_IMAGE =
   "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=60";
@@ -588,6 +589,13 @@ const Booking = React.memo(() => {
         setError(`${insertError.message || "Failed to create booking."}${hint}`);
         setSubmitting(false);
         return;
+      }
+
+      // Sync booking to Algolia (updates room's booked_dates)
+      if (insertedData) {
+        syncBookingInsert(insertedData).catch(err => {
+          console.warn("Failed to sync booking to Algolia:", err);
+        });
       }
 
       setSubmitting(false);

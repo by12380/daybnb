@@ -6,9 +6,10 @@ This guide explains how to set up Algolia GeoSearch for location-based search in
 
 Algolia provides fast, typo-tolerant search with built-in GeoSearch capabilities. The integration consists of:
 
-1. **Algolia Index**: Stores room data with geo coordinates
-2. **Supabase Edge Function**: Syncs data between Supabase and Algolia
-3. **React Components**: Search UI with location detection and filters
+1. **Algolia Index**: Stores room data with geo coordinates and booked dates
+2. **Supabase Edge Function**: Syncs data between Supabase and Algolia (including booking data)
+3. **React Components**: Search UI with location detection, availability filters, and price sorting
+4. **Booking Sync**: Automatic updates to Algolia when bookings are created, updated, or cancelled
 
 ## Prerequisites
 
@@ -142,14 +143,26 @@ The sync function configures these settings:
   attributesForFaceting: [
     "filterOnly(price_per_hour)",
     "filterOnly(guests)",
+    "filterOnly(booked_dates)",  // For availability filtering
     "searchable(type)",
     "searchable(tags)",
     "searchable(location)"
   ],
   customRanking: ["desc(price_per_hour)"],
-  hitsPerPage: 20
+  hitsPerPage: 20,
+  // Replica indices for sorting
+  replicas: [
+    "daybnb_places_price_asc",
+    "daybnb_places_price_desc"
+  ]
 }
 ```
+
+### Replica Indices for Price Sorting
+
+Two replica indices are created for sorting by price:
+- `daybnb_places_price_asc`: Sort by price low to high
+- `daybnb_places_price_desc`: Sort by price high to low
 
 ## GeoSearch Features
 
@@ -159,11 +172,60 @@ The sync function configures these settings:
 - Configurable search radius (5km to 200km)
 
 ### Filters
-- **Date**: Select booking date
+- **Date**: Select booking date (with availability filtering via Algolia)
+- **Hide Booked Rooms**: Toggle to filter out rooms that are booked on the selected date
 - **Time Range**: 8 AM - 5 PM daytime hours
 - **Price**: Min/max hourly price
 - **Room Type**: Filter by suite, resort, villa, etc.
 - **Guests**: Minimum guest capacity
+
+### Sorting
+- **Relevance**: Default Algolia ranking
+- **Price: Low to High**: Sort by cheapest first
+- **Price: High to Low**: Sort by most expensive first
+
+## Booking Availability Integration
+
+### How It Works
+
+1. Each room record in Algolia contains a `booked_dates` array with numeric date values (YYYYMMDD format)
+2. When a user selects a date, Algolia filters out rooms where `booked_dates` contains that date
+3. This provides instant, scalable availability filtering without hitting the database
+
+### Data Structure
+
+Room records in Algolia now include:
+```javascript
+{
+  objectID: "room-uuid",
+  title: "Luxury Suite",
+  // ... other fields ...
+  booked_dates: [20260201, 20260202, 20260215],  // Numeric format for filtering
+  booked_dates_iso: ["2026-02-01", "2026-02-02", "2026-02-15"]  // ISO format for display
+}
+```
+
+### Booking Sync Events
+
+When bookings are created, updated, or cancelled, the room's `booked_dates` are automatically updated in Algolia:
+
+| Event | Action |
+|-------|--------|
+| Booking Created | Add date to room's `booked_dates` |
+| Booking Updated | Update dates if booking date changed |
+| Booking Cancelled | Remove date from room's `booked_dates` |
+| Booking Approved | Keep date in `booked_dates` |
+| Booking Rejected | Remove date from `booked_dates` |
+
+### Sync Function Types
+
+The sync function now supports these additional operations:
+
+| Type | Description |
+|------|-------------|
+| `BOOKING_INSERT` | Sync when a booking is created |
+| `BOOKING_UPDATE` | Sync when a booking is updated |
+| `BOOKING_DELETE` | Sync when a booking is cancelled/deleted |
 
 ## Troubleshooting
 
@@ -194,17 +256,41 @@ The sync function configures these settings:
 | `INSERT` | Add a new room to Algolia |
 | `UPDATE` | Update an existing room |
 | `DELETE` | Remove a room from Algolia |
-| `FULL_SYNC` | Sync all rooms from Supabase |
-| `CONFIGURE_INDEX` | Set up index settings |
+| `BOOKING_INSERT` | Sync room after booking creation |
+| `BOOKING_UPDATE` | Sync room after booking update |
+| `BOOKING_DELETE` | Sync room after booking cancellation |
+| `FULL_SYNC` | Sync all rooms from Supabase (includes booking data) |
+| `CONFIGURE_INDEX` | Set up index settings and replicas |
 
-### Example Sync Call
+### Example Sync Calls
 
 ```javascript
-import { fullSyncToAlgolia } from './lib/algoliaSync.js';
+import { 
+  fullSyncToAlgolia, 
+  configureAlgoliaIndex,
+  syncBookingInsert,
+  syncBookingUpdate,
+  syncBookingDelete 
+} from './lib/algoliaSync.js';
 
-// Sync all rooms
+// Sync all rooms with booking data
 await fullSyncToAlgolia();
+
+// Configure index settings and create sorting replicas
+await configureAlgoliaIndex();
+
+// Sync after booking operations
+await syncBookingInsert(bookingRecord);
+await syncBookingUpdate(updatedBooking, oldBooking);
+await syncBookingDelete(bookingRecord);
 ```
+
+### Automatic Booking Sync
+
+Booking sync is automatically called in these components:
+- `src/guest/pages/Booking.jsx` - On booking creation
+- `src/guest/pages/MyBookings.jsx` - On booking edit/cancel
+- `src/admin/pages/Bookings.jsx` - On admin edit/delete/approve/reject
 
 ## Security Notes
 

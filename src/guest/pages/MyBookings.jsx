@@ -9,6 +9,7 @@ import { DAYTIME_END, DAYTIME_START } from "../utils/constants.js";
 import { formatPrice, calculateTotalPrice } from "../utils/format.js";
 import { useAuth } from "../../auth/useAuth.js";
 import { supabase } from "../../lib/supabaseClient.js";
+import { syncBookingUpdate, syncBookingDelete } from "../../lib/algoliaSync.js";
 
 const BOOKINGS_TABLE = "bookings";
 const TIME_STEP_MINUTES = 30;
@@ -362,19 +363,23 @@ const EditBookingModal = React.memo(({
 
     setSaving(true);
 
-    const { error: updateError } = await supabase
+    const updatedBooking = {
+      booking_date: date,
+      start_time: startTime,
+      end_time: endTime,
+      user_full_name: fullName.trim() || null,
+      user_phone: phone.trim() || null,
+      total_price: totalPrice > 0 ? totalPrice : null,
+      price_per_hour: pricePerHour > 0 ? pricePerHour : null,
+      billable_hours: durationHours > 0 ? durationHours : null,
+    };
+
+    const { data: updatedData, error: updateError } = await supabase
       .from(BOOKINGS_TABLE)
-      .update({
-        booking_date: date,
-        start_time: startTime,
-        end_time: endTime,
-        user_full_name: fullName.trim() || null,
-        user_phone: phone.trim() || null,
-        total_price: totalPrice > 0 ? totalPrice : null,
-        price_per_hour: pricePerHour > 0 ? pricePerHour : null,
-        billable_hours: durationHours > 0 ? durationHours : null,
-      })
-      .eq("id", booking.id);
+      .update(updatedBooking)
+      .eq("id", booking.id)
+      .select()
+      .single();
 
     setSaving(false);
 
@@ -383,8 +388,15 @@ const EditBookingModal = React.memo(({
       return;
     }
 
+    // Sync to Algolia (updates room's booked_dates if date changed)
+    if (updatedData) {
+      syncBookingUpdate(updatedData, booking).catch(err => {
+        console.warn("Failed to sync booking update to Algolia:", err);
+      });
+    }
+
     onSave();
-  }, [booking?.id, date, dateBookings, durationHours, endTime, fullName, onSave, phone, pricePerHour, startTime, totalPrice]);
+  }, [booking, date, dateBookings, durationHours, endTime, fullName, onSave, phone, pricePerHour, startTime, totalPrice]);
 
   return (
     <Modal
@@ -535,8 +547,15 @@ const CancelBookingModal = React.memo(({ open, booking, room, onClose, onConfirm
       return;
     }
 
+    // Sync to Algolia (removes date from room's booked_dates)
+    if (booking) {
+      syncBookingDelete(booking).catch(err => {
+        console.warn("Failed to sync booking deletion to Algolia:", err);
+      });
+    }
+
     onConfirm();
-  }, [booking?.id, onConfirm]);
+  }, [booking, onConfirm]);
 
   return (
     <Modal

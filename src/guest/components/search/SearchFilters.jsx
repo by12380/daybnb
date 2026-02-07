@@ -1,8 +1,9 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { useConfigure, useSearchBox } from "react-instantsearch";
+import { useConfigure, useSearchBox, useSortBy } from "react-instantsearch";
 import { DatePicker } from "antd";
 import dayjs from "dayjs";
 import { INPUT_STYLES } from "../ui/FormInput.jsx";
+import { indexName } from "../../../lib/algoliaClient.js";
 
 // Time options for 8am-5pm range
 function buildTimeOptions() {
@@ -140,6 +141,48 @@ function GuestsFilter({ minGuests, onGuestsChange }) {
   );
 }
 
+// Sort By Price Filter using Algolia replicas
+function SortByPriceFilter() {
+  const sortByItems = useMemo(() => [
+    { label: "Relevance", value: indexName },
+    { label: "Price: Low to High", value: `${indexName}_price_asc` },
+    { label: "Price: High to Low", value: `${indexName}_price_desc` },
+  ], []);
+
+  const { currentRefinement, refine, options } = useSortBy({
+    items: sortByItems,
+  });
+
+  return (
+    <div className="space-y-2">
+      <label className="text-xs font-medium text-ink dark:text-dark-ink">
+        Sort By
+      </label>
+      <select
+        value={currentRefinement}
+        onChange={(e) => refine(e.target.value)}
+        className={INPUT_STYLES}
+      >
+        {sortByItems.map((item) => (
+          <option key={item.value} value={item.value}>
+            {item.label}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+/**
+ * Convert a date string (YYYY-MM-DD) to numeric format (YYYYMMDD) for Algolia filtering
+ */
+function dateToNumeric(dateStr) {
+  if (!dateStr) return null;
+  const parts = dateStr.split('-');
+  if (parts.length !== 3) return null;
+  return parseInt(parts[0] + parts[1] + parts[2], 10);
+}
+
 const SearchFilters = React.memo(function SearchFilters({
   onDateChange,
   onTimeRangeChange,
@@ -157,6 +200,7 @@ const SearchFilters = React.memo(function SearchFilters({
   const [maxPrice, setMaxPrice] = useState("");
   const [minGuests, setMinGuests] = useState(1);
   const [selectedTypes, setSelectedTypes] = useState([]);
+  const [hideBookedRooms, setHideBookedRooms] = useState(true);
 
   const availableTypes = ["suite", "resort", "villa", "room", "studio"];
 
@@ -178,8 +222,18 @@ const SearchFilters = React.memo(function SearchFilters({
       parts.push(`(${typeFilters})`);
     }
     
+    // Filter out rooms that are booked on the selected date
+    // Only if hideBookedRooms is enabled and a date is selected
+    if (hideBookedRooms && selectedDate) {
+      const numericDate = dateToNumeric(selectedDate);
+      if (numericDate) {
+        // NOT booked_dates:YYYYMMDD - exclude rooms booked on this date
+        parts.push(`NOT booked_dates:${numericDate}`);
+      }
+    }
+    
     return parts.join(" AND ");
-  }, [minPrice, maxPrice, minGuests, selectedTypes]);
+  }, [minPrice, maxPrice, minGuests, selectedTypes, selectedDate, hideBookedRooms]);
 
   // Apply filters to Algolia via Configure
   useConfigure({ filters: filters || undefined });
@@ -251,6 +305,9 @@ const SearchFilters = React.memo(function SearchFilters({
       {/* Filter Content */}
       {isExpanded && (
         <div className="mt-4 space-y-6">
+          {/* Sort By Price */}
+          <SortByPriceFilter />
+
           {/* Date Filter */}
           <div className="space-y-3">
             <label className="text-sm font-medium text-ink dark:text-dark-ink mr-2">Date</label>
@@ -261,6 +318,20 @@ const SearchFilters = React.memo(function SearchFilters({
               onChange={handleDateChange}
               disabledDate={(current) => current && current < dayjs().startOf("day")}
             />
+            {/* Hide booked rooms toggle - only show when date is selected */}
+            {selectedDate && (
+              <label className="mt-2 flex cursor-pointer items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={hideBookedRooms}
+                  onChange={(e) => setHideBookedRooms(e.target.checked)}
+                  className="h-4 w-4 rounded border-border text-brand-600 focus:ring-brand-500 dark:border-dark-border"
+                />
+                <span className="text-xs text-muted dark:text-dark-muted">
+                  Hide booked rooms on this date
+                </span>
+              </label>
+            )}
           </div>
 
           {/* Time Range Filter */}
@@ -334,6 +405,7 @@ const SearchFilters = React.memo(function SearchFilters({
               setSelectedTypes([]);
               setLocalStartTime(8);
               setLocalEndTime(17);
+              setHideBookedRooms(true);
               onDateChange?.(null);
               onTimeRangeChange?.(8, 17);
             }}
