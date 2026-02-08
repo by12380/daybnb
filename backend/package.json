@@ -1,0 +1,21 @@
+{
+  "name": "daybnb-backend",
+  "version": "1.0.0",
+  "description": "Express.js API server for Daybnb",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.46.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "morgan": "^1.10.0",
+    "stripe": "^17.5.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
