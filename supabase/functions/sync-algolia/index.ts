@@ -25,6 +25,7 @@ interface RoomRecord {
   type?: string;
   image?: string;
   tags?: string[];
+  price_per_day?: number;
   price_per_hour?: number;
   description?: string;
   latitude?: number;
@@ -41,8 +42,10 @@ interface AlgoliaRecord {
   type?: string;
   image?: string;
   tags?: string[];
+  price_per_day: number;
   price_per_hour: number;
   description?: string;
+  booked_dates?: string[];
   _geoloc?: {
     lat: number;
     lng: number;
@@ -51,8 +54,20 @@ interface AlgoliaRecord {
   updated_at?: string;
 }
 
+interface BookingRecord {
+  id?: string;
+  room_id: string;
+  booking_date: string;
+  status?: string;
+}
+
+const ACTIVE_BOOKING_STATUSES = ["pending", "approved", "confirmed"];
+
 // Transform Supabase room record to Algolia record
-function transformToAlgoliaRecord(room: RoomRecord): AlgoliaRecord {
+function transformToAlgoliaRecord(
+  room: RoomRecord,
+  bookedDates: string[] = []
+): AlgoliaRecord {
   const record: AlgoliaRecord = {
     objectID: room.id,
     title: room.title,
@@ -61,8 +76,10 @@ function transformToAlgoliaRecord(room: RoomRecord): AlgoliaRecord {
     type: room.type,
     image: room.image,
     tags: room.tags || [],
+    price_per_day: room.price_per_day ?? room.price_per_hour ?? 0,
     price_per_hour: room.price_per_hour || 0,
     description: room.description,
+    booked_dates: bookedDates,
     created_at: room.created_at,
     updated_at: room.updated_at,
   };
@@ -81,6 +98,61 @@ function transformToAlgoliaRecord(room: RoomRecord): AlgoliaRecord {
   }
 
   return record;
+}
+
+function uniqueDates(dates: string[]): string[] {
+  return Array.from(new Set(dates.filter(Boolean)));
+}
+
+async function fetchBookedDatesByRoomIds(roomIds: string[]) {
+  if (!roomIds.length) return {};
+
+  const { data: bookings, error } = await supabase
+    .from("bookings")
+    .select("room_id, booking_date, status")
+    .in("room_id", roomIds)
+    .in("status", ACTIVE_BOOKING_STATUSES);
+
+  if (error) {
+    throw new Error(`Failed to fetch bookings: ${error.message}`);
+  }
+
+  const bookingsByRoom: Record<string, string[]> = {};
+  (bookings || []).forEach((booking) => {
+    if (!booking.room_id || !booking.booking_date) return;
+    if (!bookingsByRoom[booking.room_id]) {
+      bookingsByRoom[booking.room_id] = [];
+    }
+    bookingsByRoom[booking.room_id].push(booking.booking_date);
+  });
+
+  Object.keys(bookingsByRoom).forEach((roomId) => {
+    bookingsByRoom[roomId] = uniqueDates(bookingsByRoom[roomId]);
+  });
+
+  return bookingsByRoom;
+}
+
+async function syncRoomBookings(roomId: string) {
+  const { data: room, error: roomError } = await supabase
+    .from("rooms")
+    .select("*")
+    .eq("id", roomId)
+    .maybeSingle();
+
+  if (roomError) {
+    throw new Error(`Failed to fetch room ${roomId}: ${roomError.message}`);
+  }
+
+  if (!room) {
+    return { message: `Room ${roomId} not found`, roomId };
+  }
+
+  const bookingsByRoom = await fetchBookedDatesByRoomIds([roomId]);
+  const bookedDates = bookingsByRoom[roomId] || [];
+
+  const algoliaRecord = transformToAlgoliaRecord(room, bookedDates);
+  return saveObject(algoliaRecord);
 }
 
 // Algolia REST API helper
@@ -167,7 +239,11 @@ serve(async (req) => {
       case "INSERT":
         // Add new record to Algolia
         if (record) {
-          const algoliaRecord = transformToAlgoliaRecord(record);
+          const bookingsByRoom = await fetchBookedDatesByRoomIds([record.id]);
+          const algoliaRecord = transformToAlgoliaRecord(
+            record,
+            bookingsByRoom[record.id] || []
+          );
           result = await saveObject(algoliaRecord);
           console.log(`Added room ${record.id} to Algolia:`, result);
         }
@@ -176,7 +252,11 @@ serve(async (req) => {
       case "UPDATE":
         // Update existing record in Algolia
         if (record) {
-          const algoliaRecord = transformToAlgoliaRecord(record);
+          const bookingsByRoom = await fetchBookedDatesByRoomIds([record.id]);
+          const algoliaRecord = transformToAlgoliaRecord(
+            record,
+            bookingsByRoom[record.id] || []
+          );
           result = await saveObject(algoliaRecord);
           console.log(`Updated room ${record.id} in Algolia:`, result);
         }
@@ -202,7 +282,11 @@ serve(async (req) => {
         }
 
         if (rooms && rooms.length > 0) {
-          const algoliaRecords = rooms.map(transformToAlgoliaRecord);
+          const roomIds = rooms.map((room) => room.id).filter(Boolean);
+          const bookingsByRoom = await fetchBookedDatesByRoomIds(roomIds);
+          const algoliaRecords = rooms.map((room) =>
+            transformToAlgoliaRecord(room, bookingsByRoom[room.id] || [])
+          );
           
           // Clear existing index and add all records
           await clearObjects();
@@ -227,6 +311,8 @@ serve(async (req) => {
           ],
           // Attributes for filtering
           attributesForFaceting: [
+            "filterOnly(booked_dates)",
+            "filterOnly(price_per_day)",
             "filterOnly(price_per_hour)",
             "filterOnly(guests)",
             "searchable(type)",
@@ -234,7 +320,7 @@ serve(async (req) => {
             "searchable(location)",
           ],
           // Custom ranking
-          customRanking: ["desc(price_per_hour)"],
+          customRanking: ["desc(price_per_day)", "desc(price_per_hour)"],
           // Pagination
           hitsPerPage: 20,
           // Highlighting
@@ -245,11 +331,40 @@ serve(async (req) => {
         console.log("Algolia index configured for GeoSearch:", result);
         break;
 
+      case "BOOKING_INSERT":
+      case "BOOKING_UPDATE":
+      case "BOOKING_DELETE": {
+        const bookingRecord = (record || old_record) as BookingRecord | undefined;
+        const roomId = bookingRecord?.room_id;
+
+        if (!roomId) {
+          throw new Error("Missing room_id for booking sync");
+        }
+
+        const oldRoomId = (old_record as BookingRecord | undefined)?.room_id;
+        if (type === "BOOKING_UPDATE" && oldRoomId && oldRoomId !== roomId) {
+          await syncRoomBookings(oldRoomId);
+        }
+
+        result = await syncRoomBookings(roomId);
+        console.log(`Synced booking changes for room ${roomId}:`, result);
+        break;
+      }
+
       default:
         return new Response(
           JSON.stringify({
             error: "Invalid operation type",
-            validTypes: ["INSERT", "UPDATE", "DELETE", "FULL_SYNC", "CONFIGURE_INDEX"],
+            validTypes: [
+              "INSERT",
+              "UPDATE",
+              "DELETE",
+              "FULL_SYNC",
+              "CONFIGURE_INDEX",
+              "BOOKING_INSERT",
+              "BOOKING_UPDATE",
+              "BOOKING_DELETE",
+            ],
           }),
           {
             status: 400,

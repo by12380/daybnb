@@ -9,6 +9,7 @@ import { StarsDisplay, StarsInput } from "../components/ui/Stars.jsx";
 import { formatPrice } from "../utils/format.js";
 import { useAuth } from "../../auth/useAuth.js";
 import { supabase } from "../../lib/supabaseClient.js";
+import { syncBookingInsert } from "../../lib/algoliaSync.js";
 import { fetchReviewsForRoom, upsertRoomReview } from "../utils/roomReviews.js";
 import { createCheckoutSession, redirectToCheckout } from "../../lib/stripe.js";
 import AvailabilityCalendar from "../components/AvailabilityCalendar.jsx";
@@ -65,6 +66,7 @@ const Booking = React.memo(() => {
     loading: welcomeOfferLoading,
     calculateDiscountedPrice,
     discountPercent: welcomeDiscountPercent,
+    refetch: refetchWelcomeOffer,
   } = useWelcomeOffer();
 
   // Reviews state
@@ -452,6 +454,16 @@ const Booking = React.memo(() => {
       }
 
       setSubmitting(false);
+
+      if (insertedData) {
+        try {
+          await syncBookingInsert(insertedData);
+        } catch (syncError) {
+          console.warn("Failed to sync booking to Algolia:", syncError);
+        }
+        // Once a booking is created, remove welcome offer for future bookings
+        await refetchWelcomeOffer();
+      }
 
       // If online payment selected and there's a price, redirect to Stripe
       if (isOnlinePayment && insertedData?.id) {

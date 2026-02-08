@@ -5,6 +5,7 @@ import { supabase } from "../../lib/supabaseClient.js";
 import { formatPrice } from "../../guest/utils/format.js";
 import Button from "../../guest/components/ui/Button.jsx";
 import FormInput, { INPUT_STYLES } from "../../guest/components/ui/FormInput.jsx";
+import { syncBookingDelete, syncBookingUpdate } from "../../lib/algoliaSync.js";
 
 const BOOKINGS_TABLE = "bookings";
 
@@ -223,7 +224,7 @@ const EditBookingModal = React.memo(({ open, booking, room, onClose, onSave }) =
 
     setSaving(true);
 
-    const { error: updateError } = await supabase
+    const { data: updatedBooking, error: updateError } = await supabase
       .from(BOOKINGS_TABLE)
       .update({
         booking_date: date,
@@ -232,7 +233,9 @@ const EditBookingModal = React.memo(({ open, booking, room, onClose, onSave }) =
         total_price: totalPrice > 0 ? totalPrice : null,
         price_per_day: pricePerDay > 0 ? pricePerDay : null,
       })
-      .eq("id", booking.id);
+      .eq("id", booking.id)
+      .select()
+      .single();
 
     setSaving(false);
 
@@ -241,8 +244,16 @@ const EditBookingModal = React.memo(({ open, booking, room, onClose, onSave }) =
       return;
     }
 
+    if (updatedBooking) {
+      try {
+        await syncBookingUpdate(updatedBooking, booking);
+      } catch (syncError) {
+        console.warn("Failed to sync booking update to Algolia:", syncError);
+      }
+    }
+
     onSave();
-  }, [booking?.id, date, fullName, onSave, phone, pricePerDay, totalPrice, isDateBooked]);
+  }, [booking, booking?.id, date, fullName, onSave, phone, pricePerDay, totalPrice, isDateBooked]);
 
   return (
     <Modal
@@ -367,8 +378,14 @@ const DeleteBookingModal = React.memo(({ open, booking, room, onClose, onConfirm
       return;
     }
 
+    try {
+      await syncBookingDelete(booking);
+    } catch (syncError) {
+      console.warn("Failed to sync booking deletion to Algolia:", syncError);
+    }
+
     onConfirm();
-  }, [booking?.id, onConfirm]);
+  }, [booking, booking?.id, onConfirm]);
 
   return (
     <Modal
@@ -426,15 +443,25 @@ const ApproveBookingModal = React.memo(({ open, booking, room, onClose, onConfir
     setApproving(true);
 
     // Update booking status to approved
-    const { error: updateError } = await supabase
+    const { data: updatedBooking, error: updateError } = await supabase
       .from(BOOKINGS_TABLE)
       .update({ status: "approved" })
-      .eq("id", booking.id);
+      .eq("id", booking.id)
+      .select()
+      .single();
 
     if (updateError) {
       setError(updateError.message || "Failed to approve booking.");
       setApproving(false);
       return;
+    }
+
+    if (updatedBooking) {
+      try {
+        await syncBookingUpdate(updatedBooking, booking);
+      } catch (syncError) {
+        console.warn("Failed to sync booking approval to Algolia:", syncError);
+      }
     }
 
     // Create notification for the user
@@ -518,15 +545,25 @@ const RejectBookingModal = React.memo(({ open, booking, room, onClose, onConfirm
     setRejecting(true);
 
     // Update booking status to rejected
-    const { error: updateError } = await supabase
+    const { data: updatedBooking, error: updateError } = await supabase
       .from(BOOKINGS_TABLE)
       .update({ status: "rejected" })
-      .eq("id", booking.id);
+      .eq("id", booking.id)
+      .select()
+      .single();
 
     if (updateError) {
       setError(updateError.message || "Failed to reject booking.");
       setRejecting(false);
       return;
+    }
+
+    if (updatedBooking) {
+      try {
+        await syncBookingUpdate(updatedBooking, booking);
+      } catch (syncError) {
+        console.warn("Failed to sync booking rejection to Algolia:", syncError);
+      }
     }
 
     // Create notification for the user

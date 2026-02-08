@@ -8,6 +8,7 @@ import FormInput, { INPUT_STYLES } from "../components/ui/FormInput.jsx";
 import { formatPrice } from "../utils/format.js";
 import { useAuth } from "../../auth/useAuth.js";
 import { supabase } from "../../lib/supabaseClient.js";
+import { syncBookingDelete, syncBookingUpdate } from "../../lib/algoliaSync.js";
 
 const BOOKINGS_TABLE = "bookings";
 
@@ -203,7 +204,7 @@ const EditBookingModal = React.memo(({
 
     setSaving(true);
 
-    const { error: updateError } = await supabase
+    const { data: updatedBooking, error: updateError } = await supabase
       .from(BOOKINGS_TABLE)
       .update({
         booking_date: date,
@@ -212,7 +213,9 @@ const EditBookingModal = React.memo(({
         total_price: totalPrice > 0 ? totalPrice : null,
         price_per_day: pricePerDay > 0 ? pricePerDay : null,
       })
-      .eq("id", booking.id);
+      .eq("id", booking.id)
+      .select()
+      .single();
 
     setSaving(false);
 
@@ -221,8 +224,16 @@ const EditBookingModal = React.memo(({
       return;
     }
 
+    if (updatedBooking) {
+      try {
+        await syncBookingUpdate(updatedBooking, booking);
+      } catch (syncError) {
+        console.warn("Failed to sync booking update to Algolia:", syncError);
+      }
+    }
+
     onSave();
-  }, [booking?.id, date, fullName, onSave, phone, pricePerDay, totalPrice, isDateBooked]);
+  }, [booking, booking?.id, date, fullName, onSave, phone, pricePerDay, totalPrice, isDateBooked]);
 
   return (
     <Modal
@@ -348,8 +359,14 @@ const CancelBookingModal = React.memo(({ open, booking, room, onClose, onConfirm
       return;
     }
 
+    try {
+      await syncBookingDelete(booking);
+    } catch (syncError) {
+      console.warn("Failed to sync booking cancellation to Algolia:", syncError);
+    }
+
     onConfirm();
-  }, [booking?.id, onConfirm]);
+  }, [booking, booking?.id, onConfirm]);
 
   return (
     <Modal

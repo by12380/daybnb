@@ -157,9 +157,13 @@ const SearchFilters = React.memo(function SearchFilters({
       const typeFilters = selectedTypes.map(t => `type:${t}`).join(" OR ");
       parts.push(`(${typeFilters})`);
     }
+
+    if (selectedDate) {
+      parts.push(`NOT booked_dates:${selectedDate}`);
+    }
     
     return parts.join(" AND ");
-  }, [minPrice, maxPrice, minGuests, selectedTypes]);
+  }, [minPrice, maxPrice, minGuests, selectedTypes, selectedDate]);
 
   // Apply filters to Algolia via Configure
   useConfigure({ filters: filters || undefined });

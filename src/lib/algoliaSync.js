@@ -8,9 +8,9 @@ const FUNCTIONS_URL = SUPABASE_URL ? `${SUPABASE_URL}/functions/v1` : "";
 /**
  * Call the Algolia sync edge function
  * @param {Object} params - Sync parameters
- * @param {string} params.type - Operation type: INSERT, UPDATE, DELETE, FULL_SYNC, CONFIGURE_INDEX
- * @param {Object} [params.record] - The room record (for INSERT/UPDATE)
- * @param {Object} [params.old_record] - The old record (for DELETE)
+ * @param {string} params.type - Operation type: INSERT, UPDATE, DELETE, FULL_SYNC, CONFIGURE_INDEX, BOOKING_INSERT, BOOKING_UPDATE, BOOKING_DELETE
+ * @param {Object} [params.record] - The room or booking record (for INSERT/UPDATE)
+ * @param {Object} [params.old_record] - The old record (for DELETE/UPDATE)
  */
 export async function syncToAlgolia({ type, record, old_record }) {
   if (!FUNCTIONS_URL) {
@@ -57,6 +57,69 @@ export async function syncToAlgolia({ type, record, old_record }) {
 }
 
 /**
+ * Call the Algolia bookings sync edge function
+ * @param {Object} params - Sync parameters
+ * @param {string} params.type - Operation type: INSERT, UPDATE, DELETE, FULL_SYNC, CONFIGURE_INDEX
+ * @param {Object} [params.record] - The booking record (for INSERT/UPDATE)
+ * @param {Object} [params.old_record] - The old record (for DELETE)
+ */
+export async function syncBookingsToAlgolia({ type, record, old_record }) {
+  if (!FUNCTIONS_URL) {
+    console.warn("Supabase URL not configured, skipping Algolia bookings sync");
+    return null;
+  }
+
+  if (!supabase) {
+    console.warn("Supabase client not configured, skipping Algolia bookings sync");
+    return null;
+  }
+
+  try {
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+    if (sessionError) {
+      console.warn("Failed to get session:", sessionError);
+    }
+
+    const authToken = session?.access_token || SUPABASE_ANON_KEY;
+
+    const response = await fetch(`${FUNCTIONS_URL}/sync-bookings`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${authToken}`,
+        "apikey": SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify({ type, record, old_record }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
+      throw new Error(errorData.error || errorData.message || `Algolia bookings sync failed (${response.status})`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Algolia bookings sync error:", error);
+    throw error;
+  }
+}
+
+/**
+ * Trigger a full sync of all bookings to Algolia
+ */
+export async function fullSyncBookingsToAlgolia() {
+  return syncBookingsToAlgolia({ type: "FULL_SYNC" });
+}
+
+/**
+ * Configure Algolia bookings index settings
+ */
+export async function configureAlgoliaBookingsIndex() {
+  return syncBookingsToAlgolia({ type: "CONFIGURE_INDEX" });
+}
+
+/**
  * Trigger a full sync of all rooms to Algolia
  */
 export async function fullSyncToAlgolia() {
@@ -89,4 +152,29 @@ export async function syncRoomUpdate(room) {
  */
 export async function syncRoomDelete(roomId) {
   return syncToAlgolia({ type: "DELETE", old_record: { id: roomId } });
+}
+
+/**
+ * Sync a booking insert to Algolia
+ */
+export async function syncBookingInsert(booking) {
+  return syncToAlgolia({ type: "BOOKING_INSERT", record: booking });
+}
+
+/**
+ * Sync a booking update to Algolia
+ */
+export async function syncBookingUpdate(booking, oldBooking) {
+  return syncToAlgolia({
+    type: "BOOKING_UPDATE",
+    record: booking,
+    old_record: oldBooking,
+  });
+}
+
+/**
+ * Sync a booking delete/cancel to Algolia
+ */
+export async function syncBookingDelete(booking) {
+  return syncToAlgolia({ type: "BOOKING_DELETE", old_record: booking });
 }

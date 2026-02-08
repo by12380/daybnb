@@ -41,6 +41,7 @@ VITE_ALGOLIA_INDEX_NAME=daybnb_places
 ALGOLIA_APP_ID=your_application_id
 ALGOLIA_ADMIN_KEY=your_admin_api_key
 ALGOLIA_INDEX_NAME=daybnb_places
+ALGOLIA_BOOKINGS_INDEX_NAME=daybnb_bookings
 ```
 
 ## Step 3: Update Supabase Rooms Table
@@ -70,6 +71,7 @@ Deploy the `sync-algolia` edge function to Supabase:
 ```bash
 # From project root
 supabase functions deploy sync-algolia
+supabase functions deploy sync-bookings
 ```
 
 ## Step 5: Initial Data Sync
@@ -85,10 +87,28 @@ curl -X POST 'https://YOUR_PROJECT_REF.supabase.co/functions/v1/sync-algolia' \
   -d '{"type": "FULL_SYNC"}'
 ```
 
+To sync bookings into a separate index:
+
+```bash
+curl -X POST 'https://YOUR_PROJECT_REF.supabase.co/functions/v1/sync-bookings' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer YOUR_ANON_KEY' \
+  -d '{"type": "FULL_SYNC"}'
+```
+
 ### Option B: Configure Index Settings
 
 ```bash
 curl -X POST 'https://YOUR_PROJECT_REF.supabase.co/functions/v1/sync-algolia' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer YOUR_ANON_KEY' \
+  -d '{"type": "CONFIGURE_INDEX"}'
+```
+
+Configure the bookings index (optional but recommended):
+
+```bash
+curl -X POST 'https://YOUR_PROJECT_REF.supabase.co/functions/v1/sync-bookings' \
   -H 'Content-Type: application/json' \
   -H 'Authorization: Bearer YOUR_ANON_KEY' \
   -d '{"type": "CONFIGURE_INDEX"}'
@@ -106,6 +126,15 @@ For automatic sync when rooms are added/updated/deleted, create a database webho
    - **Table**: `rooms`
    - **Events**: INSERT, UPDATE, DELETE
    - **URL**: `https://YOUR_PROJECT_REF.supabase.co/functions/v1/sync-algolia`
+   - **HTTP Headers**: Add `Authorization: Bearer YOUR_SERVICE_ROLE_KEY`
+
+To sync bookings automatically, add another webhook:
+
+1. Create a new webhook:
+   - **Name**: `sync-bookings-to-algolia`
+   - **Table**: `bookings`
+   - **Events**: INSERT, UPDATE, DELETE
+   - **URL**: `https://YOUR_PROJECT_REF.supabase.co/functions/v1/sync-bookings`
    - **HTTP Headers**: Add `Authorization: Bearer YOUR_SERVICE_ROLE_KEY`
 
 ### Webhook Payload Format

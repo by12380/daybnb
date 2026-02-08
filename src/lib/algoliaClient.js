@@ -76,10 +76,8 @@ export function buildFilters({ minPrice, maxPrice, availableDate, startHour, end
     filters.push(`price_per_day <= ${maxPrice}`);
   }
 
-  // Note: Date availability would typically be handled by:
-  // 1. Storing available dates in Algolia as an array
-  // 2. Or checking availability in Supabase after Algolia returns results
-  // For now, we'll handle availability checking post-search via Supabase
+  // Date availability is handled via booked_dates array in Algolia.
+  // Use NOT booked_dates:YYYY-MM-DD to filter available rooms.
 
   return filters.length > 0 ? filters.join(" AND ") : "";
 }

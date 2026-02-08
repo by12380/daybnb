@@ -9,7 +9,7 @@ const LandingHero = React.memo(() => {
   }, []);
 
   return (
-    <div className="relative overflow-hidden rounded-3xl border border-border bg-gradient-to-br from-brand-50 via-panel to-panel px-6 py-14 shadow-2xl shadow-slate-200/60 transition-colors duration-300 dark:from-brand-600/10 dark:shadow-black/30">
+    <div className="relative overflow rounded-3xl border border-border bg-gradient-to-br from-brand-50 via-panel to-panel px-6 py-14 shadow-2xl shadow-slate-200/60 transition-colors duration-300 dark:from-brand-600/10 dark:shadow-black/30">
       <div className="absolute -right-24 -top-24 h-64 w-64 rounded-full bg-brand-200/60 blur-3xl dark:bg-brand-500/20" />
       <div className="absolute -bottom-24 -left-24 h-64 w-64 rounded-full bg-accent-100 blur-3xl dark:bg-accent-500/10" />
       <div className="relative">

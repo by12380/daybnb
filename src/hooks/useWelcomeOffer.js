@@ -4,7 +4,7 @@ import { supabase } from "../lib/supabaseClient.js";
 
 // Welcome offer configuration
 export const WELCOME_DISCOUNT_PERCENT = 10;
-export const WELCOME_OFFER_BOOKINGS_LIMIT = 1; // Offer valid until first booking is completed
+export const WELCOME_OFFER_BOOKINGS_LIMIT = 1; // Offer valid until first booking is created
 
 /**
  * Hook to manage welcome offer for new users
@@ -14,7 +14,7 @@ export function useWelcomeOffer() {
   const { user, loading: authLoading } = useAuth();
   const [isEligible, setIsEligible] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [completedBookingsCount, setCompletedBookingsCount] = useState(0);
+  const [bookingsCount, setBookingsCount] = useState(0);
   const [hasUsedOffer, setHasUsedOffer] = useState(false);
 
   const checkEligibility = useCallback(async () => {
@@ -27,12 +27,12 @@ export function useWelcomeOffer() {
     setLoading(true);
 
     try {
-      // Check how many completed/paid bookings the user has
+      // Check how many total bookings the user has
       const { data: bookings, error } = await supabase
         .from("bookings")
-        .select("id, payment_status, status")
+        .select("id")
         .eq("user_id", user.id)
-        .or("payment_status.eq.paid,status.eq.confirmed,status.eq.approved");
+        .limit(WELCOME_OFFER_BOOKINGS_LIMIT);
 
       if (error) {
         console.error("Error checking welcome offer eligibility:", error);
@@ -42,12 +42,12 @@ export function useWelcomeOffer() {
         return;
       }
 
-      const completedCount = (bookings || []).length;
-      setCompletedBookingsCount(completedCount);
+      const totalCount = (bookings || []).length;
+      setBookingsCount(totalCount);
 
-      // User is eligible if they have no completed bookings
+      // User is eligible if they have no bookings at all
       // New users with 0 bookings get the 10% discount
-      const eligible = completedCount < WELCOME_OFFER_BOOKINGS_LIMIT;
+      const eligible = totalCount < WELCOME_OFFER_BOOKINGS_LIMIT;
       setIsEligible(eligible);
       setHasUsedOffer(!eligible);
     } catch (err) {
@@ -93,7 +93,7 @@ export function useWelcomeOffer() {
   return {
     isEligible,
     loading: authLoading || loading,
-    completedBookingsCount,
+    bookingsCount,
     hasUsedOffer,
     discountPercent: WELCOME_DISCOUNT_PERCENT,
     calculateDiscountedPrice,

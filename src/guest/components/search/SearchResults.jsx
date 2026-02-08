@@ -8,7 +8,6 @@ import { useAuth } from "../../../auth/useAuth.js";
 import { fetchLikedRoomIds, likeRoom, unlikeRoom } from "../../utils/roomLikes.js";
 import { supabase } from "../../../lib/supabaseClient.js";
 import {
-  fetchMultipleRoomsBookingsForDate,
   getRoomAvailabilityStatus,
 } from "../../utils/roomAvailability.js";
 
@@ -173,12 +172,12 @@ function SearchResultCard({ hit, onBook, liked, onToggleLike, availability }) {
           <AvailabilityBadge status={availability.status} message={availability.message} />
         )}
 
-        {(hit.price_per_day || hit.price_per_hour) > 0 && (
-          <p className="text-lg font-semibold text-brand-700 dark:text-brand-400">
-            {formatPrice(hit.price_per_day || hit.price_per_hour)}
-            <span className="text-xs font-normal text-muted dark:text-dark-muted">/day</span>
-          </p>
-        )}
+        <p className="text-lg font-semibold text-brand-700 dark:text-brand-400">
+          {formatPrice(hit.price_per_day || hit.price_per_hour || 0)}
+          <span className="text-xs font-normal text-muted dark:text-dark-muted">
+            /{hit.price_per_day ? "day" : "hour"}
+          </span>
+        </p>
 
         {tags.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
@@ -442,8 +441,7 @@ function SearchResults({ selectedDate }) {
   const { items, results } = useHits();
 
   const [likedIds, setLikedIds] = useState(() => new Set());
-  const [roomAvailability, setRoomAvailability] = useState({});
-  const [loadingAvailability, setLoadingAvailability] = useState(false);
+  const [sortOrder, setSortOrder] = useState("none");
 
   // Get search state from results
   const isLoading = !results;
@@ -474,39 +472,32 @@ function SearchResults({ selectedDate }) {
     };
   }, [user?.id]);
 
-  // Fetch availability for all rooms when date is selected
-  useEffect(() => {
-    let cancelled = false;
+  const roomAvailability = useMemo(() => {
+    if (!selectedDate || !items || items.length === 0) return {};
 
-    async function loadAvailability() {
-      if (!selectedDate || !items || items.length === 0) {
-        setRoomAvailability({});
-        return;
-      }
-
-      setLoadingAvailability(true);
-      
-      const roomIds = items.map((hit) => hit.objectID).filter(Boolean);
-      const bookingsByRoom = await fetchMultipleRoomsBookingsForDate(roomIds, selectedDate);
-
-      if (cancelled) return;
-
-      // Calculate availability status for each room (date-based)
-      const availability = {};
-      for (const roomId of roomIds) {
-        const isBooked = !!bookingsByRoom[roomId];
-        availability[roomId] = getRoomAvailabilityStatus(isBooked ? [{ id: roomId }] : []);
-      }
-
-      setRoomAvailability(availability);
-      setLoadingAvailability(false);
+    const availability = {};
+    for (const hit of items) {
+      const bookedDates = hit.booked_dates || [];
+      const isBooked = bookedDates.includes(selectedDate);
+      availability[hit.objectID] = getRoomAvailabilityStatus(
+        isBooked ? [{ id: hit.objectID }] : []
+      );
     }
+    return availability;
+  }, [items, selectedDate]);
 
-    loadAvailability();
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedDate, items]);
+  const sortedItems = useMemo(() => {
+    if (!items || items.length === 0) return [];
+    if (sortOrder === "none") return items;
+
+    const copy = [...items];
+    copy.sort((a, b) => {
+      const priceA = a.price_per_day ?? a.price_per_hour ?? 0;
+      const priceB = b.price_per_day ?? b.price_per_hour ?? 0;
+      return sortOrder === "asc" ? priceA - priceB : priceB - priceA;
+    });
+    return copy;
+  }, [items, sortOrder]);
 
   const handleBook = useCallback(
     (hit) => {
@@ -562,8 +553,8 @@ function SearchResults({ selectedDate }) {
 
   return (
     <div className="space-y-4">
-      {/* Results count */}
-      <div className="flex items-center justify-between">
+      {/* Results count + sort */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted dark:text-dark-muted">
           Found <span className="font-semibold text-ink dark:text-dark-ink">{nbHits}</span>{" "}
           {nbHits === 1 ? "place" : "places"}
@@ -574,18 +565,46 @@ function SearchResults({ selectedDate }) {
             </>
           )}
         </p>
+        <div className="flex items-center gap-2 text-xs">
+          <span className="text-muted dark:text-dark-muted">Sort by price</span>
+          <button
+            type="button"
+            onClick={() => setSortOrder("asc")}
+            className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
+              sortOrder === "asc"
+                ? "border-brand-500 bg-brand-50 text-brand-700 dark:border-brand-400 dark:bg-brand-900/30 dark:text-brand-300"
+                : "border-border bg-surface/60 text-muted hover:border-brand-200 hover:text-ink dark:border-dark-border dark:bg-dark-surface/60 dark:text-dark-muted dark:hover:border-brand-700"
+            }`}
+          >
+            Low to High
+          </button>
+          <button
+            type="button"
+            onClick={() => setSortOrder("desc")}
+            className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
+              sortOrder === "desc"
+                ? "border-brand-500 bg-brand-50 text-brand-700 dark:border-brand-400 dark:bg-brand-900/30 dark:text-brand-300"
+                : "border-border bg-surface/60 text-muted hover:border-brand-200 hover:text-ink dark:border-dark-border dark:bg-dark-surface/60 dark:text-dark-muted dark:hover:border-brand-700"
+            }`}
+          >
+            High to Low
+          </button>
+          <button
+            type="button"
+            onClick={() => setSortOrder("none")}
+            className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
+              sortOrder === "none"
+                ? "border-brand-500 bg-brand-50 text-brand-700 dark:border-brand-400 dark:bg-brand-900/30 dark:text-brand-300"
+                : "border-border bg-surface/60 text-muted hover:border-brand-200 hover:text-ink dark:border-dark-border dark:bg-dark-surface/60 dark:text-dark-muted dark:hover:border-brand-700"
+            }`}
+          >
+            Default
+          </button>
+        </div>
       </div>
 
-      {/* Availability loading indicator */}
-      {selectedDate && loadingAvailability && (
-        <div className="flex items-center gap-2 rounded-lg bg-brand-50 px-4 py-2 text-sm text-brand-700 dark:bg-brand-900/30 dark:text-brand-300">
-          <div className="h-4 w-4 animate-spin rounded-full border-2 border-brand-300 border-t-brand-600" />
-          Checking availability for {selectedDate}...
-        </div>
-      )}
-
       {/* Date filter active indicator */}
-      {selectedDate && !loadingAvailability && (
+      {selectedDate && (
         <div className="flex items-center gap-2 rounded-lg bg-blue-50 px-4 py-2 text-sm text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -596,7 +615,7 @@ function SearchResults({ selectedDate }) {
 
       {/* Results grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {items.map((hit) => (
+        {sortedItems.map((hit) => (
           <SearchResultCard
             key={hit.objectID}
             hit={hit}

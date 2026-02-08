@@ -222,8 +222,7 @@ const LandingGallery = React.memo(({ location = "", guests = 0 }) => {
             loading={loading}
           />
         </div>
-      )}
-    </div>
+      )}    </div>
   );
 });
 
