@@ -1,32 +1,30 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
 import Card from "../components/ui/Card.jsx";
 import RoomCard from "../components/RoomCard.jsx";
 import { useAuth } from "../../auth/useAuth.js";
-import { supabase } from "../../lib/supabaseClient.js";
+import { fetchRooms } from "../../redux/slices/roomSlice.js";
 import { fetchLikedRoomIds, likeRoom, unlikeRoom } from "../utils/roomLikes.js";
 import { fetchRatingsForRooms } from "../utils/roomReviews.js";
 
 const LikedRooms = React.memo(() => {
+  const dispatch = useDispatch();
   const { user } = useAuth();
 
+  const { rooms: allRooms, loading: roomsLoading } = useSelector((state) => state.rooms);
+
   const [likedIds, setLikedIds] = useState(() => new Set());
-  const [rooms, setRooms] = useState([]);
   const [ratingsByRoomId, setRatingsByRoomId] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  // Fetch all rooms via API and liked IDs
   useEffect(() => {
     let cancelled = false;
 
     async function load() {
       setError("");
       setLoading(true);
-
-      if (!supabase) {
-        setError("Supabase not configured.");
-        setLoading(false);
-        return;
-      }
 
       if (!user?.id) {
         setError("You must be signed in to view liked rooms.");
@@ -35,53 +33,55 @@ const LikedRooms = React.memo(() => {
       }
 
       try {
-        const ids = await fetchLikedRoomIds(user.id);
+        // Fetch liked room IDs via backend API
+        const ids = await fetchLikedRoomIds();
         if (cancelled) return;
         setLikedIds(ids);
 
-        const list = [...ids];
-        if (!list.length) {
-          setRooms([]);
-          setRatingsByRoomId({});
-          setLoading(false);
-          return;
-        }
+        // Fetch all rooms via backend API
+        await dispatch(fetchRooms({ limit: 200 }));
 
-        const { data: roomsData, error: roomsError } = await supabase
-          .from("rooms")
-          .select("*")
-          .in("id", list);
-
-        if (roomsError) throw roomsError;
         if (cancelled) return;
-
-        const fetched = roomsData || [];
-        setRooms(fetched);
-
-        try {
-          const ratingMap = await fetchRatingsForRooms(fetched.map((r) => r.id).filter(Boolean));
-          if (!cancelled) setRatingsByRoomId(ratingMap || {});
-        } catch (e) {
-          console.warn("Failed to load ratings:", e);
-        }
+        setLoading(false);
       } catch (e) {
         if (!cancelled) setError(e.message || "Failed to load liked rooms.");
-      } finally {
         if (!cancelled) setLoading(false);
       }
     }
 
     load();
-    return () => {
-      cancelled = true;
-    };
-  }, [user?.id]);
+    return () => { cancelled = true; };
+  }, [dispatch, user?.id]);
+
+  // Filter rooms to only liked ones
+  const likedRooms = useMemo(() => {
+    if (!likedIds.size) return [];
+    return (allRooms || []).filter((r) => likedIds.has(r.id));
+  }, [allRooms, likedIds]);
+
+  // Fetch ratings for liked rooms
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadRatings() {
+      const ids = likedRooms.map((r) => r.id).filter(Boolean);
+      if (!ids.length) { setRatingsByRoomId({}); return; }
+
+      try {
+        const ratingMap = await fetchRatingsForRooms(ids);
+        if (!cancelled) setRatingsByRoomId(ratingMap || {});
+      } catch (e) {
+        console.warn("Failed to load ratings:", e);
+      }
+    }
+
+    loadRatings();
+    return () => { cancelled = true; };
+  }, [likedRooms]);
 
   const items = useMemo(() => {
-    // Keep a stable ordering: newest like first would require created_at from room_likes.
-    // For now, sort by title.
-    return [...(rooms || [])].sort((a, b) => String(a?.title || "").localeCompare(String(b?.title || "")));
-  }, [rooms]);
+    return [...likedRooms].sort((a, b) => String(a?.title || "").localeCompare(String(b?.title || "")));
+  }, [likedRooms]);
 
   const toggleLike = async (room) => {
     if (!room?.id || !user?.id) return;
@@ -95,20 +95,19 @@ const LikedRooms = React.memo(() => {
       else next.add(room.id);
       return next;
     });
-    setRooms((prev) => (isLiked ? (prev || []).filter((r) => r.id !== room.id) : prev));
 
     try {
-      if (isLiked) await unlikeRoom({ userId: user.id, roomId: room.id });
-      else await likeRoom({ userId: user.id, roomId: room.id });
+      if (isLiked) await unlikeRoom({ roomId: room.id });
+      else await likeRoom({ roomId: room.id });
     } catch (e) {
       console.warn("Failed to toggle like:", e);
     }
   };
 
-  if (loading) {
+  if (loading || roomsLoading) {
     return (
       <Card>
-        <p className="text-sm font-semibold text-ink">Loading liked rooms…</p>
+        <p className="text-sm font-semibold text-ink">Loading liked rooms...</p>
         <p className="mt-1 text-sm text-muted">Fetching your saved rooms.</p>
       </Card>
     );
@@ -117,7 +116,7 @@ const LikedRooms = React.memo(() => {
   if (error) {
     return (
       <Card>
-        <p className="text-sm font-semibold text-ink">Couldn’t load liked rooms</p>
+        <p className="text-sm font-semibold text-ink">Couldn't load liked rooms</p>
         <p className="mt-1 text-sm text-red-600">{error}</p>
       </Card>
     );
@@ -128,7 +127,7 @@ const LikedRooms = React.memo(() => {
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-700">Liked</p>
         <h1 className="mt-1 text-2xl font-semibold text-ink">Liked rooms</h1>
-        <p className="mt-1 text-sm text-muted">All the rooms you’ve saved for later.</p>
+        <p className="mt-1 text-sm text-muted">All the rooms you've saved for later.</p>
       </div>
 
       {items.length === 0 ? (
@@ -159,4 +158,3 @@ const LikedRooms = React.memo(() => {
 });
 
 export default LikedRooms;
-

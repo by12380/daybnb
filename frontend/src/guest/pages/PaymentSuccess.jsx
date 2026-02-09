@@ -1,46 +1,27 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
 import Card from "../components/ui/Card.jsx";
 import Button from "../components/ui/Button.jsx";
-import { supabase } from "../../lib/supabaseClient.js";
+import { fetchBookingById, clearSelectedBooking } from "../../redux/slices/bookingSlice.js";
 
 const PaymentSuccess = () => {
+  const dispatch = useDispatch();
   const [searchParams] = useSearchParams();
   const bookingId = searchParams.get("booking_id");
-  const sessionId = searchParams.get("session_id");
-  
-  const [booking, setBooking] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+
+  const { selectedBooking: booking, loading, error } = useSelector(
+    (state) => state.bookings
+  );
 
   useEffect(() => {
-    async function fetchBooking() {
-      if (!bookingId || !supabase) {
-        setLoading(false);
-        return;
-      }
-
-      try {
-        const { data, error: fetchError } = await supabase
-          .from("bookings")
-          .select("*, rooms(title, location, image)")
-          .eq("id", bookingId)
-          .maybeSingle();
-
-        if (fetchError) {
-          setError(fetchError.message);
-        } else {
-          setBooking(data);
-        }
-      } catch (err) {
-        setError(err.message || "Failed to fetch booking");
-      } finally {
-        setLoading(false);
-      }
+    if (bookingId) {
+      dispatch(fetchBookingById(bookingId));
     }
-
-    fetchBooking();
-  }, [bookingId]);
+    return () => {
+      dispatch(clearSelectedBooking());
+    };
+  }, [dispatch, bookingId]);
 
   if (loading) {
     return (
@@ -60,43 +41,18 @@ const PaymentSuccess = () => {
       <Card className="max-w-lg text-center">
         {/* Success Icon */}
         <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
-          <svg
-            className="h-10 w-10 text-green-600 dark:text-green-400"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M5 13l4 4L19 7"
-            />
+          <svg className="h-10 w-10 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
         </div>
 
-        <h1 className="mt-6 text-2xl font-bold text-ink dark:text-dark-ink">
-          Payment Successful!
-        </h1>
-        
-        <p className="mt-2 text-muted dark:text-dark-muted">
-          Your booking has been confirmed and payment received.
-        </p>
+        <h1 className="mt-6 text-2xl font-bold text-ink dark:text-dark-ink">Payment Successful!</h1>
+        <p className="mt-2 text-muted dark:text-dark-muted">Your booking has been confirmed and payment received.</p>
 
         {booking && (
           <div className="mt-6 rounded-xl border border-border bg-surface/50 p-4 text-left dark:border-dark-border dark:bg-dark-surface/50">
-            <p className="text-sm font-semibold text-ink dark:text-dark-ink">
-              Booking Details
-            </p>
+            <p className="text-sm font-semibold text-ink dark:text-dark-ink">Booking Details</p>
             <div className="mt-3 space-y-2 text-sm">
-              {booking.rooms?.title && (
-                <div className="flex justify-between">
-                  <span className="text-muted dark:text-dark-muted">Room</span>
-                  <span className="font-medium text-ink dark:text-dark-ink">
-                    {booking.rooms.title}
-                  </span>
-                </div>
-              )}
               {booking.booking_date && (
                 <div className="flex justify-between">
                   <span className="text-muted dark:text-dark-muted">Date</span>
@@ -117,19 +73,11 @@ const PaymentSuccess = () => {
           </div>
         )}
 
-        {error && (
-          <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p>
-        )}
+        {error && <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p>}
 
         <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
-          <Link to="/my-bookings">
-            <Button className="w-full sm:w-auto">View My Bookings</Button>
-          </Link>
-          <Link to="/">
-            <Button variant="outline" className="w-full sm:w-auto">
-              Back to Home
-            </Button>
-          </Link>
+          <Link to="/my-bookings"><Button className="w-full sm:w-auto">View My Bookings</Button></Link>
+          <Link to="/"><Button variant="outline" className="w-full sm:w-auto">Back to Home</Button></Link>
         </div>
 
         <p className="mt-6 text-xs text-muted dark:text-dark-muted">

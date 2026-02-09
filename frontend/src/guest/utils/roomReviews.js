@@ -1,6 +1,4 @@
-import { supabase } from "../../lib/supabaseClient.js";
-
-export const ROOM_REVIEWS_TABLE = "room_reviews";
+import api from "../../redux/api.js";
 
 export function summarizeRatings(rows) {
   const map = {};
@@ -22,41 +20,12 @@ export function summarizeRatings(rows) {
   return out;
 }
 
-export async function fetchReviewsForRoom(roomId) {
-  if (!supabase) throw new Error("Supabase not configured.");
-  const { data, error } = await supabase
-    .from(ROOM_REVIEWS_TABLE)
-    .select("id, room_id, user_id, user_full_name, user_email, rating, note, created_at")
-    .eq("room_id", roomId)
-    .order("created_at", { ascending: false });
-  if (error) throw error;
-  return data || [];
-}
-
 export async function fetchRatingsForRooms(roomIds) {
-  if (!supabase) throw new Error("Supabase not configured.");
   if (!roomIds?.length) return {};
 
-  const { data, error } = await supabase
-    .from(ROOM_REVIEWS_TABLE)
-    .select("room_id, rating")
-    .in("room_id", roomIds);
+  const { data } = await api.post("/reviews/ratings", {
+    room_ids: roomIds,
+  });
 
-  if (error) throw error;
-  return summarizeRatings(data || []);
+  return data.ratings || {};
 }
-
-export async function upsertRoomReview(payload) {
-  if (!supabase) throw new Error("Supabase not configured.");
-
-  // Requires a UNIQUE constraint on (user_id, room_id) to work reliably.
-  const { data, error } = await supabase
-    .from(ROOM_REVIEWS_TABLE)
-    .upsert(payload, { onConflict: "user_id,room_id" })
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
-}
-

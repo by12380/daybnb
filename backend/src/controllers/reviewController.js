@@ -66,6 +66,51 @@ exports.upsert = asyncHandler(async (req, res) => {
 });
 
 /**
+ * POST /api/reviews/ratings
+ * Get average rating and count for multiple rooms (public).
+ * Body: { room_ids: ["id1", "id2", ...] }
+ */
+exports.getBatchRatings = asyncHandler(async (req, res) => {
+  if (!supabase) throw ApiError.internal("Supabase is not configured");
+
+  const { room_ids } = req.body;
+
+  if (!Array.isArray(room_ids) || !room_ids.length) {
+    return res.json({ ratings: {} });
+  }
+
+  const ids = room_ids.map((id) => String(id).trim()).filter(Boolean);
+
+  const { data, error } = await supabase
+    .from("room_reviews")
+    .select("room_id, rating")
+    .in("room_id", ids);
+
+  if (error) throw ApiError.internal(error.message);
+
+  // Summarise into { [room_id]: { avg, count } }
+  const map = {};
+  for (const r of data || []) {
+    const roomId = r.room_id;
+    const rating = Number(r.rating);
+    if (!roomId || !Number.isFinite(rating)) continue;
+    if (!map[roomId]) map[roomId] = { sum: 0, count: 0 };
+    map[roomId].sum += rating;
+    map[roomId].count += 1;
+  }
+
+  const ratings = {};
+  for (const [roomId, v] of Object.entries(map)) {
+    ratings[roomId] = {
+      avg: v.count ? v.sum / v.count : 0,
+      count: v.count,
+    };
+  }
+
+  res.json({ ratings });
+});
+
+/**
  * DELETE /api/reviews/:id
  * Delete a review (admin or review owner).
  */

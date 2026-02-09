@@ -1,9 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
 import { Calendar } from "antd";
 import dayjs from "dayjs";
-import { supabase } from "../../lib/supabaseClient.js";
-
-const BOOKINGS_TABLE = "bookings";
+import { fetchAvailability } from "../../redux/slices/bookingSlice.js";
 
 const AvailabilityCalendar = React.memo(function AvailabilityCalendar({
   roomId,
@@ -11,49 +10,24 @@ const AvailabilityCalendar = React.memo(function AvailabilityCalendar({
   onDateSelect,
   className = "",
 }) {
-  const [monthBookings, setMonthBookings] = useState({});
-  const [loading, setLoading] = useState(false);
+  const dispatch = useDispatch();
+  const { bookedDates, loading } = useSelector((state) => state.bookings);
   const [currentMonth, setCurrentMonth] = useState(dayjs());
 
-  // Fetch bookings for the visible month
-  const fetchMonthBookings = useCallback(async (month) => {
-    if (!roomId || !supabase) return;
-
-    setLoading(true);
-    const startOfMonth = month.startOf("month").format("YYYY-MM-DD");
-    const endOfMonth = month.endOf("month").format("YYYY-MM-DD");
-
-    const { data, error } = await supabase
-      .from(BOOKINGS_TABLE)
-      .select("id, booking_date, status")
-      .eq("room_id", roomId)
-      .gte("booking_date", startOfMonth)
-      .lte("booking_date", endOfMonth)
-      .in("status", ["pending", "approved", "confirmed"]);
-
-    if (error) {
-      console.error("Error fetching month bookings:", error);
-      setMonthBookings({});
-    } else {
-      // Group bookings by date - just track if date is booked
-      const grouped = {};
-      (data || []).forEach((booking) => {
-        grouped[booking.booking_date] = true;
-      });
-      setMonthBookings(grouped);
-    }
-    setLoading(false);
-  }, [roomId]);
-
+  // Fetch booked dates for the room
   useEffect(() => {
-    fetchMonthBookings(currentMonth);
-  }, [currentMonth, fetchMonthBookings]);
+    if (roomId) {
+      dispatch(fetchAvailability(roomId));
+    }
+  }, [dispatch, roomId]);
+
+  // Build a Set for fast lookup
+  const bookedSet = useMemo(() => new Set(bookedDates || []), [bookedDates]);
 
   // Check if a date is booked
   const isDateBooked = useCallback((date) => {
-    const dateStr = date.format("YYYY-MM-DD");
-    return !!monthBookings[dateStr];
-  }, [monthBookings]);
+    return bookedSet.has(date.format("YYYY-MM-DD"));
+  }, [bookedSet]);
 
   // Custom date cell renderer
   const dateCellRender = useCallback((date) => {
@@ -61,18 +35,9 @@ const AvailabilityCalendar = React.memo(function AvailabilityCalendar({
     if (isPast) return null;
 
     const isBooked = isDateBooked(date);
-    
-    if (isBooked) {
-      return (
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="h-2 w-2 rounded-full bg-red-500" title="Booked" />
-        </div>
-      );
-    }
-
     return (
       <div className="absolute inset-0 flex items-center justify-center">
-        <div className="h-2 w-2 rounded-full bg-green-500" title="Available" />
+        <div className={`h-2 w-2 rounded-full ${isBooked ? "bg-red-500" : "bg-green-500"}`} title={isBooked ? "Booked" : "Available"} />
       </div>
     );
   }, [isDateBooked]);
@@ -81,12 +46,9 @@ const AvailabilityCalendar = React.memo(function AvailabilityCalendar({
   const handleDateSelect = useCallback((date) => {
     if (date.isBefore(dayjs(), "day")) return;
     const dateStr = date.format("YYYY-MM-DD");
-    // Check if date is already booked
-    if (monthBookings[dateStr]) {
-      return; // Don't allow selecting booked dates
-    }
+    if (bookedSet.has(dateStr)) return;
     onDateSelect?.(dateStr);
-  }, [onDateSelect, monthBookings]);
+  }, [onDateSelect, bookedSet]);
 
   // Handle month change
   const handlePanelChange = useCallback((date) => {
@@ -96,12 +58,9 @@ const AvailabilityCalendar = React.memo(function AvailabilityCalendar({
   // Disable booked dates and past dates
   const disabledDate = useCallback((current) => {
     if (!current) return false;
-    // Disable past dates
     if (current < dayjs().startOf("day")) return true;
-    // Disable already booked dates
-    const dateStr = current.format("YYYY-MM-DD");
-    return !!monthBookings[dateStr];
-  }, [monthBookings]);
+    return bookedSet.has(current.format("YYYY-MM-DD"));
+  }, [bookedSet]);
 
   return (
     <div className={`availability-calendar ${className}`}>
@@ -127,11 +86,7 @@ const AvailabilityCalendar = React.memo(function AvailabilityCalendar({
           disabledDate={disabledDate}
           cellRender={(current, info) => {
             if (info.type === "date") {
-              return (
-                <div className="relative h-full w-full">
-                  {dateCellRender(current)}
-                </div>
-              );
+              return <div className="relative h-full w-full">{dateCellRender(current)}</div>;
             }
             return info.originNode;
           }}
@@ -139,20 +94,15 @@ const AvailabilityCalendar = React.memo(function AvailabilityCalendar({
       </div>
 
       {loading && (
-        <p className="mt-2 text-center text-xs text-muted dark:text-dark-muted">
-          Loading availability...
-        </p>
+        <p className="mt-2 text-center text-xs text-muted dark:text-dark-muted">Loading availability...</p>
       )}
 
-      {/* Selected date info */}
       {selectedDate && (
         <div className="mt-4 rounded-xl border border-green-200 bg-green-50 p-3 dark:border-green-800 dark:bg-green-900/20">
           <p className="text-sm font-medium text-green-800 dark:text-green-200">
             Selected: {dayjs(selectedDate).format("MMMM D, YYYY")}
           </p>
-          <p className="mt-0.5 text-xs text-green-700 dark:text-green-300">
-            This date is available for booking
-          </p>
+          <p className="mt-0.5 text-xs text-green-700 dark:text-green-300">This date is available for booking</p>
         </div>
       )}
     </div>

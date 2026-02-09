@@ -6,7 +6,6 @@ import Button from "../ui/Button.jsx";
 import { formatPrice } from "../../utils/format.js";
 import { useAuth } from "../../../auth/useAuth.js";
 import { fetchLikedRoomIds, likeRoom, unlikeRoom } from "../../utils/roomLikes.js";
-import { supabase } from "../../../lib/supabaseClient.js";
 import {
   getRoomAvailabilityStatus,
 } from "../../utils/roomAvailability.js";
@@ -453,13 +452,13 @@ function SearchResults({ selectedDate }) {
     let cancelled = false;
 
     async function loadLikes() {
-      if (!user?.id || !supabase) {
+      if (!user?.id) {
         setLikedIds(new Set());
         return;
       }
 
       try {
-        const set = await fetchLikedRoomIds(user.id);
+        const set = await fetchLikedRoomIds();
         if (!cancelled) setLikedIds(set);
       } catch (e) {
         console.warn("Failed to load likes:", e);
@@ -527,8 +526,8 @@ function SearchResults({ selectedDate }) {
       });
 
       try {
-        if (isLiked) await unlikeRoom({ userId: user.id, roomId });
-        else await likeRoom({ userId: user.id, roomId });
+        if (isLiked) await unlikeRoom({ roomId });
+        else await likeRoom({ roomId });
       } catch (e) {
         // Revert on failure
         setLikedIds((prev) => {

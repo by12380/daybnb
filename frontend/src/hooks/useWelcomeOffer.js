@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "../auth/useAuth.js";
-import { supabase } from "../lib/supabaseClient.js";
+import api from "../redux/api.js";
 
 // Welcome offer configuration
 export const WELCOME_DISCOUNT_PERCENT = 10;
@@ -18,7 +18,7 @@ export function useWelcomeOffer() {
   const [hasUsedOffer, setHasUsedOffer] = useState(false);
 
   const checkEligibility = useCallback(async () => {
-    if (!user?.id || !supabase) {
+    if (!user?.id) {
       setIsEligible(false);
       setLoading(false);
       return;
@@ -27,22 +27,13 @@ export function useWelcomeOffer() {
     setLoading(true);
 
     try {
-      // Check how many total bookings the user has
-      const { data: bookings, error } = await supabase
-        .from("bookings")
-        .select("id")
-        .eq("user_id", user.id)
-        .limit(WELCOME_OFFER_BOOKINGS_LIMIT);
+      // Check how many total bookings the user has via backend API
+      const { data } = await api.get("/bookings", {
+        params: { limit: WELCOME_OFFER_BOOKINGS_LIMIT },
+      });
 
-      if (error) {
-        console.error("Error checking welcome offer eligibility:", error);
-        // If error, assume new user is eligible (fail-open for better UX)
-        setIsEligible(true);
-        setLoading(false);
-        return;
-      }
-
-      const totalCount = (bookings || []).length;
+      const bookings = data.bookings || [];
+      const totalCount = bookings.length;
       setBookingsCount(totalCount);
 
       // User is eligible if they have no bookings at all
@@ -51,8 +42,9 @@ export function useWelcomeOffer() {
       setIsEligible(eligible);
       setHasUsedOffer(!eligible);
     } catch (err) {
-      console.error("Error in welcome offer check:", err);
-      setIsEligible(false);
+      console.error("Error checking welcome offer eligibility:", err);
+      // If error, assume new user is eligible (fail-open for better UX)
+      setIsEligible(true);
     } finally {
       setLoading(false);
     }

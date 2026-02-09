@@ -8,6 +8,7 @@ const reviewRoutes = require("./reviews");
 const notificationRoutes = require("./notifications");
 const contactRoutes = require("./contact");
 const stripeRoutes = require("./stripe");
+const likesRoutes = require("./likes");
 
 const router = Router();
 
@@ -19,5 +20,6 @@ router.use("/reviews", reviewRoutes);
 router.use("/notifications", notificationRoutes);
 router.use("/contact", contactRoutes);
 router.use("/stripe", stripeRoutes);
+router.use("/likes", likesRoutes);
 
 module.exports = router;

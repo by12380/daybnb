@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import LandingHero from "../sections/LandingHero.jsx";
 import LandingGallery from "../sections/LandingGallery.jsx";
 import LandingSearch from "../sections/LandingSearch.jsx";
-import LandingGeoSearch from "../sections/LandingGeoSearch.jsx";
 import LandingFeatures from "../sections/LandingFeatures.jsx";
 import LandingCategories from "../sections/LandingCategories.jsx";
 import LandingHowItWorks from "../sections/LandingHowItWorks.jsx";
@@ -11,7 +10,6 @@ import LandingTestimonials from "../sections/LandingTestimonials.jsx";
 import LandingCTA from "../sections/LandingCTA.jsx";
 import WelcomeOfferBanner from "../components/WelcomeOfferBanner.jsx";
 import { useProfile } from "../../auth/useProfile.js";
-import { isAlgoliaConfigured } from "../../lib/algoliaClient.js";
 
 const Landing = React.memo(() => {
   const navigate = useNavigate();
@@ -54,21 +52,12 @@ const Landing = React.memo(() => {
         <LandingHero />
       </section>
       
-      {/* Show GeoSearch if Algolia is configured, otherwise show Supabase gallery */}
-      {isAlgoliaConfigured ? (
-        <section id="geosearch" className="py-8">
-          <LandingGeoSearch />
-        </section>
-      ) : (
-        <>
-          <section id="search" className="py-8">
-            <LandingSearch onSearch={onSearch} />
-          </section>
-          <section id="gallery" className="py-8">
-            <LandingGallery location={location} guests={guests} />
-          </section>
-        </>
-      )}
+      <section id="search" className="py-8">
+        <LandingSearch onSearch={onSearch} />
+      </section>
+      <section id="gallery" className="py-8">
+        <LandingGallery location={location} guests={guests} />
+      </section>
       
       <section id="features" className="py-8">
         <LandingFeatures />

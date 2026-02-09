@@ -39,6 +39,43 @@ export const markAllNotificationsRead = createAsyncThunk(
   }
 );
 
+export const fetchAdminNotifications = createAsyncThunk(
+  "notifications/fetchAdmin",
+  async (_, { rejectWithValue }) => {
+    try {
+      const { data } = await api.get("/notifications/admin");
+      return data;
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
+export const deleteNotification = createAsyncThunk(
+  "notifications/delete",
+  async (id, { rejectWithValue }) => {
+    try {
+      await api.delete(`/notifications/${id}`);
+      return id;
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
+export const deleteAllNotifications = createAsyncThunk(
+  "notifications/deleteAll",
+  async (role, { rejectWithValue }) => {
+    try {
+      const params = role ? { role } : {};
+      await api.delete("/notifications/all", { params });
+      return null;
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
 // ─── Slice ───────────────────────────────────────────────────
 
 const initialState = {
@@ -99,6 +136,46 @@ const notificationSlice = createSlice({
         state.unreadCount = 0;
       })
       .addCase(markAllNotificationsRead.rejected, (state, action) => {
+        state.error = action.payload;
+      });
+
+    // Fetch admin notifications
+    builder
+      .addCase(fetchAdminNotifications.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchAdminNotifications.fulfilled, (state, action) => {
+        state.loading = false;
+        state.notifications = action.payload.notifications;
+        state.unreadCount = action.payload.notifications.filter(
+          (n) => !n.read
+        ).length;
+      })
+      .addCase(fetchAdminNotifications.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      });
+
+    // Delete single notification
+    builder
+      .addCase(deleteNotification.fulfilled, (state, action) => {
+        state.notifications = state.notifications.filter(
+          (n) => n.id !== action.payload
+        );
+        state.unreadCount = state.notifications.filter((n) => !n.read).length;
+      })
+      .addCase(deleteNotification.rejected, (state, action) => {
+        state.error = action.payload;
+      });
+
+    // Delete all notifications
+    builder
+      .addCase(deleteAllNotifications.fulfilled, (state) => {
+        state.notifications = [];
+        state.unreadCount = 0;
+      })
+      .addCase(deleteAllNotifications.rejected, (state, action) => {
         state.error = action.payload;
       });
   },

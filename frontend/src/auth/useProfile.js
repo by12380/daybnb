@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "./useAuth.js";
-import { supabase } from "../lib/supabaseClient.js";
+import api from "../redux/api.js";
 
 export function useProfile() {
   const { user, loading: authLoading } = useAuth();
@@ -8,7 +8,7 @@ export function useProfile() {
   const [loading, setLoading] = useState(true);
 
   const fetchProfile = useCallback(async () => {
-    if (!user?.id || !supabase) {
+    if (!user?.id) {
       setProfile(null);
       setLoading(false);
       return;
@@ -16,17 +16,12 @@ export function useProfile() {
 
     setLoading(true);
 
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", user.id)
-      .maybeSingle();
-
-    if (error) {
+    try {
+      const { data } = await api.get("/auth/me");
+      setProfile(data.profile || null);
+    } catch (error) {
       console.error("Error fetching profile:", error);
       setProfile(null);
-    } else {
-      setProfile(data);
     }
 
     setLoading(false);

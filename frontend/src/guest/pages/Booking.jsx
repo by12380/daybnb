@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
 import { DatePicker } from "antd";
 import dayjs from "dayjs";
 import Card from "../components/ui/Card.jsx";
@@ -8,237 +9,142 @@ import FormInput, { INPUT_STYLES } from "../components/ui/FormInput.jsx";
 import { StarsDisplay, StarsInput } from "../components/ui/Stars.jsx";
 import { formatPrice } from "../utils/format.js";
 import { useAuth } from "../../auth/useAuth.js";
-import { supabase } from "../../lib/supabaseClient.js";
-import { syncBookingInsert } from "../../lib/algoliaSync.js";
-import { fetchReviewsForRoom, upsertRoomReview } from "../utils/roomReviews.js";
-import { createCheckoutSession, redirectToCheckout } from "../../lib/stripe.js";
+import { fetchRoomById, clearSelectedRoom } from "../../redux/slices/roomSlice.js";
+import {
+  createBooking,
+  fetchBookingById,
+  fetchAvailability,
+  clearBookingError,
+  clearSelectedBooking,
+  clearBookedDates,
+} from "../../redux/slices/bookingSlice.js";
+import {
+  fetchReviewsByRoom,
+  upsertReview,
+  clearReviews,
+  clearReviewError,
+} from "../../redux/slices/reviewSlice.js";
+import {
+  createCheckoutSession,
+  clearStripeError,
+  resetStripeSession,
+} from "../../redux/slices/stripeSlice.js";
 import AvailabilityCalendar from "../components/AvailabilityCalendar.jsx";
 import { useWelcomeOffer } from "../../hooks/useWelcomeOffer.js";
 
 const FALLBACK_IMAGE =
   "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=60";
 
-const BOOKINGS_TABLE = "bookings";
-const ROOM_REVIEWS_TABLE = "room_reviews";
-
 function normalizeTags(value, type) {
   if (Array.isArray(value)) return value.map(String).filter(Boolean);
   if (typeof value === "string") {
-    return value
-      .split(",")
-      .map((t) => t.trim())
-      .filter(Boolean);
+    return value.split(",").map((t) => t.trim()).filter(Boolean);
   }
   return type ? [String(type)] : [];
 }
 
 const Booking = React.memo(() => {
+  const dispatch = useDispatch();
   const { roomId } = useParams();
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  const [room, setRoom] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  // Redux state
+  const { selectedRoom: room, loading: roomLoading, error: roomError } = useSelector((state) => state.rooms);
+  const { bookedDates, loading: bookingLoading, error: bookingError } = useSelector((state) => state.bookings);
+  const { reviews, loading: reviewsLoading, error: reviewsError } = useSelector((state) => state.reviews);
+  const { sessionUrl, loading: stripeLoading, error: stripeError } = useSelector((state) => state.stripe);
 
+  // Local form state
   const [date, setDate] = useState("");
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState("");
-  const [processingPayment, setProcessingPayment] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState("online"); // "online" or "cash"
+  const [error, setError] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("online");
 
-  // Check if this is a retry payment from a cancelled checkout
   const retryBookingId = searchParams.get("retry");
-
-  // State for checking if date is already booked
-  const [isDateBooked, setIsDateBooked] = useState(false);
-  const [checkingDate, setCheckingDate] = useState(false);
 
   // Calendar visibility state
   const [showCalendar, setShowCalendar] = useState(false);
 
   // Welcome offer hook
-  const { 
-    isEligible: isWelcomeOfferEligible, 
+  const {
+    isEligible: isWelcomeOfferEligible,
     loading: welcomeOfferLoading,
     calculateDiscountedPrice,
     discountPercent: welcomeDiscountPercent,
     refetch: refetchWelcomeOffer,
   } = useWelcomeOffer();
 
-  // Reviews state
-  const [reviews, setReviews] = useState([]);
-  const [loadingReviews, setLoadingReviews] = useState(false);
-  const [reviewsError, setReviewsError] = useState("");
+  // Review form state
   const [reviewRating, setReviewRating] = useState(0);
   const [reviewNote, setReviewNote] = useState("");
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const [reviewSuccess, setReviewSuccess] = useState("");
 
+  // Fetch room
   useEffect(() => {
-    let cancelled = false;
-
-    async function load() {
-      setError("");
-      setRoom(null);
-      setSuccess("");
-
-      if (!supabase) {
-        setError(
-          "Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY."
-        );
-        return;
-      }
-
-      setLoading(true);
-      const { data, error: fetchError } = await supabase
-        .from("rooms")
-        .select("*")
-        .eq("id", roomId)
-        .maybeSingle();
-
-      if (cancelled) return;
-
-      if (fetchError) {
-        setError(fetchError.message || "Failed to load room.");
-        setLoading(false);
-        return;
-      }
-
-      if (!data) {
-        setError(
-          "Room not found (or access denied by RLS). If the room exists in Supabase, add a SELECT policy for `rooms`."
-        );
-        setLoading(false);
-        return;
-      }
-
-      setRoom(data);
-      setLoading(false);
+    if (roomId) {
+      dispatch(fetchRoomById(roomId));
+      dispatch(fetchReviewsByRoom(roomId));
+      dispatch(fetchAvailability(roomId));
     }
-
-    if (roomId) load();
     return () => {
-      cancelled = true;
+      dispatch(clearSelectedRoom());
+      dispatch(clearReviews());
+      dispatch(clearBookedDates());
     };
-  }, [roomId]);
+  }, [dispatch, roomId]);
 
-  // Load reviews for this room
+  // Prefill user info
   useEffect(() => {
-    let cancelled = false;
-
-    async function loadRoomReviews() {
-      setReviewsError("");
-      setReviewSuccess("");
-
-      if (!roomId || !supabase) {
-        setReviews([]);
-        return;
-      }
-
-      setLoadingReviews(true);
-      try {
-        const rows = await fetchReviewsForRoom(roomId);
-        if (!cancelled) setReviews(rows || []);
-      } catch (e) {
-        if (!cancelled) setReviewsError(e.message || "Failed to load reviews.");
-      } finally {
-        if (!cancelled) setLoadingReviews(false);
-      }
-    }
-
-    loadRoomReviews();
-    return () => {
-      cancelled = true;
-    };
-  }, [roomId]);
-
-  // Prefill if user already reviewed this room
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadExistingReview() {
-      if (!supabase || !roomId || !user?.id) return;
-      const { data: existing, error: existingErr } = await supabase
-        .from(ROOM_REVIEWS_TABLE)
-        .select("rating, note")
-        .eq("room_id", roomId)
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (!cancelled && !existingErr && existing) {
-        setReviewRating(Number(existing.rating) || 0);
-        setReviewNote(existing.note || "");
-      }
-    }
-
-    loadExistingReview();
-    return () => {
-      cancelled = true;
-    };
-  }, [roomId, user?.id]);
-
-  useEffect(() => {
-    // Prefill from Supabase user metadata where possible.
-    const nameFromMeta =
-      user?.user_metadata?.full_name ||
-      user?.user_metadata?.name ||
-      user?.user_metadata?.display_name ||
-      "";
+    const nameFromMeta = user?.user_metadata?.full_name || user?.user_metadata?.name || user?.user_metadata?.display_name || "";
     const phoneFromMeta = user?.phone || user?.user_metadata?.phone || "";
     setFullName((prev) => (prev ? prev : String(nameFromMeta || "")));
     setPhone((prev) => (prev ? prev : String(phoneFromMeta || "")));
   }, [user]);
 
-  // Check if selected date is already booked
+  // Handle retry booking prefill
   useEffect(() => {
-    if (!date || !roomId || !supabase) {
-      setIsDateBooked(false);
-      return;
+    if (retryBookingId && room) {
+      dispatch(fetchBookingById(retryBookingId)).then((action) => {
+        if (action.payload?.booking) {
+          const data = action.payload.booking;
+          if (data.payment_status !== "paid") {
+            if (data.booking_date) setDate(data.booking_date);
+            if (data.user_full_name) setFullName(data.user_full_name);
+            if (data.user_phone) setPhone(data.user_phone);
+          }
+        }
+      });
     }
+  }, [dispatch, retryBookingId, room]);
 
-    let cancelled = false;
-
-    async function checkDateAvailability() {
-      setCheckingDate(true);
-      const { data, error: fetchError } = await supabase
-        .from(BOOKINGS_TABLE)
-        .select("id")
-        .eq("room_id", roomId)
-        .eq("booking_date", date)
-        .in("status", ["pending", "approved", "confirmed"])
-        .limit(1);
-
-      if (cancelled) return;
-
-      if (fetchError) {
-        console.error("Error checking date availability:", fetchError);
-        setIsDateBooked(false);
-      } else {
-        setIsDateBooked((data || []).length > 0);
-      }
-      setCheckingDate(false);
+  // Redirect to Stripe on session URL
+  useEffect(() => {
+    if (sessionUrl) {
+      window.location.href = sessionUrl;
     }
-
-    checkDateAvailability();
-    return () => { cancelled = true; };
-  }, [date, roomId]);
+  }, [sessionUrl]);
 
   const tags = useMemo(() => normalizeTags(room?.tags, room?.type), [room?.tags, room?.type]);
 
-  // Price calculation - full day price
   const pricePerDay = room?.price_per_day ?? room?.price_per_hour ?? 0;
   const originalTotalPrice = pricePerDay;
 
-  // Apply welcome offer discount if eligible
   const priceInfo = useMemo(() => {
     return calculateDiscountedPrice(originalTotalPrice);
   }, [calculateDiscountedPrice, originalTotalPrice]);
 
   const totalPrice = priceInfo.discountedPrice;
+
+  // Check if selected date is booked
+  const isDateBooked = useMemo(() => {
+    return date && (bookedDates || []).includes(date);
+  }, [date, bookedDates]);
 
   const onDateChange = useCallback((_, dateString) => {
     setDate(dateString || "");
@@ -246,17 +152,13 @@ const Booking = React.memo(() => {
     setError("");
   }, []);
 
-  // Calendar handlers
   const handleCalendarDateSelect = useCallback((dateString) => {
     setDate(dateString);
     setSuccess("");
     setError("");
   }, []);
 
-  const toggleCalendar = useCallback(() => {
-    setShowCalendar((prev) => !prev);
-  }, []);
-
+  const toggleCalendar = useCallback(() => setShowCalendar((prev) => !prev), []);
   const onFullNameChange = useCallback((e) => setFullName(e.target.value), []);
   const onPhoneChange = useCallback((e) => setPhone(e.target.value), []);
 
@@ -270,64 +172,28 @@ const Booking = React.memo(() => {
   const onSubmitReview = useCallback(
     async (e) => {
       e.preventDefault();
-      setReviewsError("");
+      dispatch(clearReviewError());
       setReviewSuccess("");
 
-      if (!user?.id) {
-        setReviewsError("You must be signed in to leave a review.");
-        return;
-      }
-
+      if (!user?.id) { setError("You must be signed in to leave a review."); return; }
       const rating = Number(reviewRating);
       if (!Number.isFinite(rating) || rating < 1 || rating > 5) {
-        setReviewsError("Please select a star rating (1–5).");
+        setError("Please select a star rating (1-5).");
         return;
       }
-
-      if (!supabase) {
-        setReviewsError(
-          "Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY."
-        );
-        return;
-      }
-
-      const nameFromMeta =
-        user?.user_metadata?.full_name ||
-        user?.user_metadata?.name ||
-        user?.user_metadata?.display_name ||
-        null;
 
       setReviewSubmitting(true);
       try {
-        await upsertRoomReview({
-          room_id: roomId,
-          user_id: user.id,
-          booking_id: null,
-          user_email: user.email ?? null,
-          user_full_name: nameFromMeta ? String(nameFromMeta) : null,
-          rating,
-          note: reviewNote?.trim() || null,
-        });
-
-        const rows = await fetchReviewsForRoom(roomId);
-        setReviews(rows || []);
+        await dispatch(upsertReview({ room_id: roomId, rating, note: reviewNote?.trim() || null })).unwrap();
+        dispatch(fetchReviewsByRoom(roomId));
         setReviewSuccess("Thanks! Your review has been saved.");
       } catch (err) {
-        const message = err?.message || "Failed to save review.";
-        const hint =
-          message?.toLowerCase?.().includes("does not exist") ||
-          message?.toLowerCase?.().includes("not found")
-            ? `\n\nCreate a \`${ROOM_REVIEWS_TABLE}\` table with columns: room_id (uuid/text), user_id (uuid/text), booking_id (uuid/text, optional), rating (int), note (text, optional), user_email (text), user_full_name (text), created_at (timestamptz). Add a UNIQUE constraint on (user_id, room_id).`
-            : message?.toLowerCase?.().includes("row level security") ||
-                message?.toLowerCase?.().includes("rls")
-              ? `\n\nIf RLS is enabled, add INSERT/UPDATE/SELECT policies to \`${ROOM_REVIEWS_TABLE}\` for authenticated users.`
-              : "";
-        setReviewsError(`${message}${hint}`);
+        setError(err || "Failed to save review.");
       } finally {
         setReviewSubmitting(false);
       }
     },
-    [reviewNote, reviewRating, roomId, user?.email, user?.id, user?.user_metadata]
+    [dispatch, reviewNote, reviewRating, roomId, user?.id]
   );
 
   const validate = useCallback(() => {
@@ -338,168 +204,92 @@ const Booking = React.memo(() => {
     return "";
   }, [date, roomId, user?.id, isDateBooked]);
 
-  // Handle payment for existing booking (retry scenario)
-  const handlePayment = useCallback(
-    async (bookingId, bookingData) => {
-      setProcessingPayment(true);
-      setError("");
-
-      try {
-        const { sessionId, url } = await createCheckoutSession({
-          bookingId,
-          roomTitle: room?.title || "Room Booking",
-          roomId,
-          totalPrice: bookingData.total_price || totalPrice,
-          originalPrice: bookingData.original_price || priceInfo.originalPrice,
-          discountAmount: bookingData.discount_amount || priceInfo.discountAmount,
-          discountApplied: bookingData.discount_applied || (priceInfo.hasDiscount ? "welcome_offer" : null),
-          pricePerDay: bookingData.price_per_day || pricePerDay,
-          bookingDate: bookingData.booking_date || date,
-          userEmail: user?.email,
-          userId: user?.id,
-        });
-
-        // Redirect to Stripe Checkout
-        if (url) {
-          window.location.href = url;
-        } else if (sessionId) {
-          await redirectToCheckout(sessionId);
-        }
-      } catch (err) {
-        console.error("Payment error:", err);
-        setError(err.message || "Failed to initiate payment. Please try again.");
-        setProcessingPayment(false);
-      }
-    },
-    [room?.title, roomId, totalPrice, priceInfo, pricePerDay, date, user?.email, user?.id]
-  );
-
-  // Handle retry payment for existing booking
-  useEffect(() => {
-    if (retryBookingId && supabase && room) {
-      async function loadRetryBooking() {
-        const { data } = await supabase
-          .from(BOOKINGS_TABLE)
-          .select("*")
-          .eq("id", retryBookingId)
-          .maybeSingle();
-
-        if (data && data.payment_status !== "paid") {
-          // Pre-fill form with existing booking data
-          if (data.booking_date) setDate(data.booking_date);
-          if (data.user_full_name) setFullName(data.user_full_name);
-          if (data.user_phone) setPhone(data.user_phone);
-        }
-      }
-      loadRetryBooking();
-    }
-  }, [retryBookingId, room]);
-
   const onSubmit = useCallback(
     async (e) => {
       e.preventDefault();
       setSuccess("");
 
       const message = validate();
-      if (message) {
-        setError(message);
-        return;
-      }
-
-      if (!supabase) {
-        setError(
-          "Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY."
-        );
-        return;
-      }
+      if (message) { setError(message); return; }
 
       setSubmitting(true);
       setError("");
 
-      // Determine payment status based on payment method
       const isOnlinePayment = paymentMethod === "online" && totalPrice > 0;
-      
-      const payload = {
-        room_id: roomId,
-        booking_date: date,
-        user_id: user.id,
-        user_email: user.email ?? null,
-        user_full_name: fullName?.trim() || null,
-        user_phone: phone?.trim() || null,
-        total_price: totalPrice > 0 ? totalPrice : null,
-        price_per_day: pricePerDay > 0 ? pricePerDay : null,
-        status: "pending",
-        payment_method: paymentMethod,
-        payment_status: isOnlinePayment ? "pending" : "pay_at_property",
-      };
 
-      const { data: insertedData, error: insertError } = await supabase
-        .from(BOOKINGS_TABLE)
-        .insert(payload)
-        .select()
-        .single();
+      try {
+        const bookingPayload = {
+            room_id: roomId,
+            booking_date: date,
+            user_full_name: fullName?.trim() || null,
+            user_phone: phone?.trim() || null,
+            total_price: totalPrice > 0 ? totalPrice : null,
+            price_per_day: pricePerDay > 0 ? pricePerDay : null,
+            payment_method: paymentMethod,
+        };
 
-      if (insertError) {
-        const hint =
-          insertError?.message?.toLowerCase?.().includes("does not exist") ||
-          insertError?.message?.toLowerCase?.().includes("not found")
-            ? `\n\nCreate a \`${BOOKINGS_TABLE}\` table with columns: room_id (text/uuid), booking_date (date), user_id (uuid/text), user_email (text), user_full_name (text), user_phone (text), payment_status (text), payment_method (text), stripe_session_id (text).`
-            : insertError?.message?.toLowerCase?.().includes("row level security") ||
-                insertError?.message?.toLowerCase?.().includes("rls")
-              ? `\n\nIf RLS is enabled, add an INSERT policy to \`${BOOKINGS_TABLE}\` for authenticated users.`
-              : "";
-        setError(`${insertError.message || "Failed to create booking."}${hint}`);
-        setSubmitting(false);
-        return;
-      }
-
-      setSubmitting(false);
-
-      if (insertedData) {
-        try {
-          await syncBookingInsert(insertedData);
-        } catch (syncError) {
-          console.warn("Failed to sync booking to Algolia:", syncError);
+        // Only include discount fields when a discount is actually applied
+        if (priceInfo.hasDiscount && priceInfo.discountAmount > 0) {
+            bookingPayload.original_price = priceInfo.originalPrice;
+            bookingPayload.discount_amount = priceInfo.discountAmount;
+            bookingPayload.discount_applied = "welcome_offer";
         }
-        // Once a booking is created, remove welcome offer for future bookings
-        await refetchWelcomeOffer();
-      }
 
-      // If online payment selected and there's a price, redirect to Stripe
-      if (isOnlinePayment && insertedData?.id) {
-        setSuccess("Booking created! Redirecting to payment...");
-        await handlePayment(insertedData.id, insertedData);
-      } else {
-        // Cash payment or free booking - just confirm and redirect
-        setSuccess("Booking request submitted! You'll pay at the property. Redirecting to your bookings...");
-        setTimeout(() => {
-          const bookingId = insertedData?.id;
-          navigate(bookingId ? `/my-bookings?highlight=${bookingId}` : "/my-bookings");
-        }, 1500);
+        const result = await dispatch(createBooking(bookingPayload)).unwrap();
+
+        const insertedBooking = result.booking;
+        await refetchWelcomeOffer();
+
+        if (isOnlinePayment && insertedBooking?.id) {
+          setSuccess("Booking created! Redirecting to payment...");
+          dispatch(
+            createCheckoutSession({
+              bookingId: insertedBooking.id,
+              roomTitle: room?.title || "Room Booking",
+              roomId,
+              totalPrice,
+              originalPrice: priceInfo.originalPrice,
+              discountAmount: priceInfo.discountAmount,
+              discountApplied: priceInfo.hasDiscount ? "welcome_offer" : null,
+              pricePerDay,
+              bookingDate: date,
+              userEmail: user?.email,
+              userId: user?.id,
+            })
+          );
+        } else {
+          setSuccess("Booking request submitted! You'll pay at the property. Redirecting to your bookings...");
+          setTimeout(() => {
+            const id = insertedBooking?.id;
+            navigate(id ? `/my-bookings?highlight=${id}` : "/my-bookings");
+          }, 1500);
+        }
+      } catch (err) {
+        setError(err || "Failed to create booking.");
+      } finally {
+        setSubmitting(false);
       }
     },
-    [date, fullName, handlePayment, navigate, paymentMethod, phone, pricePerDay, roomId, totalPrice, user?.email, user?.id, validate]
+    [date, dispatch, fullName, navigate, paymentMethod, phone, priceInfo, pricePerDay, room?.title, roomId, totalPrice, user?.email, user?.id, validate, refetchWelcomeOffer]
   );
 
-  if (loading) {
+  const displayError = error || bookingError || stripeError || roomError;
+
+  if (roomLoading) {
     return (
       <Card>
-        <p className="text-sm font-semibold text-ink">Loading room…</p>
-        <p className="mt-1 text-sm text-muted">Fetching details from Supabase.</p>
+        <p className="text-sm font-semibold text-ink">Loading room...</p>
+        <p className="mt-1 text-sm text-muted">Fetching details.</p>
       </Card>
     );
   }
 
-  if (error && !room) {
+  if (displayError && !room) {
     return (
       <Card>
         <p className="text-sm font-semibold text-ink">Unable to load room</p>
-        <p className="mt-1 text-sm text-red-600">{error}</p>
-        <div className="mt-4">
-          <Link to="/">
-            <Button>Back to home</Button>
-          </Link>
-        </div>
+        <p className="mt-1 text-sm text-red-600">{displayError}</p>
+        <div className="mt-4"><Link to="/"><Button>Back to home</Button></Link></div>
       </Card>
     );
   }
@@ -508,14 +298,8 @@ const Booking = React.memo(() => {
     return (
       <Card>
         <p className="text-sm font-semibold text-ink">Room not found</p>
-        <p className="mt-1 text-sm text-muted">
-          That room doesn't exist. Go back to the homepage and pick another one.
-        </p>
-        <div className="mt-4">
-          <Link to="/">
-            <Button>Back to home</Button>
-          </Link>
-        </div>
+        <p className="mt-1 text-sm text-muted">That room doesn't exist. Go back to the homepage and pick another one.</p>
+        <div className="mt-4"><Link to="/"><Button>Back to home</Button></Link></div>
       </Card>
     );
   }
@@ -523,23 +307,12 @@ const Booking = React.memo(() => {
   return (
     <div className="grid gap-4 md:grid-cols-5">
       <Card className="md:col-span-3 overflow-hidden p-0">
-        <img
-          src={room.image || FALLBACK_IMAGE}
-          alt={room.title}
-          className="h-56 w-full object-cover"
-          loading="lazy"
-        />
+        <img src={room.image || FALLBACK_IMAGE} alt={room.title} className="h-56 w-full object-cover" loading="lazy" />
         <div className="p-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-700">
-            Booking
-          </p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-700">Booking</p>
           <h1 className="mt-2 text-2xl font-semibold text-ink">{room.title}</h1>
-          <p className="mt-1 text-sm text-muted">
-            {room.location} · Up to {room.guests} guests
-          </p>
-          <div className="mt-3">
-            <StarsDisplay value={ratingSummary.avg} count={ratingSummary.count} />
-          </div>
+          <p className="mt-1 text-sm text-muted">{room.location} · Up to {room.guests} guests</p>
+          <div className="mt-3"><StarsDisplay value={ratingSummary.avg} count={ratingSummary.count} /></div>
           {pricePerDay > 0 && (
             <p className="mt-2 text-lg font-semibold text-brand-700">
               {formatPrice(pricePerDay)}<span className="text-sm font-normal text-muted">/day</span>
@@ -548,12 +321,7 @@ const Booking = React.memo(() => {
           {tags.length ? (
             <div className="mt-4 flex flex-wrap gap-2">
               {tags.map((tag) => (
-                <span
-                  key={tag}
-                  className="rounded-full border border-border bg-surface/60 px-2 py-0.5 text-[11px] text-muted"
-                >
-                  {tag}
-                </span>
+                <span key={tag} className="rounded-full border border-border bg-surface/60 px-2 py-0.5 text-[11px] text-muted">{tag}</span>
               ))}
             </div>
           ) : null}
@@ -571,108 +339,54 @@ const Booking = React.memo(() => {
                 </svg>
               </div>
               <div>
-                <p className="font-semibold text-green-800 dark:text-green-200">
-                  Welcome Offer: {welcomeDiscountPercent}% Off!
-                </p>
-                <p className="mt-0.5 text-sm text-green-700 dark:text-green-300">
-                  As a new user, enjoy {welcomeDiscountPercent}% off your first booking. This offer is automatically applied!
-                </p>
+                <p className="font-semibold text-green-800 dark:text-green-200">Welcome Offer: {welcomeDiscountPercent}% Off!</p>
+                <p className="mt-0.5 text-sm text-green-700 dark:text-green-300">As a new user, enjoy {welcomeDiscountPercent}% off your first booking. This offer is automatically applied!</p>
               </div>
             </div>
           </div>
         )}
 
         <p className="text-sm font-semibold text-ink">Book your daytime stay</p>
-        <p className="mt-1 text-sm text-muted">
-          Select a <span className="font-medium text-ink">date</span> for your booking.
-        </p>
+        <p className="mt-1 text-sm text-muted">Select a <span className="font-medium text-ink">date</span> for your booking.</p>
 
-        {/* Calendar Toggle Button */}
-        <button
-          type="button"
-          onClick={toggleCalendar}
-          className="mt-3 flex w-full items-center justify-between rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-left transition hover:bg-brand-100 dark:border-brand-800 dark:bg-brand-900/30 dark:hover:bg-brand-900/50"
-        >
+        {/* Calendar Toggle */}
+        <button type="button" onClick={toggleCalendar} className="mt-3 flex w-full items-center justify-between rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-left transition hover:bg-brand-100 dark:border-brand-800 dark:bg-brand-900/30 dark:hover:bg-brand-900/50">
           <div className="flex items-center gap-2">
             <svg className="h-5 w-5 text-brand-600 dark:text-brand-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
-            <span className="text-sm font-medium text-brand-700 dark:text-brand-300">
-              {showCalendar ? "Hide Availability Calendar" : "View Availability Calendar"}
-            </span>
+            <span className="text-sm font-medium text-brand-700 dark:text-brand-300">{showCalendar ? "Hide Availability Calendar" : "View Availability Calendar"}</span>
           </div>
-          <svg
-            className={`h-5 w-5 text-brand-600 transition-transform dark:text-brand-400 ${showCalendar ? "rotate-180" : ""}`}
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
+          <svg className={`h-5 w-5 text-brand-600 transition-transform dark:text-brand-400 ${showCalendar ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
           </svg>
         </button>
 
-        {/* Availability Calendar */}
         {showCalendar && (
           <div className="mt-4 rounded-xl border border-border bg-panel p-4 dark:border-dark-border dark:bg-dark-panel">
-            <AvailabilityCalendar
-              roomId={roomId}
-              selectedDate={date}
-              onDateSelect={handleCalendarDateSelect}
-            />
+            <AvailabilityCalendar roomId={roomId} selectedDate={date} onDateSelect={handleCalendarDateSelect} />
           </div>
         )}
 
         <form className="mt-4 space-y-4" onSubmit={onSubmit} noValidate>
           <label className="flex flex-col gap-2">
             <span className="text-sm font-medium text-muted">Date</span>
-            <DatePicker
-              className={INPUT_STYLES}
-              placeholder="Select date"
-              value={date ? dayjs(date) : null}
-              onChange={onDateChange}
-              disabledDate={(current) => current && current < dayjs().startOf("day")}
-            />
+            <DatePicker className={INPUT_STYLES} placeholder="Select date" value={date ? dayjs(date) : null} onChange={onDateChange} disabledDate={(current) => current && current < dayjs().startOf("day")} />
           </label>
 
-          {checkingDate && (
-            <p className="text-xs text-muted">Checking availability...</p>
-          )}
-
-          {/* Date already booked warning */}
-          {date && isDateBooked && !checkingDate && (
+          {/* Date booked warning */}
+          {date && isDateBooked && (
             <div className="rounded-xl border border-red-200 bg-red-50 p-3 dark:border-red-800 dark:bg-red-900/20">
-              <div className="flex items-start gap-2">
-                <svg className="mt-0.5 h-4 w-4 shrink-0 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-                <div>
-                  <p className="text-sm font-medium text-red-800 dark:text-red-200">
-                    This date is already booked
-                  </p>
-                  <p className="mt-1 text-xs text-red-700 dark:text-red-300">
-                    Please select a different date from the calendar.
-                  </p>
-                </div>
-              </div>
+              <p className="text-sm font-medium text-red-800 dark:text-red-200">This date is already booked</p>
+              <p className="mt-1 text-xs text-red-700 dark:text-red-300">Please select a different date from the calendar.</p>
             </div>
           )}
 
-          {/* Date available confirmation */}
-          {date && !isDateBooked && !checkingDate && (
+          {/* Date available */}
+          {date && !isDateBooked && (
             <div className="rounded-xl border border-green-200 bg-green-50 p-3 dark:border-green-800 dark:bg-green-900/20">
-              <div className="flex items-start gap-2">
-                <svg className="mt-0.5 h-4 w-4 shrink-0 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-                <div>
-                  <p className="text-sm font-medium text-green-800 dark:text-green-200">
-                    Date is available
-                  </p>
-                  <p className="mt-1 text-xs text-green-700 dark:text-green-300">
-                    {dayjs(date).format("dddd, MMMM D, YYYY")}
-                  </p>
-                </div>
-              </div>
+              <p className="text-sm font-medium text-green-800 dark:text-green-200">Date is available</p>
+              <p className="mt-1 text-xs text-green-700 dark:text-green-300">{dayjs(date).format("dddd, MMMM D, YYYY")}</p>
             </div>
           )}
 
@@ -685,34 +399,21 @@ const Booking = React.memo(() => {
                   <span className="text-muted dark:text-dark-muted">Day Rate</span>
                   <span className="font-medium text-ink dark:text-dark-ink">{formatPrice(pricePerDay)}</span>
                 </div>
-                
-                {/* Welcome Offer Discount */}
                 {priceInfo.hasDiscount && (
                   <div className="flex justify-between text-sm">
                     <span className="flex items-center gap-1.5 text-green-600 dark:text-green-400">
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                      </svg>
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>
                       Welcome Offer ({priceInfo.discountPercent}% off)
                     </span>
-                    <span className="font-medium text-green-600 dark:text-green-400">
-                      -{formatPrice(priceInfo.discountAmount)}
-                    </span>
+                    <span className="font-medium text-green-600 dark:text-green-400">-{formatPrice(priceInfo.discountAmount)}</span>
                   </div>
                 )}
-                
                 <div className="border-t border-brand-100 pt-2 dark:border-brand-800">
                   <div className="flex justify-between">
                     <span className="font-semibold text-ink dark:text-dark-ink">Total</span>
                     <div className="text-right">
-                      {priceInfo.hasDiscount && (
-                        <span className="mr-2 text-sm text-muted line-through dark:text-dark-muted">
-                          {formatPrice(priceInfo.originalPrice)}
-                        </span>
-                      )}
-                      <span className="text-lg font-bold text-brand-700 dark:text-brand-400">
-                        {formatPrice(totalPrice)}
-                      </span>
+                      {priceInfo.hasDiscount && <span className="mr-2 text-sm text-muted line-through dark:text-dark-muted">{formatPrice(priceInfo.originalPrice)}</span>}
+                      <span className="text-lg font-bold text-brand-700 dark:text-brand-400">{formatPrice(totalPrice)}</span>
                     </div>
                   </div>
                 </div>
@@ -720,169 +421,77 @@ const Booking = React.memo(() => {
             </div>
           ) : null}
 
-          {/* Payment Method Selection */}
+          {/* Payment Method */}
           {totalPrice > 0 && date && !isDateBooked && (
             <div className="space-y-3">
               <p className="text-sm font-medium text-muted dark:text-dark-muted">Payment Method</p>
               <div className="grid gap-3 sm:grid-cols-2">
-                {/* Pay Online Option */}
-                <label
-                  className={`relative flex cursor-pointer items-start gap-3 rounded-xl border-2 p-4 transition-all ${
-                    paymentMethod === "online"
-                      ? "border-brand-500 bg-brand-50 dark:border-brand-400 dark:bg-brand-900/30"
-                      : "border-border bg-surface/40 hover:border-brand-200 dark:border-dark-border dark:bg-dark-surface/40 dark:hover:border-brand-700"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="paymentMethod"
-                    value="online"
-                    checked={paymentMethod === "online"}
-                    onChange={(e) => setPaymentMethod(e.target.value)}
-                    className="mt-1 h-4 w-4 text-brand-600 focus:ring-brand-500"
-                  />
+                <label className={`relative flex cursor-pointer items-start gap-3 rounded-xl border-2 p-4 transition-all ${paymentMethod === "online" ? "border-brand-500 bg-brand-50 dark:border-brand-400 dark:bg-brand-900/30" : "border-border bg-surface/40 hover:border-brand-200 dark:border-dark-border dark:bg-dark-surface/40 dark:hover:border-brand-700"}`}>
+                  <input type="radio" name="paymentMethod" value="online" checked={paymentMethod === "online"} onChange={(e) => setPaymentMethod(e.target.value)} className="mt-1 h-4 w-4 text-brand-600 focus:ring-brand-500" />
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
-                      <svg className="h-5 w-5 text-brand-600 dark:text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                      </svg>
+                      <svg className="h-5 w-5 text-brand-600 dark:text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
                       <span className="font-semibold text-ink dark:text-dark-ink">Pay Online</span>
                     </div>
-                    <p className="mt-1 text-xs text-muted dark:text-dark-muted">
-                      Secure payment via Stripe. Pay now with card.
-                    </p>
+                    <p className="mt-1 text-xs text-muted dark:text-dark-muted">Secure payment via Stripe. Pay now with card.</p>
                   </div>
-                  {paymentMethod === "online" && (
-                    <div className="absolute right-3 top-3">
-                      <svg className="h-5 w-5 text-brand-600 dark:text-brand-400" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                    </div>
-                  )}
                 </label>
-
-                {/* Pay at Property Option */}
-                <label
-                  className={`relative flex cursor-pointer items-start gap-3 rounded-xl border-2 p-4 transition-all ${
-                    paymentMethod === "cash"
-                      ? "border-brand-500 bg-brand-50 dark:border-brand-400 dark:bg-brand-900/30"
-                      : "border-border bg-surface/40 hover:border-brand-200 dark:border-dark-border dark:bg-dark-surface/40 dark:hover:border-brand-700"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="paymentMethod"
-                    value="cash"
-                    checked={paymentMethod === "cash"}
-                    onChange={(e) => setPaymentMethod(e.target.value)}
-                    className="mt-1 h-4 w-4 text-brand-600 focus:ring-brand-500"
-                  />
+                <label className={`relative flex cursor-pointer items-start gap-3 rounded-xl border-2 p-4 transition-all ${paymentMethod === "cash" ? "border-brand-500 bg-brand-50 dark:border-brand-400 dark:bg-brand-900/30" : "border-border bg-surface/40 hover:border-brand-200 dark:border-dark-border dark:bg-dark-surface/40 dark:hover:border-brand-700"}`}>
+                  <input type="radio" name="paymentMethod" value="cash" checked={paymentMethod === "cash"} onChange={(e) => setPaymentMethod(e.target.value)} className="mt-1 h-4 w-4 text-brand-600 focus:ring-brand-500" />
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
-                      <svg className="h-5 w-5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-                      </svg>
+                      <svg className="h-5 w-5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
                       <span className="font-semibold text-ink dark:text-dark-ink">Pay at Property</span>
                     </div>
-                    <p className="mt-1 text-xs text-muted dark:text-dark-muted">
-                      Pay with cash or card when you arrive.
-                    </p>
+                    <p className="mt-1 text-xs text-muted dark:text-dark-muted">Pay with cash or card when you arrive.</p>
                   </div>
-                  {paymentMethod === "cash" && (
-                    <div className="absolute right-3 top-3">
-                      <svg className="h-5 w-5 text-brand-600 dark:text-brand-400" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                    </div>
-                  )}
                 </label>
               </div>
             </div>
           )}
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <FormInput
-              label="Full name (optional)"
-              value={fullName}
-              onChange={onFullNameChange}
-              placeholder="Ada Lovelace"
-              autoComplete="name"
-            />
-            <FormInput
-              label="Phone (optional)"
-              value={phone}
-              onChange={onPhoneChange}
-              placeholder="+1 (555) 123-4567"
-              autoComplete="tel"
-            />
+            <FormInput label="Full name (optional)" value={fullName} onChange={onFullNameChange} placeholder="Ada Lovelace" autoComplete="name" />
+            <FormInput label="Phone (optional)" value={phone} onChange={onPhoneChange} placeholder="+1 (555) 123-4567" autoComplete="tel" />
           </div>
 
-          <p className="text-xs text-muted dark:text-dark-muted">
-            Signed in as <span className="font-medium text-ink dark:text-dark-ink">{user?.email}</span>
-          </p>
+          <p className="text-xs text-muted dark:text-dark-muted">Signed in as <span className="font-medium text-ink dark:text-dark-ink">{user?.email}</span></p>
 
-          {error ? <p className="text-sm text-red-600 dark:text-red-400">{error}</p> : null}
+          {displayError ? <p className="text-sm text-red-600 dark:text-red-400">{displayError}</p> : null}
           {success ? <p className="text-sm text-green-700 dark:text-green-400">{success}</p> : null}
 
           <div className="flex gap-3">
-            <Link to="/">
-              <Button variant="outline" type="button">
-                Back
-              </Button>
-            </Link>
-            <Button 
-              className="flex-1" 
-              type="submit" 
-              disabled={submitting || processingPayment || !date || isDateBooked}
-            >
-              {processingPayment 
-                ? "Redirecting to payment…" 
-                : submitting 
-                  ? "Creating booking…" 
-                  : totalPrice > 0 && paymentMethod === "online"
-                    ? `Pay ${formatPrice(totalPrice)} & Book`
-                    : totalPrice > 0 && paymentMethod === "cash"
-                      ? "Book Now - Pay at Property"
-                      : "Book now"}
+            <Link to="/"><Button variant="outline" type="button">Back</Button></Link>
+            <Button className="flex-1" type="submit" disabled={submitting || stripeLoading || !date || isDateBooked}>
+              {stripeLoading ? "Redirecting to payment..." : submitting ? "Creating booking..." : totalPrice > 0 && paymentMethod === "online" ? `Pay ${formatPrice(totalPrice)} & Book` : totalPrice > 0 && paymentMethod === "cash" ? "Book Now - Pay at Property" : "Book now"}
             </Button>
           </div>
 
-          {/* Payment security note */}
           {totalPrice > 0 && paymentMethod === "online" && (
             <p className="flex items-center justify-center gap-1.5 text-xs text-muted dark:text-dark-muted">
-              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-              </svg>
+              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
               Secure payment powered by Stripe
             </p>
           )}
-
-          {/* Cash payment note */}
           {totalPrice > 0 && paymentMethod === "cash" && (
             <p className="flex items-center justify-center gap-1.5 text-xs text-muted dark:text-dark-muted">
-              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
+              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
               Payment of {formatPrice(totalPrice)} will be collected at the property
             </p>
           )}
         </form>
       </Card>
 
+      {/* Reviews Section */}
       <Card className="md:col-span-5">
         <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
           <div className="flex-1">
             <p className="text-sm font-semibold text-ink dark:text-dark-ink">Reviews</p>
-            <p className="mt-1 text-sm text-muted dark:text-dark-muted">
-              What guests are saying about <span className="font-medium text-ink dark:text-dark-ink">{room.title}</span>
-            </p>
+            <p className="mt-1 text-sm text-muted dark:text-dark-muted">What guests are saying about <span className="font-medium text-ink dark:text-dark-ink">{room.title}</span></p>
+            <div className="mt-3"><StarsDisplay value={ratingSummary.avg} count={ratingSummary.count} /></div>
 
-            <div className="mt-3">
-              <StarsDisplay value={ratingSummary.avg} count={ratingSummary.count} />
-            </div>
-
-            {loadingReviews ? (
-              <p className="mt-4 text-sm text-muted dark:text-dark-muted">Loading reviews…</p>
+            {reviewsLoading ? (
+              <p className="mt-4 text-sm text-muted dark:text-dark-muted">Loading reviews...</p>
             ) : reviewsError ? (
               <p className="mt-4 whitespace-pre-wrap text-sm text-red-600 dark:text-red-400">{reviewsError}</p>
             ) : reviews.length === 0 ? (
@@ -893,18 +502,12 @@ const Booking = React.memo(() => {
                   <div key={r.id} className="rounded-2xl border border-border bg-surface/40 p-4 ring-1 ring-border/40">
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                       <div>
-                        <p className="text-sm font-semibold text-ink dark:text-dark-ink">
-                          {r.user_full_name || r.user_email || "Guest"}
-                        </p>
-                        <p className="text-xs text-muted dark:text-dark-muted">
-                          {r.created_at ? new Date(r.created_at).toLocaleDateString() : ""}
-                        </p>
+                        <p className="text-sm font-semibold text-ink dark:text-dark-ink">{r.user_full_name || r.user_email || "Guest"}</p>
+                        <p className="text-xs text-muted dark:text-dark-muted">{r.created_at ? new Date(r.created_at).toLocaleDateString() : ""}</p>
                       </div>
                       <StarsDisplay value={Number(r.rating) || 0} className="sm:justify-end" />
                     </div>
-                    {r.note ? (
-                      <p className="mt-3 whitespace-pre-wrap text-sm text-ink/90 dark:text-dark-ink/90">{r.note}</p>
-                    ) : null}
+                    {r.note ? <p className="mt-3 whitespace-pre-wrap text-sm text-ink/90 dark:text-dark-ink/90">{r.note}</p> : null}
                   </div>
                 ))}
               </div>
@@ -913,38 +516,18 @@ const Booking = React.memo(() => {
 
           <div className="w-full md:w-[360px]">
             <p className="text-sm font-semibold text-ink dark:text-dark-ink">Leave a review</p>
-            <p className="mt-1 text-sm text-muted dark:text-dark-muted">
-              Rate this room and add a note.
-            </p>
-
+            <p className="mt-1 text-sm text-muted dark:text-dark-muted">Rate this room and add a note.</p>
             <form className="mt-4 space-y-3" onSubmit={onSubmitReview}>
               <div className="rounded-2xl border border-border bg-surface/40 p-3 ring-1 ring-border/40">
                 <p className="text-xs font-medium text-muted dark:text-dark-muted">Your rating</p>
-                <StarsInput
-                  value={reviewRating}
-                  onChange={setReviewRating}
-                  disabled={reviewSubmitting}
-                  size="lg"
-                  className="mt-1"
-                />
+                <StarsInput value={reviewRating} onChange={setReviewRating} disabled={reviewSubmitting} size="lg" className="mt-1" />
               </div>
-
               <label className="flex flex-col gap-2">
                 <span className="text-xs font-medium text-muted dark:text-dark-muted">Note (optional)</span>
-                <textarea
-                  className={`${INPUT_STYLES} min-h-[96px] resize-none bg-surface/40 ring-1 ring-border/40`}
-                  value={reviewNote}
-                  onChange={(e) => setReviewNote(e.target.value)}
-                  disabled={reviewSubmitting}
-                  placeholder="Share what you liked (or what could be improved)…"
-                />
+                <textarea className={`${INPUT_STYLES} min-h-[96px] resize-none bg-surface/40 ring-1 ring-border/40`} value={reviewNote} onChange={(e) => setReviewNote(e.target.value)} disabled={reviewSubmitting} placeholder="Share what you liked (or what could be improved)..." />
               </label>
-
               {reviewSuccess ? <p className="text-sm text-green-700 dark:text-green-400">{reviewSuccess}</p> : null}
-
-              <Button type="submit" disabled={reviewSubmitting}>
-                {reviewSubmitting ? "Saving…" : "Submit review"}
-              </Button>
+              <Button type="submit" disabled={reviewSubmitting}>{reviewSubmitting ? "Saving..." : "Submit review"}</Button>
             </form>
           </div>
         </div>

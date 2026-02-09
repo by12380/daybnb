@@ -1,73 +1,39 @@
 import React, { useCallback, useEffect, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
 import { DatePicker } from "antd";
 import dayjs from "dayjs";
 import Button from "../components/ui/Button.jsx";
 import Card from "../components/ui/Card.jsx";
 import FormInput, { INPUT_STYLES } from "../components/ui/FormInput.jsx";
 import { BOOKING_TYPES } from "../utils/constants.js";
-import { supabase } from "../../lib/supabaseClient.js";
+import { fetchRooms } from "../../redux/slices/roomSlice.js";
 
 const LandingSearch = React.memo(({ onSearch }) => {
+  const dispatch = useDispatch();
+  const { rooms, loading: roomsLoading, error: roomsError } = useSelector((state) => state.rooms);
+
   const [bookingType, setBookingType] = useState("hourly");
-  const [cities, setCities] = useState([]);
-  const [citiesLoading, setCitiesLoading] = useState(false);
-  const [citiesError, setCitiesError] = useState("");
   const [formState, setFormState] = useState({
     location: "",
     date: "",
     guests: 1,
   });
 
+  // Fetch rooms to extract unique cities
   useEffect(() => {
-    let cancelled = false;
+    dispatch(fetchRooms({ limit: 200 }));
+  }, [dispatch]);
 
-    const fetchCities = async () => {
-      setCitiesError("");
-      setCities([]);
-
-      if (!supabase) {
-        setCitiesError(
-          "Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY."
-        );
-        return;
-      }
-
-      setCitiesLoading(true);
-
-      const { data, error } = await supabase.from("rooms").select("location");
-      if (cancelled) return;
-
-      if (error) {
-        setCitiesError(error.message || "Failed to load locations.");
-        setCitiesLoading(false);
-        return;
-      }
-
-      // Extract unique cities
-      const uniqueCities = [
-        ...new Set(
-          data
-            .map((room) => String(room?.location ?? "").trim())
-            .filter(Boolean)
-        ),
-      ].sort((a, b) => a.localeCompare(b));
-
-      if (!uniqueCities.length) {
-        setCitiesError(
-          "No cities returned from Supabase. If RLS is enabled on `rooms`, add a SELECT policy for anon/authenticated users."
-        );
-      }
-
-      setCities(uniqueCities);
-      setCitiesLoading(false);
-    };
-
-    fetchCities();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  // Extract unique cities from rooms
+  const cities = React.useMemo(() => {
+    return [
+      ...new Set(
+        (rooms || [])
+          .map((room) => String(room?.location ?? "").trim())
+          .filter(Boolean)
+      ),
+    ].sort((a, b) => a.localeCompare(b));
+  }, [rooms]);
 
   const onTypeChange = useCallback((event) => {
     setBookingType(event.target.value);
@@ -112,12 +78,12 @@ const LandingSearch = React.memo(({ onSearch }) => {
             value={formState.location}
             onChange={onChange}
             className={INPUT_STYLES}
-            disabled={citiesLoading || Boolean(citiesError)}
+            disabled={roomsLoading || Boolean(roomsError)}
           >
             <option value="">
-              {citiesLoading
+              {roomsLoading
                 ? "Loading cities…"
-                : citiesError
+                : roomsError
                   ? "Unable to load cities"
                   : "Select a city"}
             </option>
@@ -127,8 +93,8 @@ const LandingSearch = React.memo(({ onSearch }) => {
               </option>
             ))}
           </select>
-          {citiesError ? (
-            <span className="text-xs text-red-600 dark:text-red-400">{citiesError}</span>
+          {roomsError ? (
+            <span className="text-xs text-red-600 dark:text-red-400">{roomsError}</span>
           ) : null}
         </label>
         <label className="flex flex-col gap-2 md:col-span-1">

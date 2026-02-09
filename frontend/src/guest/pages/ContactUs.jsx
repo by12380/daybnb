@@ -1,9 +1,14 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
+import { useDispatch, useSelector } from "react-redux";
 import Card from "../components/ui/Card.jsx";
 import Button from "../components/ui/Button.jsx";
 import FormInput, { INPUT_STYLES } from "../components/ui/FormInput.jsx";
-import { supabase } from "../../lib/supabaseClient.js";
 import { useAuth } from "../../auth/useAuth.js";
+import {
+  submitContact,
+  clearContactError,
+  resetSubmitSuccess,
+} from "../../redux/slices/contactSlice.js";
 
 // Icons
 function MailIcon({ className }) {
@@ -56,104 +61,80 @@ const initialFormState = {
 };
 
 function ContactUs() {
+  const dispatch = useDispatch();
   const { user } = useAuth();
+  const { loading: submitting, submitSuccess, error: apiError } = useSelector(
+    (state) => state.contact
+  );
+
   const [form, setForm] = useState(() => ({
     ...initialFormState,
     email: user?.email || "",
   }));
-  const [submitting, setSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
-  const [error, setError] = useState(null);
+  const [validationError, setValidationError] = useState(null);
+
+  // Clean up on unmount
+  useEffect(() => {
+    return () => {
+      dispatch(clearContactError());
+      dispatch(resetSubmitSuccess());
+    };
+  }, [dispatch]);
 
   const handleChange = useCallback((e) => {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
-    setError(null);
-  }, []);
+    setValidationError(null);
+    dispatch(clearContactError());
+  }, [dispatch]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError(null);
+    setValidationError(null);
 
     // Validation
     if (!form.name.trim()) {
-      setError("Please enter your name");
+      setValidationError("Please enter your name");
       return;
     }
     if (!form.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
-      setError("Please enter a valid email address");
+      setValidationError("Please enter a valid email address");
       return;
     }
     if (!form.mobile.trim() || !/^[0-9+\-\s()]{10,15}$/.test(form.mobile.replace(/\s/g, ""))) {
-      setError("Please enter a valid mobile number");
+      setValidationError("Please enter a valid mobile number");
       return;
     }
     if (!form.city.trim()) {
-      setError("Please enter your city");
+      setValidationError("Please enter your city");
       return;
     }
     if (!form.message.trim() || form.message.trim().length < 10) {
-      setError("Please enter a message (at least 10 characters)");
+      setValidationError("Please enter a message (at least 10 characters)");
       return;
     }
 
-    setSubmitting(true);
-
-    try {
-      // Insert contact message
-      const { data: messageData, error: insertError } = await supabase
-        .from("contact_messages")
-        .insert({
-          name: form.name.trim(),
-          email: form.email.trim().toLowerCase(),
-          mobile: form.mobile.trim(),
-          city: form.city.trim(),
-          message: form.message.trim(),
-          user_id: user?.id || null,
-        })
-        .select()
-        .single();
-
-      if (insertError) {
-        throw insertError;
-      }
-
-      // Create notification for admin
-      const { error: notifError } = await supabase.from("notifications").insert({
-        type: "contact_message",
-        title: "New Contact Message",
-        body: `${form.name.trim()} from ${form.city.trim()} sent a message`,
-        recipient_role: "admin",
-        data: {
-          message_id: messageData?.id,
-          sender_name: form.name.trim(),
-          sender_email: form.email.trim().toLowerCase(),
-          city: form.city.trim(),
-        },
-      });
-
-      if (notifError) {
-        // Non-blocking - log but don't fail the submission
-        console.warn("Failed to create notification:", notifError);
-      }
-
-      setSubmitted(true);
-      setForm(initialFormState);
-    } catch (err) {
-      console.error("Error submitting contact form:", err);
-      setError(err.message || "Failed to send message. Please try again.");
-    } finally {
-      setSubmitting(false);
-    }
+    dispatch(
+      submitContact({
+        name: form.name.trim(),
+        email: form.email.trim().toLowerCase(),
+        mobile: form.mobile.trim(),
+        city: form.city.trim(),
+        message: form.message.trim(),
+      })
+    );
   };
 
   const handleSendAnother = () => {
-    setSubmitted(false);
+    dispatch(resetSubmitSuccess());
+    dispatch(clearContactError());
     setForm({
       ...initialFormState,
       email: user?.email || "",
     });
   };
+
+  const displayError = validationError || apiError;
 
   return (
     <div className="mx-auto max-w-5xl py-8">
@@ -242,7 +223,7 @@ function ContactUs() {
         {/* Contact Form */}
         <div className="lg:col-span-2">
           <Card>
-            {submitted ? (
+            {submitSuccess ? (
               <div className="py-8 text-center">
                 <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-50 dark:bg-green-900/30">
                   <CheckCircleIcon className="h-8 w-8 text-green-600 dark:text-green-400" />
@@ -327,9 +308,9 @@ function ContactUs() {
                     />
                   </label>
 
-                  {error && (
+                  {displayError && (
                     <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600 dark:bg-red-900/30 dark:text-red-400">
-                      {error}
+                      {displayError}
                     </div>
                   )}
 

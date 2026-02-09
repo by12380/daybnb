@@ -103,13 +103,17 @@ exports.create = asyncHandler(async (req, res) => {
     user_phone: user_phone?.trim() || null,
     total_price: total_price > 0 ? total_price : null,
     price_per_day: price_per_day > 0 ? price_per_day : null,
-    original_price: original_price > 0 ? original_price : null,
-    discount_amount: discount_amount > 0 ? discount_amount : null,
-    discount_applied: discount_applied || null,
     status: "pending",
     payment_method: payment_method || "online",
     payment_status: isOnlinePayment ? "pending" : "pay_at_property",
   };
+
+  // Only include discount fields when a discount is actually applied
+  if (discount_amount > 0) {
+    payload.original_price = original_price > 0 ? original_price : null;
+    payload.discount_amount = discount_amount;
+    payload.discount_applied = discount_applied || null;
+  }
 
   const { data, error } = await supabaseAdmin
     .from("bookings")

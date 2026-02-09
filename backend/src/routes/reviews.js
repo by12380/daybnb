@@ -25,6 +25,7 @@ async function attachUserRole(req, _res, next) {
 }
 
 // Public
+router.post("/ratings", reviewController.getBatchRatings);
 router.get("/", reviewController.getByRoom);
 
 // Authenticated

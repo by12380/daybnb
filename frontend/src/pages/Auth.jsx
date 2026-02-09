@@ -5,7 +5,7 @@ import Button from "../guest/components/ui/Button.jsx";
 import FormInput from "../guest/components/ui/FormInput.jsx";
 import { useAuth } from "../auth/useAuth.js";
 import { useProfile } from "../auth/useProfile.js";
-import { supabase } from "../lib/supabaseClient.js";
+import api from "../redux/api.js";
 
 const Auth = React.memo(() => {
   const { session, loading, signIn, signUp } = useAuth();
@@ -27,46 +27,14 @@ const Auth = React.memo(() => {
 
   const ensureProfileRow = useCallback(
     async ({ user, isSignUp }) => {
-      if (!supabase || !user?.id) return;
+      if (!user?.id) return;
 
-      // Only create a profile if it doesn't exist yet.
-      // Important: do NOT overwrite `user_type` for existing users (admin/user).
-      const { data: existing, error: existingError } = await supabase
-        .from("profiles")
-        .select("id,user_type")
-        .eq("id", user.id)
-        .maybeSingle();
-
-      if (existingError) {
+      try {
+        await api.post("/auth/ensure-profile", { is_signup: isSignUp });
+      } catch (err) {
         // Non-fatal; the profile screen can still create it later.
-        console.warn("Could not check existing profile:", existingError);
-        return;
+        console.warn("Could not ensure profile:", err);
       }
-
-      if (existing?.id) {
-        // Keep email in sync without touching user_type.
-        await supabase
-          .from("profiles")
-          .update({
-            email: user.email ?? null,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", user.id);
-        return;
-      }
-
-      await supabase.from("profiles").insert({
-        id: user.id,
-        email: user.email ?? null,
-        full_name:
-          user.user_metadata?.full_name ||
-          user.user_metadata?.name ||
-          user.user_metadata?.display_name ||
-          null,
-        phone: user.phone || user.user_metadata?.phone || null,
-        user_type: isSignUp ? "user" : null,
-        updated_at: new Date().toISOString(),
-      });
     },
     []
   );

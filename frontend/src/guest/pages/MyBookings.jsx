@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
 import { DatePicker, Modal } from "antd";
 import dayjs from "dayjs";
 import Card from "../components/ui/Card.jsx";
@@ -7,10 +8,15 @@ import Button from "../components/ui/Button.jsx";
 import FormInput, { INPUT_STYLES } from "../components/ui/FormInput.jsx";
 import { formatPrice } from "../utils/format.js";
 import { useAuth } from "../../auth/useAuth.js";
-import { supabase } from "../../lib/supabaseClient.js";
-import { syncBookingDelete, syncBookingUpdate } from "../../lib/algoliaSync.js";
-
-const BOOKINGS_TABLE = "bookings";
+import {
+  fetchBookings,
+  updateBooking,
+  deleteBooking,
+  fetchAvailability,
+  clearBookingError,
+  clearBookedDates,
+} from "../../redux/slices/bookingSlice.js";
+import { fetchRooms } from "../../redux/slices/roomSlice.js";
 
 function formatDate(dateStr) {
   if (!dateStr) return "N/A";
@@ -24,8 +30,7 @@ function formatDate(dateStr) {
 
 function getBookingStatusInfo(booking) {
   const isPast = new Date(booking.booking_date) < new Date(new Date().toDateString());
-  
-  // Check booking status field first
+
   if (booking.status === "pending") {
     return { color: "text-yellow-700 dark:text-yellow-400", bg: "bg-yellow-50 dark:bg-yellow-900/30", border: "border-yellow-200 dark:border-yellow-700", text: "Pending Approval", canModify: true };
   }
@@ -38,7 +43,6 @@ function getBookingStatusInfo(booking) {
     }
     return { color: "text-green-700 dark:text-green-400", bg: "bg-green-50 dark:bg-green-900/30", border: "border-green-200 dark:border-green-700", text: "Approved", canModify: true };
   }
-  // Default fallback for bookings without status field
   if (isPast) {
     return { color: "text-muted", bg: "bg-surface/60", border: "border-border", text: "Completed", canModify: false };
   }
@@ -76,7 +80,6 @@ const BookingCard = React.memo(({ booking, room, onEdit, onCancel, isHighlighted
                 <span className="font-medium text-ink dark:text-dark-ink">{formatDate(booking.booking_date)}</span>
               </div>
             </div>
-            {/* Price Information */}
             {booking.total_price != null && booking.total_price > 0 && (
               <div className="mt-2 flex items-center gap-2">
                 <span className="text-lg font-semibold text-brand-700 dark:text-brand-400">{formatPrice(booking.total_price)}</span>
@@ -119,22 +122,14 @@ const BookingCard = React.memo(({ booking, room, onEdit, onCancel, isHighlighted
   );
 });
 
-const EditBookingModal = React.memo(({
-  open,
-  booking,
-  room,
-  onClose,
-  onSave,
-}) => {
+const EditBookingModal = React.memo(({ open, booking, room, onClose, onSave }) => {
+  const dispatch = useDispatch();
   const [date, setDate] = useState("");
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [isDateBooked, setIsDateBooked] = useState(false);
-  const [checkingDate, setCheckingDate] = useState(false);
 
-  // Price calculation
   const pricePerDay = room?.price_per_day ?? room?.price_per_hour ?? 0;
   const totalPrice = pricePerDay;
 
@@ -144,111 +139,42 @@ const EditBookingModal = React.memo(({
       setFullName(booking.user_full_name || "");
       setPhone(booking.user_phone || "");
       setError("");
-      setIsDateBooked(false);
     }
   }, [booking, open]);
 
-  // Check if selected date is already booked (excluding current booking)
-  useEffect(() => {
-    if (!date || !room?.id || !open) {
-      setIsDateBooked(false);
-      return;
-    }
-
-    // If date hasn't changed from original, it's available
-    if (date === booking?.booking_date) {
-      setIsDateBooked(false);
-      return;
-    }
-
-    let cancelled = false;
-
-    async function checkDateAvailability() {
-      setCheckingDate(true);
-      const { data, error: fetchError } = await supabase
-        .from(BOOKINGS_TABLE)
-        .select("id")
-        .eq("room_id", room.id)
-        .eq("booking_date", date)
-        .in("status", ["pending", "approved", "confirmed"])
-        .neq("id", booking?.id) // Exclude current booking
-        .limit(1);
-
-      if (cancelled) return;
-
-      if (fetchError) {
-        console.error("Error checking date availability:", fetchError);
-        setIsDateBooked(false);
-      } else {
-        setIsDateBooked((data || []).length > 0);
-      }
-      setCheckingDate(false);
-    }
-
-    checkDateAvailability();
-    return () => { cancelled = true; };
-  }, [date, room?.id, open, booking?.id, booking?.booking_date]);
-
   const handleSave = useCallback(async () => {
     setError("");
-
     if (!date) {
       setError("Please select a date.");
       return;
     }
 
-    if (isDateBooked) {
-      setError("This date is already booked. Please select another date.");
-      return;
-    }
-
     setSaving(true);
-
-    const { data: updatedBooking, error: updateError } = await supabase
-      .from(BOOKINGS_TABLE)
-      .update({
-        booking_date: date,
-        user_full_name: fullName.trim() || null,
-        user_phone: phone.trim() || null,
-        total_price: totalPrice > 0 ? totalPrice : null,
-        price_per_day: pricePerDay > 0 ? pricePerDay : null,
-      })
-      .eq("id", booking.id)
-      .select()
-      .single();
-
-    setSaving(false);
-
-    if (updateError) {
-      setError(updateError.message || "Failed to update booking.");
-      return;
+    try {
+      await dispatch(
+        updateBooking({
+          id: booking.id,
+          booking_date: date,
+          user_full_name: fullName.trim() || null,
+          user_phone: phone.trim() || null,
+          total_price: totalPrice > 0 ? totalPrice : null,
+          price_per_day: pricePerDay > 0 ? pricePerDay : null,
+        })
+      ).unwrap();
+      onSave();
+    } catch (err) {
+      setError(err || "Failed to update booking.");
+    } finally {
+      setSaving(false);
     }
-
-    if (updatedBooking) {
-      try {
-        await syncBookingUpdate(updatedBooking, booking);
-      } catch (syncError) {
-        console.warn("Failed to sync booking update to Algolia:", syncError);
-      }
-    }
-
-    onSave();
-  }, [booking, booking?.id, date, fullName, onSave, phone, pricePerDay, totalPrice, isDateBooked]);
+  }, [booking?.id, date, dispatch, fullName, onSave, phone, pricePerDay, totalPrice]);
 
   return (
-    <Modal
-      title="Edit Booking"
-      open={open}
-      onCancel={onClose}
-      footer={null}
-      destroyOnClose
-    >
+    <Modal title="Edit Booking" open={open} onCancel={onClose} footer={null} destroyOnClose>
       <div className="space-y-4 pt-4">
         {room && (
           <div className="flex items-center gap-3 rounded-xl border border-border bg-surface/60 p-3">
-            {room.image && (
-              <img src={room.image} alt={room.title} className="h-12 w-12 rounded-lg object-cover" />
-            )}
+            {room.image && <img src={room.image} alt={room.title} className="h-12 w-12 rounded-lg object-cover" />}
             <div>
               <p className="font-medium text-ink dark:text-dark-ink">{room.title}</p>
               <p className="text-xs text-muted dark:text-dark-muted">{room.location}</p>
@@ -262,47 +188,14 @@ const EditBookingModal = React.memo(({
             className={INPUT_STYLES}
             placeholder="Select date"
             value={date ? dayjs(date) : null}
-            onChange={(_, dateString) => {
-              setDate(dateString || "");
-              setError("");
-            }}
+            onChange={(_, dateString) => { setDate(dateString || ""); setError(""); }}
             disabledDate={(current) => current && current < dayjs().startOf("day")}
           />
         </label>
 
-        {checkingDate && (
-          <p className="text-xs text-muted dark:text-dark-muted">Checking availability...</p>
-        )}
-
-        {/* Date already booked warning */}
-        {date && isDateBooked && !checkingDate && (
-          <div className="rounded-xl border border-red-200 bg-red-50 p-3 dark:border-red-800 dark:bg-red-900/20">
-            <p className="text-sm font-medium text-red-800 dark:text-red-200">
-              This date is already booked
-            </p>
-            <p className="mt-1 text-xs text-red-700 dark:text-red-300">
-              Please select a different date.
-            </p>
-          </div>
-        )}
-
-        {/* Date available confirmation */}
-        {date && !isDateBooked && !checkingDate && (
-          <div className="rounded-xl border border-green-200 bg-green-50 p-3 dark:border-green-800 dark:bg-green-900/20">
-            <p className="text-sm font-medium text-green-800 dark:text-green-200">
-              Date is available
-            </p>
-            <p className="mt-1 text-xs text-green-700 dark:text-green-300">
-              {dayjs(date).format("dddd, MMMM D, YYYY")}
-            </p>
-          </div>
-        )}
-
-        {/* Price Breakdown */}
         {pricePerDay > 0 && (
           <div className="rounded-xl border border-brand-100 bg-brand-50 p-4 dark:border-brand-800 dark:bg-brand-900/30">
-            <p className="text-sm font-semibold text-ink dark:text-dark-ink">Price</p>
-            <div className="mt-2 flex justify-between">
+            <div className="flex justify-between">
               <span className="text-muted dark:text-dark-muted">Day Rate</span>
               <span className="text-lg font-bold text-brand-700 dark:text-brand-400">{formatPrice(totalPrice)}</span>
             </div>
@@ -310,27 +203,15 @@ const EditBookingModal = React.memo(({
         )}
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <FormInput
-            label="Full name"
-            value={fullName}
-            onChange={(e) => setFullName(e.target.value)}
-            placeholder="Your name"
-          />
-          <FormInput
-            label="Phone"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            placeholder="+1 (555) 123-4567"
-          />
+          <FormInput label="Full name" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Your name" />
+          <FormInput label="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+1 (555) 123-4567" />
         </div>
 
         {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
         <div className="flex justify-end gap-3 pt-2">
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button onClick={handleSave} disabled={saving || isDateBooked}>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={handleSave} disabled={saving}>
             {saving ? "Saving..." : "Save Changes"}
           </Button>
         </div>
@@ -340,47 +221,29 @@ const EditBookingModal = React.memo(({
 });
 
 const CancelBookingModal = React.memo(({ open, booking, room, onClose, onConfirm }) => {
+  const dispatch = useDispatch();
   const [cancelling, setCancelling] = useState(false);
   const [error, setError] = useState("");
 
   const handleConfirm = useCallback(async () => {
     setError("");
     setCancelling(true);
-
-    const { error: deleteError } = await supabase
-      .from(BOOKINGS_TABLE)
-      .delete()
-      .eq("id", booking.id);
-
-    setCancelling(false);
-
-    if (deleteError) {
-      setError(deleteError.message || "Failed to cancel booking.");
-      return;
-    }
-
     try {
-      await syncBookingDelete(booking);
-    } catch (syncError) {
-      console.warn("Failed to sync booking cancellation to Algolia:", syncError);
+      await dispatch(deleteBooking(booking.id)).unwrap();
+      onConfirm();
+    } catch (err) {
+      setError(err || "Failed to cancel booking.");
+    } finally {
+      setCancelling(false);
     }
-
-    onConfirm();
-  }, [booking, booking?.id, onConfirm]);
+  }, [booking?.id, dispatch, onConfirm]);
 
   return (
-    <Modal
-      title="Cancel Booking"
-      open={open}
-      onCancel={onClose}
-      footer={null}
-      destroyOnClose
-    >
+    <Modal title="Cancel Booking" open={open} onCancel={onClose} footer={null} destroyOnClose>
       <div className="space-y-4 pt-4">
         <p className="text-sm text-muted dark:text-dark-muted">
           Are you sure you want to cancel this booking? This action cannot be undone.
         </p>
-
         {room && (
           <div className="rounded-xl border border-red-100 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/30">
             <p className="font-medium text-ink dark:text-dark-ink">{room.title}</p>
@@ -391,18 +254,10 @@ const CancelBookingModal = React.memo(({ open, booking, room, onClose, onConfirm
             </div>
           </div>
         )}
-
         {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
-
         <div className="flex justify-end gap-3 pt-2">
-          <Button variant="outline" onClick={onClose}>
-            Keep Booking
-          </Button>
-          <Button
-            className="!bg-red-600 hover:!bg-red-700"
-            onClick={handleConfirm}
-            disabled={cancelling}
-          >
+          <Button variant="outline" onClick={onClose}>Keep Booking</Button>
+          <Button className="!bg-red-600 hover:!bg-red-700" onClick={handleConfirm} disabled={cancelling}>
             {cancelling ? "Cancelling..." : "Yes, Cancel Booking"}
           </Button>
         </div>
@@ -412,77 +267,49 @@ const CancelBookingModal = React.memo(({ open, booking, room, onClose, onConfirm
 });
 
 const MyBookings = React.memo(() => {
+  const dispatch = useDispatch();
   const { user, loading: authLoading } = useAuth();
   const [searchParams] = useSearchParams();
   const highlightedBookingId = searchParams.get("highlight");
 
-  const [bookings, setBookings] = useState([]);
-  const [rooms, setRooms] = useState({});
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const {
+    bookings,
+    loading,
+    error,
+  } = useSelector((state) => state.bookings);
+
+  const { rooms: roomsList } = useSelector((state) => state.rooms);
 
   const [editingBooking, setEditingBooking] = useState(null);
   const [cancellingBooking, setCancellingBooking] = useState(null);
 
-  const fetchBookings = useCallback(async () => {
-    if (!user?.id || !supabase) return;
+  // Build rooms lookup map
+  const roomsMap = React.useMemo(() => {
+    const map = {};
+    (roomsList || []).forEach((r) => { map[r.id] = r; });
+    return map;
+  }, [roomsList]);
 
-    setLoading(true);
-    setError("");
-
-    const { data, error: fetchError } = await supabase
-      .from(BOOKINGS_TABLE)
-      .select("*")
-      .eq("user_id", user.id)
-      .order("booking_date", { ascending: false });
-
-    if (fetchError) {
-      setError(fetchError.message || "Failed to load bookings.");
-      setLoading(false);
-      return;
-    }
-
-    setBookings(data || []);
-
-    // Fetch room details for each booking
-    const roomIds = [...new Set((data || []).map((b) => b.room_id).filter(Boolean))];
-    if (roomIds.length > 0) {
-      const { data: roomsData } = await supabase
-        .from("rooms")
-        .select("*")
-        .in("id", roomIds);
-
-      const roomsMap = {};
-      (roomsData || []).forEach((r) => {
-        roomsMap[r.id] = r;
-      });
-      setRooms(roomsMap);
-    }
-
-    setLoading(false);
-  }, [user?.id]);
-
+  // Fetch bookings and rooms on mount
   useEffect(() => {
-    fetchBookings();
-  }, [fetchBookings]);
+    if (user?.id) {
+      dispatch(fetchBookings());
+      dispatch(fetchRooms());
+    }
+  }, [dispatch, user?.id]);
 
-  const handleEdit = useCallback((booking) => {
-    setEditingBooking(booking);
-  }, []);
-
-  const handleCancel = useCallback((booking) => {
-    setCancellingBooking(booking);
-  }, []);
+  const handleEdit = useCallback((booking) => setEditingBooking(booking), []);
+  const handleCancel = useCallback((booking) => setCancellingBooking(booking), []);
 
   const handleEditSave = useCallback(() => {
     setEditingBooking(null);
-    fetchBookings();
-  }, [fetchBookings]);
+    dispatch(fetchBookings());
+  }, [dispatch]);
 
   const handleCancelConfirm = useCallback(() => {
     setCancellingBooking(null);
-    fetchBookings();
-  }, [fetchBookings]);
+    // Booking already removed from store by deleteBooking.fulfilled
+  }, []);
 
   if (authLoading || loading) {
     return (
@@ -498,11 +325,7 @@ const MyBookings = React.memo(() => {
       <Card>
         <p className="text-sm font-semibold text-ink dark:text-dark-ink">Not signed in</p>
         <p className="mt-1 text-sm text-muted dark:text-dark-muted">Please sign in to view your bookings.</p>
-        <div className="mt-4">
-          <Link to="/auth">
-            <Button>Sign in</Button>
-          </Link>
-        </div>
+        <div className="mt-4"><Link to="/auth"><Button>Sign in</Button></Link></div>
       </Card>
     );
   }
@@ -513,23 +336,18 @@ const MyBookings = React.memo(() => {
         <p className="text-sm font-semibold text-ink dark:text-dark-ink">Error loading bookings</p>
         <p className="mt-1 text-sm text-red-600 dark:text-red-400">{error}</p>
         <div className="mt-4">
-          <Button onClick={fetchBookings}>Try Again</Button>
+          <Button onClick={() => dispatch(fetchBookings())}>Try Again</Button>
         </div>
       </Card>
     );
   }
 
-  // Separate bookings by status
   const pendingBookings = bookings.filter((b) => b.status === "pending");
   const upcomingBookings = bookings.filter(
-    (b) => 
-      new Date(b.booking_date) >= new Date(new Date().toDateString()) &&
-      b.status === "approved"
+    (b) => new Date(b.booking_date) >= new Date(new Date().toDateString()) && b.status === "approved"
   );
   const pastBookings = bookings.filter(
-    (b) => 
-      new Date(b.booking_date) < new Date(new Date().toDateString()) &&
-      b.status === "approved"
+    (b) => new Date(b.booking_date) < new Date(new Date().toDateString()) && b.status === "approved"
   );
   const rejectedBookings = bookings.filter((b) => b.status === "rejected");
 
@@ -537,17 +355,11 @@ const MyBookings = React.memo(() => {
     <div className="mx-auto max-w-3xl space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gradient dark:text-gradient-dark">
-            My Bookings
-          </p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gradient dark:text-gradient-dark">My Bookings</p>
           <h1 className="mt-1 text-2xl font-semibold text-ink dark:text-dark-ink">Your Reservations</h1>
-          <p className="mt-1 text-sm text-muted dark:text-dark-muted">
-            Manage your daytime room bookings
-          </p>
+          <p className="mt-1 text-sm text-muted dark:text-dark-muted">Manage your daytime room bookings</p>
         </div>
-        <Link to="/">
-          <Button variant="outline">Browse Rooms</Button>
-        </Link>
+        <Link to="/"><Button variant="outline">Browse Rooms</Button></Link>
       </div>
 
       {bookings.length === 0 ? (
@@ -559,14 +371,8 @@ const MyBookings = React.memo(() => {
               </svg>
             </div>
             <p className="text-lg font-semibold text-ink dark:text-dark-ink">No bookings yet</p>
-            <p className="mt-1 text-sm text-muted dark:text-dark-muted">
-              Start by browsing available rooms and making your first reservation.
-            </p>
-            <div className="mt-4">
-              <Link to="/">
-                <Button>Browse Rooms</Button>
-              </Link>
-            </div>
+            <p className="mt-1 text-sm text-muted dark:text-dark-muted">Start by browsing available rooms and making your first reservation.</p>
+            <div className="mt-4"><Link to="/"><Button>Browse Rooms</Button></Link></div>
           </div>
         </Card>
       ) : (
@@ -585,14 +391,7 @@ const MyBookings = React.memo(() => {
                 </p>
               </div>
               {pendingBookings.map((booking) => (
-                <BookingCard
-                  key={booking.id}
-                  booking={booking}
-                  room={rooms[booking.room_id]}
-                  onEdit={handleEdit}
-                  onCancel={handleCancel}
-                  isHighlighted={booking.id === highlightedBookingId}
-                />
+                <BookingCard key={booking.id} booking={booking} room={roomsMap[booking.room_id]} onEdit={handleEdit} onCancel={handleCancel} isHighlighted={booking.id === highlightedBookingId} />
               ))}
             </div>
           )}
@@ -608,32 +407,16 @@ const MyBookings = React.memo(() => {
                 Approved ({upcomingBookings.length})
               </h2>
               {upcomingBookings.map((booking) => (
-                <BookingCard
-                  key={booking.id}
-                  booking={booking}
-                  room={rooms[booking.room_id]}
-                  onEdit={handleEdit}
-                  onCancel={handleCancel}
-                  isHighlighted={booking.id === highlightedBookingId}
-                />
+                <BookingCard key={booking.id} booking={booking} room={roomsMap[booking.room_id]} onEdit={handleEdit} onCancel={handleCancel} isHighlighted={booking.id === highlightedBookingId} />
               ))}
             </div>
           )}
 
           {pastBookings.length > 0 && (
             <div className="space-y-4">
-              <h2 className="text-sm font-semibold text-ink dark:text-dark-ink">
-                Past ({pastBookings.length})
-              </h2>
+              <h2 className="text-sm font-semibold text-ink dark:text-dark-ink">Past ({pastBookings.length})</h2>
               {pastBookings.map((booking) => (
-                <BookingCard
-                  key={booking.id}
-                  booking={booking}
-                  room={rooms[booking.room_id]}
-                  onEdit={handleEdit}
-                  onCancel={handleCancel}
-                  isHighlighted={booking.id === highlightedBookingId}
-                />
+                <BookingCard key={booking.id} booking={booking} room={roomsMap[booking.room_id]} onEdit={handleEdit} onCancel={handleCancel} isHighlighted={booking.id === highlightedBookingId} />
               ))}
             </div>
           )}
@@ -649,14 +432,7 @@ const MyBookings = React.memo(() => {
                 Not Approved ({rejectedBookings.length})
               </h2>
               {rejectedBookings.map((booking) => (
-                <BookingCard
-                  key={booking.id}
-                  booking={booking}
-                  room={rooms[booking.room_id]}
-                  onEdit={handleEdit}
-                  onCancel={handleCancel}
-                  isHighlighted={booking.id === highlightedBookingId}
-                />
+                <BookingCard key={booking.id} booking={booking} room={roomsMap[booking.room_id]} onEdit={handleEdit} onCancel={handleCancel} isHighlighted={booking.id === highlightedBookingId} />
               ))}
             </div>
           )}
@@ -666,7 +442,7 @@ const MyBookings = React.memo(() => {
       <EditBookingModal
         open={!!editingBooking}
         booking={editingBooking}
-        room={editingBooking ? rooms[editingBooking.room_id] : null}
+        room={editingBooking ? roomsMap[editingBooking.room_id] : null}
         onClose={() => setEditingBooking(null)}
         onSave={handleEditSave}
       />
@@ -674,7 +450,7 @@ const MyBookings = React.memo(() => {
       <CancelBookingModal
         open={!!cancellingBooking}
         booking={cancellingBooking}
-        room={cancellingBooking ? rooms[cancellingBooking.room_id] : null}
+        room={cancellingBooking ? roomsMap[cancellingBooking.room_id] : null}
         onClose={() => setCancellingBooking(null)}
         onConfirm={handleCancelConfirm}
       />
