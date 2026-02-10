@@ -14,8 +14,13 @@ import { useProfile } from "../../auth/useProfile.js";
 const Landing = React.memo(() => {
   const navigate = useNavigate();
   const { isAdmin, loading } = useProfile();
-  const [location, setLocation] = useState("");
-  const [guests, setGuests] = useState(0);
+  const [searchFilters, setSearchFilters] = useState({
+    location: "",
+    guests: 0,
+    date: "",
+    minPrice: "",
+    maxPrice: "",
+  });
 
   // Redirect admin users to admin dashboard
   useEffect(() => {
@@ -25,8 +30,13 @@ const Landing = React.memo(() => {
   }, [loading, isAdmin, navigate]);
 
   const onSearch = useCallback((params) => {
-    setLocation(params.location || "");
-    setGuests(Number(params.guests) || 0);
+    setSearchFilters({
+      location: params.location || "",
+      guests: Number(params.guests) || 0,
+      date: params.date || "",
+      minPrice: params.minPrice || "",
+      maxPrice: params.maxPrice || "",
+    });
   }, []);
 
   // Show loading while checking admin status
@@ -56,7 +66,13 @@ const Landing = React.memo(() => {
         <LandingSearch onSearch={onSearch} />
       </section>
       <section id="gallery" className="py-8">
-        <LandingGallery location={location} guests={guests} />
+        <LandingGallery
+          location={searchFilters.location}
+          guests={searchFilters.guests}
+          date={searchFilters.date}
+          minPrice={searchFilters.minPrice}
+          maxPrice={searchFilters.maxPrice}
+        />
       </section>
       
       <section id="features" className="py-8">

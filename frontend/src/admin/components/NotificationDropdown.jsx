@@ -28,6 +28,22 @@ function getNotificationIcon(type) {
           </svg>
         </div>
       );
+    case "booking_updated":
+      return (
+        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/50">
+          <svg className="h-4 w-4 text-amber-600 dark:text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5M16.586 3.586a2 2 0 112.828 2.828L11 14.828l-4 1 1-4 8.586-8.414z" />
+          </svg>
+        </div>
+      );
+    case "booking_cancelled":
+      return (
+        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-orange-100 dark:bg-orange-900/50">
+          <svg className="h-4 w-4 text-orange-600 dark:text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 7h14M5 21h14a2 2 0 002-2V9H3v10a2 2 0 002 2z" />
+          </svg>
+        </div>
+      );
     case "booking_approved":
       return (
         <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/50">
@@ -197,8 +213,8 @@ export default function NotificationDropdown() {
           </div>
 
           {/* Footer */}
-          {notifications.length > 0 && (
-            <div className="border-t border-border px-4 py-2 dark:border-dark-border">
+          <div className="border-t border-border px-4 py-2 dark:border-dark-border">
+            {notifications.length > 0 && (
               <Link
                 to="/admin/bookings"
                 onClick={() => setIsOpen(false)}
@@ -206,8 +222,9 @@ export default function NotificationDropdown() {
               >
                 View all bookings
               </Link>
-            </div>
-          )}
+            )}
+
+          </div>
         </div>
       )}
     </div>

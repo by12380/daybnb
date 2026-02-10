@@ -1,6 +1,7 @@
 const { supabase, supabaseAdmin } = require("../config/supabase");
 const asyncHandler = require("../utils/asyncHandler");
 const ApiError = require("../utils/ApiError");
+const { emitNotificationToUser, emitNotificationToRole } = require("../socket");
 
 /**
  * GET /api/bookings
@@ -123,6 +124,26 @@ exports.create = asyncHandler(async (req, res) => {
 
   if (error) throw ApiError.internal(error.message);
 
+  // Notify admins about the new booking via socket
+  const adminNotification = {
+    recipient_role: "admin",
+    type: "booking_created",
+    title: "New Booking Request",
+    body: `New booking for ${data.booking_date} from ${data.user_email || "a user"}.`,
+    data: { booking_id: data.id, room_id: data.room_id, booking_date: data.booking_date },
+    created_at: new Date().toISOString(),
+  };
+
+  // Save to DB
+  const { data: savedNotif } = await supabaseAdmin
+    .from("notifications")
+    .insert(adminNotification)
+    .select()
+    .single();
+
+  // Push via socket to all connected admins
+  emitNotificationToRole("admin", savedNotif || adminNotification);
+
   res.status(201).json({ booking: data });
 });
 
@@ -136,7 +157,7 @@ exports.update = asyncHandler(async (req, res) => {
   // Fetch existing booking to check ownership
   const { data: existingBooking } = await supabaseAdmin
     .from("bookings")
-    .select("user_id")
+    .select("user_id, room_id, booking_date, user_email, user_full_name")
     .eq("id", req.params.id)
     .maybeSingle();
 
@@ -146,15 +167,22 @@ exports.update = asyncHandler(async (req, res) => {
     throw ApiError.forbidden("Access denied");
   }
 
-  const { booking_date, user_full_name, user_phone, total_price, price_per_day } =
-    req.body;
+  const { booking_date, user_full_name, user_phone } = req.body;
 
   const updates = {};
   if (booking_date !== undefined) updates.booking_date = booking_date;
   if (user_full_name !== undefined) updates.user_full_name = user_full_name?.trim() || null;
   if (user_phone !== undefined) updates.user_phone = user_phone?.trim() || null;
-  if (total_price !== undefined) updates.total_price = total_price;
-  if (price_per_day !== undefined) updates.price_per_day = price_per_day;
+
+  // Price fields (total_price, price_per_day) are intentionally NOT updatable here.
+  // They are locked at the time of booking creation so admin room-price changes
+  // don't affect previously booked rooms.
+
+  // When a customer edits their booking, reset status to "pending"
+  // so the admin must re-approve it.
+  if (req.userRole !== "admin") {
+    updates.status = "pending";
+  }
 
   const { data, error } = await supabaseAdmin
     .from("bookings")
@@ -164,6 +192,43 @@ exports.update = asyncHandler(async (req, res) => {
     .single();
 
   if (error) throw ApiError.internal(error.message);
+
+  // If customer edited booking details, re-notify admins for fresh approval review.
+  if (req.userRole !== "admin") {
+    const oldDate = existingBooking.booking_date;
+    const newDate = data.booking_date;
+    const changedDateText =
+      oldDate && newDate && oldDate !== newDate
+        ? `Date changed from ${oldDate} to ${newDate}.`
+        : `Date: ${newDate || oldDate || "not set"}.`;
+
+    const editedBy =
+      data.user_full_name ||
+      existingBooking.user_full_name ||
+      data.user_email ||
+      existingBooking.user_email ||
+      "a customer";
+
+    const adminNotification = {
+      recipient_role: "admin",
+      type: "booking_updated",
+      title: "Booking Updated by Customer",
+      body: `${editedBy} updated booking details. ${changedDateText}`,
+      data: {
+        booking_id: data.id,
+        room_id: data.room_id || existingBooking.room_id,
+        booking_date: newDate || oldDate,
+      },
+    };
+
+    const { data: savedNotif } = await supabaseAdmin
+      .from("notifications")
+      .insert(adminNotification)
+      .select()
+      .single();
+
+    emitNotificationToRole("admin", savedNotif || adminNotification);
+  }
 
   res.json({ booking: data });
 });
@@ -185,7 +250,7 @@ exports.approve = asyncHandler(async (req, res) => {
   if (!data) throw ApiError.notFound("Booking not found");
 
   // Send notification to the user
-  await supabaseAdmin.from("notifications").insert({
+  const approvedNotif = {
     recipient_user_id: data.user_id,
     type: "booking_approved",
     title: "Booking Confirmed!",
@@ -195,7 +260,16 @@ exports.approve = asyncHandler(async (req, res) => {
       room_id: data.room_id,
       booking_date: data.booking_date,
     },
-  });
+  };
+
+  const { data: savedNotif } = await supabaseAdmin
+    .from("notifications")
+    .insert(approvedNotif)
+    .select()
+    .single();
+
+  // Push via socket to the specific user
+  emitNotificationToUser(data.user_id, savedNotif || approvedNotif);
 
   res.json({ booking: data });
 });
@@ -220,7 +294,7 @@ exports.reject = asyncHandler(async (req, res) => {
 
   // Send notification to the user
   const reasonText = reason?.trim() ? ` Reason: ${reason.trim()}` : "";
-  await supabaseAdmin.from("notifications").insert({
+  const rejectedNotif = {
     recipient_user_id: data.user_id,
     type: "booking_rejected",
     title: "Booking Not Approved",
@@ -231,7 +305,16 @@ exports.reject = asyncHandler(async (req, res) => {
       booking_date: data.booking_date,
       reason: reason?.trim() || null,
     },
-  });
+  };
+
+  const { data: savedNotif } = await supabaseAdmin
+    .from("notifications")
+    .insert(rejectedNotif)
+    .select()
+    .single();
+
+  // Push via socket to the specific user
+  emitNotificationToUser(data.user_id, savedNotif || rejectedNotif);
 
   res.json({ booking: data });
 });
@@ -245,7 +328,7 @@ exports.remove = asyncHandler(async (req, res) => {
   // Check ownership
   const { data: existingBooking } = await supabaseAdmin
     .from("bookings")
-    .select("user_id")
+    .select("id, user_id, room_id, booking_date, user_email, user_full_name")
     .eq("id", req.params.id)
     .maybeSingle();
 
@@ -261,6 +344,35 @@ exports.remove = asyncHandler(async (req, res) => {
     .eq("id", req.params.id);
 
   if (error) throw ApiError.internal(error.message);
+
+  // Notify admins when a customer cancels booking.
+  if (req.userRole !== "admin") {
+    const cancelledBy =
+      existingBooking.user_full_name ||
+      existingBooking.user_email ||
+      req.user.email ||
+      "a customer";
+
+    const adminNotification = {
+      recipient_role: "admin",
+      type: "booking_cancelled",
+      title: "Booking Cancelled by Customer",
+      body: `${cancelledBy} cancelled booking for ${existingBooking.booking_date}.`,
+      data: {
+        booking_id: existingBooking.id,
+        room_id: existingBooking.room_id,
+        booking_date: existingBooking.booking_date,
+      },
+    };
+
+    const { data: savedNotif } = await supabaseAdmin
+      .from("notifications")
+      .insert(adminNotification)
+      .select()
+      .single();
+
+    emitNotificationToRole("admin", savedNotif || adminNotification);
+  }
 
   res.json({ message: "Booking deleted successfully" });
 });
@@ -283,4 +395,28 @@ exports.getAvailability = asyncHandler(async (req, res) => {
   const bookedDates = (data || []).map((b) => b.booking_date);
 
   res.json({ booked_dates: bookedDates });
+});
+
+/**
+ * GET /api/bookings/booked-rooms?date=YYYY-MM-DD
+ * Returns an array of room IDs that are booked on the given date
+ * (status: pending, approved, or confirmed).
+ */
+exports.getBookedRoomsByDate = asyncHandler(async (req, res) => {
+  if (!supabase) throw ApiError.internal("Supabase is not configured");
+
+  const { date } = req.query;
+  if (!date) throw ApiError.badRequest("date query parameter is required");
+
+  const { data, error } = await supabase
+    .from("bookings")
+    .select("room_id")
+    .eq("booking_date", date)
+    .in("status", ["pending", "approved", "confirmed"]);
+
+  if (error) throw ApiError.internal(error.message);
+
+  const roomIds = [...new Set((data || []).map((b) => b.room_id))];
+
+  res.json({ booked_room_ids: roomIds });
 });

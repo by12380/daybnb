@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { DatePicker } from "antd";
 import dayjs from "dayjs";
-import Button from "../components/ui/Button.jsx";
 import Card from "../components/ui/Card.jsx";
 import FormInput, { INPUT_STYLES } from "../components/ui/FormInput.jsx";
 import { BOOKING_TYPES } from "../utils/constants.js";
@@ -17,6 +16,8 @@ const LandingSearch = React.memo(({ onSearch }) => {
     location: "",
     date: "",
     guests: 1,
+    minPrice: "",
+    maxPrice: "",
   });
 
   // Fetch rooms to extract unique cities
@@ -35,6 +36,11 @@ const LandingSearch = React.memo(({ onSearch }) => {
     ].sort((a, b) => a.localeCompare(b));
   }, [rooms]);
 
+  // Call onSearch whenever any filter changes
+  useEffect(() => {
+    onSearch?.({ ...formState, bookingType });
+  }, [formState, bookingType, onSearch]);
+
   const onTypeChange = useCallback((event) => {
     setBookingType(event.target.value);
   }, []);
@@ -45,16 +51,8 @@ const LandingSearch = React.memo(({ onSearch }) => {
   }, []);
 
   const onDateChange = useCallback((_, dateString) => {
-    setFormState((prev) => ({ ...prev, date: dateString }));
+    setFormState((prev) => ({ ...prev, date: dateString || "" }));
   }, []);
-
-  const onSubmit = useCallback(
-    (event) => {
-      event.preventDefault();
-      onSearch?.({ ...formState, bookingType });
-    },
-    [bookingType, formState, onSearch]
-  );
 
   return (
     <Card className="space-y-6">
@@ -66,11 +64,7 @@ const LandingSearch = React.memo(({ onSearch }) => {
           Book a room for the day. Select your preferred date and location.
         </p>
       </div>
-      <form
-        className="grid gap-4 md:grid-cols-6"
-        onSubmit={onSubmit}
-        noValidate
-      >
+      <div className="grid gap-4 md:grid-cols-7">
         <label className="flex flex-col gap-2 md:col-span-2">
           <span className="text-sm font-medium text-muted dark:text-dark-muted">Location</span>
           <select
@@ -85,7 +79,7 @@ const LandingSearch = React.memo(({ onSearch }) => {
                 ? "Loading cities…"
                 : roomsError
                   ? "Unable to load cities"
-                  : "Select a city"}
+                  : "All locations"}
             </option>
             {cities.map((city) => (
               <option key={city} value={city}>
@@ -104,6 +98,8 @@ const LandingSearch = React.memo(({ onSearch }) => {
             placeholder="Select date"
             value={formState.date ? dayjs(formState.date) : null}
             onChange={onDateChange}
+            disabledDate={(current) => current && current < dayjs().startOf("day")}
+            allowClear
           />
         </label>
         <label className="flex flex-col gap-2 md:col-span-1">
@@ -130,12 +126,27 @@ const LandingSearch = React.memo(({ onSearch }) => {
           type="number"
           className="md:col-span-1"
         />
-        <div className="md:col-span-6">
-          <Button type="submit" className="w-full md:w-auto">
-            Search daytime stays
-          </Button>
-        </div>
-      </form>
+        <FormInput
+          label="Min Price"
+          name="minPrice"
+          min="0"
+          value={formState.minPrice}
+          onChange={onChange}
+          type="number"
+          placeholder="No min"
+          className="md:col-span-1"
+        />
+        <FormInput
+          label="Max Price"
+          name="maxPrice"
+          min="0"
+          value={formState.maxPrice}
+          onChange={onChange}
+          type="number"
+          placeholder="No max"
+          className="md:col-span-1"
+        />
+      </div>
     </Card>
   );
 });

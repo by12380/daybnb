@@ -1,6 +1,31 @@
 const { supabaseAdmin } = require("../config/supabase");
 const asyncHandler = require("../utils/asyncHandler");
 const ApiError = require("../utils/ApiError");
+const { emitNotificationToRole } = require("../socket");
+
+async function createAdminNotificationForMessage(contactMessage) {
+  const { data, error } = await supabaseAdmin
+    .from("notifications")
+    .insert({
+      recipient_role: "admin",
+      type: "contact_message",
+      title: "New contact message",
+      body: `${contactMessage.name} sent a new inquiry.`,
+      data: {
+        message_id: contactMessage.id,
+        email: contactMessage.email,
+      },
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error("Contact notification insert failed:", error.message);
+    return;
+  }
+
+  emitNotificationToRole("admin", data);
+}
 
 /**
  * POST /api/contact
@@ -35,6 +60,8 @@ exports.submit = asyncHandler(async (req, res) => {
     .single();
 
   if (error) throw ApiError.internal(error.message);
+
+  await createAdminNotificationForMessage(data);
 
   res.status(201).json({
     message: "Message sent successfully",

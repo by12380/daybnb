@@ -130,8 +130,9 @@ const EditBookingModal = React.memo(({ open, booking, room, onClose, onSave }) =
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  const pricePerDay = room?.price_per_day ?? room?.price_per_hour ?? 0;
-  const totalPrice = pricePerDay;
+  // Use the price stored at booking time, not the current room price
+  const pricePerDay = booking?.price_per_day ?? room?.price_per_day ?? room?.price_per_hour ?? 0;
+  const totalPrice = booking?.total_price ?? pricePerDay;
 
   useEffect(() => {
     if (booking && open) {
@@ -157,8 +158,6 @@ const EditBookingModal = React.memo(({ open, booking, room, onClose, onSave }) =
           booking_date: date,
           user_full_name: fullName.trim() || null,
           user_phone: phone.trim() || null,
-          total_price: totalPrice > 0 ? totalPrice : null,
-          price_per_day: pricePerDay > 0 ? pricePerDay : null,
         })
       ).unwrap();
       onSave();

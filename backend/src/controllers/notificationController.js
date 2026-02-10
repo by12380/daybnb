@@ -118,3 +118,4 @@ exports.removeAll = asyncHandler(async (req, res) => {
 
   res.json({ message: "All notifications deleted" });
 });
+

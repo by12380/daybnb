@@ -5,50 +5,41 @@ import {
   fetchAdminNotifications,
   deleteNotification,
   deleteAllNotifications,
+  addNotification,
 } from "../redux/slices/notificationSlice.js";
-import { supabase } from "../lib/supabaseClient.js";
-
-const NOTIFICATIONS_TABLE = "notifications";
+import { useSocket } from "../lib/SocketProvider.jsx";
 
 /**
- * Hook for admin notifications (recipient_role = 'admin')
+ * Hook for admin notifications (recipient_role = 'admin').
+ * Listens for real-time updates via Socket.IO.
  */
 export function useAdminNotifications() {
   const dispatch = useDispatch();
+  const socket = useSocket();
   const { notifications, loading, error, unreadCount } = useSelector(
     (state) => state.notifications
   );
 
-  // Fetch admin notifications via API
+  // Fetch admin notifications via API on mount
   useEffect(() => {
     dispatch(fetchAdminNotifications());
   }, [dispatch]);
 
-  // Real-time subscription for new admin notifications
+  // Listen for real-time notifications via Socket.IO
   useEffect(() => {
-    if (!supabase) return;
+    if (!socket) return;
 
-    const channel = supabase
-      .channel("admin-notifications")
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: NOTIFICATIONS_TABLE,
-          filter: "recipient_role=eq.admin",
-        },
-        () => {
-          // Re-fetch on new notification
-          dispatch(fetchAdminNotifications());
-        }
-      )
-      .subscribe();
+    const handler = (notification) => {
+      console.log("📬 [admin] Real-time notification received:", notification);
+      dispatch(addNotification(notification));
+    };
+
+    socket.on("notification:new", handler);
 
     return () => {
-      supabase.removeChannel(channel);
+      socket.off("notification:new", handler);
     };
-  }, [dispatch]);
+  }, [socket, dispatch]);
 
   const handleDeleteNotification = useCallback(
     (notificationId) => {
@@ -73,46 +64,38 @@ export function useAdminNotifications() {
 }
 
 /**
- * Hook for user-specific notifications (recipient_user_id = user.id)
+ * Hook for user-specific notifications (recipient_user_id = user.id).
+ * Listens for real-time updates via Socket.IO.
  */
 export function useUserNotifications(userId) {
   const dispatch = useDispatch();
+  const socket = useSocket();
   const { notifications, loading, error, unreadCount } = useSelector(
     (state) => state.notifications
   );
 
-  // Fetch user notifications via API
+  // Fetch user notifications via API on mount
   useEffect(() => {
     if (userId) {
       dispatch(fetchNotifications());
     }
   }, [dispatch, userId]);
 
-  // Real-time subscription for new user notifications
+  // Listen for real-time notifications via Socket.IO
   useEffect(() => {
-    if (!supabase || !userId) return;
+    if (!socket || !userId) return;
 
-    const channel = supabase
-      .channel(`user-notifications-${userId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: NOTIFICATIONS_TABLE,
-          filter: `recipient_user_id=eq.${userId}`,
-        },
-        () => {
-          // Re-fetch on new notification
-          dispatch(fetchNotifications());
-        }
-      )
-      .subscribe();
+    const handler = (notification) => {
+      console.log("📬 [user] Real-time notification received:", notification);
+      dispatch(addNotification(notification));
+    };
+
+    socket.on("notification:new", handler);
 
     return () => {
-      supabase.removeChannel(channel);
+      socket.off("notification:new", handler);
     };
-  }, [dispatch, userId]);
+  }, [socket, dispatch, userId]);
 
   const handleDeleteNotification = useCallback(
     (notificationId) => {

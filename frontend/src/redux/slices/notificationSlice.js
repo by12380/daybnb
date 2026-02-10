@@ -76,6 +76,7 @@ export const deleteAllNotifications = createAsyncThunk(
   }
 );
 
+
 // ─── Slice ───────────────────────────────────────────────────
 
 const initialState = {
@@ -91,6 +92,21 @@ const notificationSlice = createSlice({
   reducers: {
     clearNotificationError(state) {
       state.error = null;
+    },
+    /**
+     * Add a single notification received in real-time via Socket.IO.
+     * Prepends it to the list and bumps unreadCount.
+     */
+    addNotification(state, action) {
+      const notification = action.payload;
+      // Avoid duplicates
+      const exists = state.notifications.some((n) => n.id === notification.id);
+      if (!exists) {
+        state.notifications.unshift(notification);
+        if (!notification.read) {
+          state.unreadCount += 1;
+        }
+      }
     },
   },
   extraReducers: (builder) => {
@@ -181,6 +197,6 @@ const notificationSlice = createSlice({
   },
 });
 
-export const { clearNotificationError } = notificationSlice.actions;
+export const { clearNotificationError, addNotification } = notificationSlice.actions;
 
 export default notificationSlice.reducer;

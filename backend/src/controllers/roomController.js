@@ -10,13 +10,20 @@ const ApiError = require("../utils/ApiError");
 exports.getAll = asyncHandler(async (req, res) => {
   if (!supabase) throw ApiError.internal("Supabase is not configured");
 
-  const { type, search, limit = 50, offset = 0 } = req.query;
+  const {
+    type,
+    search,
+    guests,
+    min_price,
+    max_price,
+    date,
+    limit = 50,
+    offset = 0,
+  } = req.query;
 
   let query = supabase
     .from("rooms")
-    .select("*", { count: "exact" })
-    .order("created_at", { ascending: false })
-    .range(Number(offset), Number(offset) + Number(limit) - 1);
+    .select("*", { count: "exact" });
 
   if (type) {
     query = query.eq("type", type);
@@ -27,6 +34,42 @@ exports.getAll = asyncHandler(async (req, res) => {
       `title.ilike.%${search}%,location.ilike.%${search}%`
     );
   }
+
+  const parsedGuests = Number(guests);
+  if (Number.isFinite(parsedGuests) && parsedGuests > 0) {
+    query = query.gte("guests", parsedGuests);
+  }
+
+  const parsedMinPrice = Number(min_price);
+  if (Number.isFinite(parsedMinPrice) && parsedMinPrice >= 0) {
+    query = query.gte("price_per_day", parsedMinPrice);
+  }
+
+  const parsedMaxPrice = Number(max_price);
+  if (Number.isFinite(parsedMaxPrice) && parsedMaxPrice >= 0) {
+    query = query.lte("price_per_day", parsedMaxPrice);
+  }
+
+  if (date) {
+    const { data: bookedRows, error: bookedError } = await supabase
+      .from("bookings")
+      .select("room_id")
+      .eq("booking_date", date)
+      .in("status", ["pending", "approved", "confirmed"]);
+
+    if (bookedError) throw ApiError.internal(bookedError.message);
+
+    const bookedRoomIds = [...new Set((bookedRows || []).map((row) => row.room_id).filter(Boolean))];
+
+    if (bookedRoomIds.length > 0) {
+      const excludedIds = bookedRoomIds.map((id) => `"${String(id).replace(/"/g, "")}"`).join(",");
+      query = query.not("id", "in", `(${excludedIds})`);
+    }
+  }
+
+  query = query
+    .order("created_at", { ascending: false })
+    .range(Number(offset), Number(offset) + Number(limit) - 1);
 
   const { data, error, count } = await query;
   if (error) throw ApiError.internal(error.message);

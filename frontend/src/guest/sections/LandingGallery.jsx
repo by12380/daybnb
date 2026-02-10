@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import Card from "../components/ui/Card.jsx";
@@ -11,7 +11,8 @@ import { fetchRatingsForRooms } from "../utils/roomReviews.js";
 
 const PAGE_SIZE = 10;
 
-const LandingGallery = React.memo(({ location = "", guests = 0 }) => {
+const LandingGallery = React.memo(
+  ({ location = "", guests = 0, date = "", minPrice = "", maxPrice = "" }) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -29,11 +30,24 @@ const LandingGallery = React.memo(({ location = "", guests = 0 }) => {
 
   const totalPages = Math.ceil((totalCount || 0) / PAGE_SIZE);
 
-  // Fetch rooms via API
+  // Reset to first page whenever any filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [location, guests, date, minPrice, maxPrice]);
+
+  // Fetch filtered rooms via API
   useEffect(() => {
     const offset = (currentPage - 1) * PAGE_SIZE;
-    dispatch(fetchRooms({ limit: PAGE_SIZE, offset }));
-  }, [dispatch, currentPage]);
+    const params = { limit: PAGE_SIZE, offset };
+
+    if (location?.trim()) params.search = location.trim();
+    if (Number(guests) > 0) params.guests = Number(guests);
+    if (date) params.date = date;
+    if (minPrice !== "" && Number(minPrice) >= 0) params.min_price = Number(minPrice);
+    if (maxPrice !== "" && Number(maxPrice) >= 0) params.max_price = Number(maxPrice);
+
+    dispatch(fetchRooms(params));
+  }, [dispatch, currentPage, location, guests, date, minPrice, maxPrice]);
 
   const handlePageChange = useCallback((page) => {
     setCurrentPage(page);
@@ -72,17 +86,6 @@ const LandingGallery = React.memo(({ location = "", guests = 0 }) => {
     loadRatings();
     return () => { cancelled = true; };
   }, [rooms]);
-
-  // Filter rooms based on search params
-  const items = useMemo(() => {
-    const locationQuery = location.toLowerCase().trim();
-    const guestsQuery = Number(guests);
-    return (rooms || []).filter((room) => {
-      const matchesLocation = !locationQuery || room.location?.toLowerCase().includes(locationQuery) || room.title?.toLowerCase().includes(locationQuery);
-      const matchesGuests = !guestsQuery || room.guests >= guestsQuery;
-      return matchesLocation && matchesGuests;
-    });
-  }, [rooms, location, guests]);
 
   const toggleLike = async (room) => {
     if (!room?.id) return;
@@ -136,13 +139,17 @@ const LandingGallery = React.memo(({ location = "", guests = 0 }) => {
             <p className="text-sm font-medium text-red-600 dark:text-red-400">Failed to load rooms</p>
             <p className="mt-1 text-xs text-muted dark:text-dark-muted">{error}</p>
           </Card>
-        ) : items.length === 0 ? (
+        ) : (rooms || []).length === 0 ? (
           <Card className="md:col-span-2">
             <p className="text-sm font-medium text-ink dark:text-dark-ink">No rooms match your search.</p>
-            <p className="mt-1 text-xs text-muted dark:text-dark-muted">Try a different location or fewer guests.</p>
+            <p className="mt-1 text-xs text-muted dark:text-dark-muted">
+              {date
+                ? "All rooms are booked on this date. Try a different date, location, or fewer guests."
+                : "Try a different location or fewer guests."}
+            </p>
           </Card>
         ) : (
-          items.map((room) => {
+          (rooms || []).map((room) => {
             const rating = ratingsByRoomId?.[room.id] || { avg: 0, count: 0 };
             return (
               <RoomCard key={room.id} room={room} liked={likedIds.has(room.id)} onToggleLike={toggleLike} ratingAvg={rating.avg} ratingCount={rating.count} showLike />
@@ -158,6 +165,7 @@ const LandingGallery = React.memo(({ location = "", guests = 0 }) => {
       )}
     </div>
   );
-});
+  }
+);
 
 export default LandingGallery;

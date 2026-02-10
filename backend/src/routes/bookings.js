@@ -30,6 +30,7 @@ async function attachUserRole(req, _res, next) {
 
 // Public
 router.get("/availability/:roomId", bookingController.getAvailability);
+router.get("/booked-rooms", bookingController.getBookedRoomsByDate);
 
 // Authenticated (role-aware)
 router.get("/", requireAuth, attachUserRole, bookingController.getAll);

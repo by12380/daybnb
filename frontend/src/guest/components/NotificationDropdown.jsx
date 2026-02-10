@@ -189,8 +189,8 @@ export default function UserNotificationDropdown() {
           </div>
 
           {/* Footer */}
-          {notifications.length > 0 && (
-            <div className="border-t border-border px-4 py-2">
+          <div className="border-t border-border px-4 py-2">
+            {notifications.length > 0 && (
               <Link
                 to="/my-bookings"
                 onClick={closeDropdown}
@@ -198,8 +198,9 @@ export default function UserNotificationDropdown() {
               >
                 View all bookings
               </Link>
-            </div>
-          )}
+            )}
+
+          </div>
         </div>
       )}
     </div>
