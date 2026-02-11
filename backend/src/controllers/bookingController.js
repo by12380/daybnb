@@ -1,12 +1,14 @@
 const { supabase, supabaseAdmin } = require("../config/supabase");
 const asyncHandler = require("../utils/asyncHandler");
 const ApiError = require("../utils/ApiError");
+const { ROLES } = require("../middleware/rbac");
 const { emitNotificationToUser, emitNotificationToRole } = require("../socket");
 
 /**
  * GET /api/bookings
  * Admin: returns all bookings.
- * Regular user: returns only their own bookings.
+ * Owner: returns bookings on their rooms.
+ * Customer: returns only their own bookings.
  */
 exports.getAll = asyncHandler(async (req, res) => {
   if (!supabaseAdmin) throw ApiError.internal("Supabase is not configured");
@@ -19,8 +21,22 @@ exports.getAll = asyncHandler(async (req, res) => {
     .order("booking_date", { ascending: false })
     .range(Number(offset), Number(offset) + Number(limit) - 1);
 
-  // Non-admin users can only see their own bookings
-  if (req.userRole !== "admin") {
+  if (req.userRole === ROLES.ADMIN) {
+    // Admin sees all bookings
+  } else if (req.userRole === ROLES.OWNER) {
+    // Owner sees bookings on their rooms
+    const { data: ownerRooms } = await supabaseAdmin
+      .from("rooms")
+      .select("id")
+      .eq("owner_id", req.user.id);
+
+    const roomIds = (ownerRooms || []).map((r) => r.id);
+    if (roomIds.length === 0) {
+      return res.json({ bookings: [], total: 0 });
+    }
+    query = query.in("room_id", roomIds);
+  } else {
+    // Customer sees only their own bookings
     query = query.eq("user_id", req.user.id);
   }
 
@@ -48,8 +64,22 @@ exports.getById = asyncHandler(async (req, res) => {
   if (error) throw ApiError.internal(error.message);
   if (!data) throw ApiError.notFound("Booking not found");
 
-  // Non-admin users can only see their own bookings
-  if (req.userRole !== "admin" && data.user_id !== req.user.id) {
+  // Access control
+  if (req.userRole === ROLES.ADMIN) {
+    // Admin can see any booking
+  } else if (req.userRole === ROLES.OWNER) {
+    // Owner can see bookings on their rooms
+    const { data: room } = await supabaseAdmin
+      .from("rooms")
+      .select("id, owner_id")
+      .eq("id", data.room_id)
+      .eq("owner_id", req.user.id)
+      .maybeSingle();
+
+    if (!room && data.user_id !== req.user.id) {
+      throw ApiError.forbidden("Access denied");
+    }
+  } else if (data.user_id !== req.user.id) {
     throw ApiError.forbidden("Access denied");
   }
 
@@ -144,12 +174,38 @@ exports.create = asyncHandler(async (req, res) => {
   // Push via socket to all connected admins
   emitNotificationToRole("admin", savedNotif || adminNotification);
 
+  // Also notify the room owner if the room has one
+  const { data: room } = await supabaseAdmin
+    .from("rooms")
+    .select("owner_id")
+    .eq("id", data.room_id)
+    .maybeSingle();
+
+  if (room?.owner_id) {
+    const ownerNotification = {
+      recipient_user_id: room.owner_id,
+      type: "booking_created",
+      title: "New Booking Request",
+      body: `New booking for ${data.booking_date} from ${data.user_email || "a customer"}.`,
+      data: { booking_id: data.id, room_id: data.room_id, booking_date: data.booking_date },
+      created_at: new Date().toISOString(),
+    };
+
+    const { data: savedOwnerNotif } = await supabaseAdmin
+      .from("notifications")
+      .insert(ownerNotification)
+      .select()
+      .single();
+
+    emitNotificationToUser(room.owner_id, savedOwnerNotif || ownerNotification);
+  }
+
   res.status(201).json({ booking: data });
 });
 
 /**
  * PUT /api/bookings/:id
- * Update a booking (admin or owner).
+ * Update a booking (admin, owner of the room, or the booking customer).
  */
 exports.update = asyncHandler(async (req, res) => {
   if (!supabaseAdmin) throw ApiError.internal("Supabase is not configured");
@@ -163,7 +219,22 @@ exports.update = asyncHandler(async (req, res) => {
 
   if (!existingBooking) throw ApiError.notFound("Booking not found");
 
-  if (req.userRole !== "admin" && existingBooking.user_id !== req.user.id) {
+  // Access control
+  const isAdmin = req.userRole === ROLES.ADMIN;
+  const isBookingOwner = existingBooking.user_id === req.user.id;
+  let isRoomOwner = false;
+
+  if (req.userRole === ROLES.OWNER) {
+    const { data: room } = await supabaseAdmin
+      .from("rooms")
+      .select("id, owner_id")
+      .eq("id", existingBooking.room_id)
+      .eq("owner_id", req.user.id)
+      .maybeSingle();
+    isRoomOwner = !!room;
+  }
+
+  if (!isAdmin && !isRoomOwner && !isBookingOwner) {
     throw ApiError.forbidden("Access denied");
   }
 
@@ -174,13 +245,9 @@ exports.update = asyncHandler(async (req, res) => {
   if (user_full_name !== undefined) updates.user_full_name = user_full_name?.trim() || null;
   if (user_phone !== undefined) updates.user_phone = user_phone?.trim() || null;
 
-  // Price fields (total_price, price_per_day) are intentionally NOT updatable here.
-  // They are locked at the time of booking creation so admin room-price changes
-  // don't affect previously booked rooms.
-
   // When a customer edits their booking, reset status to "pending"
-  // so the admin must re-approve it.
-  if (req.userRole !== "admin") {
+  // so the admin/owner must re-approve it.
+  if (!isAdmin && !isRoomOwner) {
     updates.status = "pending";
   }
 
@@ -193,8 +260,8 @@ exports.update = asyncHandler(async (req, res) => {
 
   if (error) throw ApiError.internal(error.message);
 
-  // If customer edited booking details, re-notify admins for fresh approval review.
-  if (req.userRole !== "admin") {
+  // If customer edited booking details, re-notify admins and room owner
+  if (!isAdmin && !isRoomOwner) {
     const oldDate = existingBooking.booking_date;
     const newDate = data.booking_date;
     const changedDateText =
@@ -228,13 +295,42 @@ exports.update = asyncHandler(async (req, res) => {
       .single();
 
     emitNotificationToRole("admin", savedNotif || adminNotification);
+
+    // Also notify room owner
+    const { data: room } = await supabaseAdmin
+      .from("rooms")
+      .select("owner_id")
+      .eq("id", data.room_id || existingBooking.room_id)
+      .maybeSingle();
+
+    if (room?.owner_id) {
+      const ownerNotification = {
+        recipient_user_id: room.owner_id,
+        type: "booking_updated",
+        title: "Booking Updated by Customer",
+        body: `${editedBy} updated booking details. ${changedDateText}`,
+        data: {
+          booking_id: data.id,
+          room_id: data.room_id || existingBooking.room_id,
+          booking_date: newDate || oldDate,
+        },
+      };
+
+      const { data: savedOwnerNotif } = await supabaseAdmin
+        .from("notifications")
+        .insert(ownerNotification)
+        .select()
+        .single();
+
+      emitNotificationToUser(room.owner_id, savedOwnerNotif || ownerNotification);
+    }
   }
 
   res.json({ booking: data });
 });
 
 /**
- * PATCH /api/bookings/:id/approve  (admin only)
+ * PATCH /api/bookings/:id/approve  (admin or room owner)
  */
 exports.approve = asyncHandler(async (req, res) => {
   if (!supabaseAdmin) throw ApiError.internal("Supabase is not configured");
@@ -268,14 +364,13 @@ exports.approve = asyncHandler(async (req, res) => {
     .select()
     .single();
 
-  // Push via socket to the specific user
   emitNotificationToUser(data.user_id, savedNotif || approvedNotif);
 
   res.json({ booking: data });
 });
 
 /**
- * PATCH /api/bookings/:id/reject  (admin only)
+ * PATCH /api/bookings/:id/reject  (admin or room owner)
  */
 exports.reject = asyncHandler(async (req, res) => {
   if (!supabaseAdmin) throw ApiError.internal("Supabase is not configured");
@@ -313,14 +408,13 @@ exports.reject = asyncHandler(async (req, res) => {
     .select()
     .single();
 
-  // Push via socket to the specific user
   emitNotificationToUser(data.user_id, savedNotif || rejectedNotif);
 
   res.json({ booking: data });
 });
 
 /**
- * DELETE /api/bookings/:id  (admin or owner)
+ * DELETE /api/bookings/:id  (admin, room owner, or booking customer)
  */
 exports.remove = asyncHandler(async (req, res) => {
   if (!supabaseAdmin) throw ApiError.internal("Supabase is not configured");
@@ -334,7 +428,22 @@ exports.remove = asyncHandler(async (req, res) => {
 
   if (!existingBooking) throw ApiError.notFound("Booking not found");
 
-  if (req.userRole !== "admin" && existingBooking.user_id !== req.user.id) {
+  // Access control
+  const isAdmin = req.userRole === ROLES.ADMIN;
+  const isBookingOwner = existingBooking.user_id === req.user.id;
+  let isRoomOwner = false;
+
+  if (req.userRole === ROLES.OWNER) {
+    const { data: room } = await supabaseAdmin
+      .from("rooms")
+      .select("id, owner_id")
+      .eq("id", existingBooking.room_id)
+      .eq("owner_id", req.user.id)
+      .maybeSingle();
+    isRoomOwner = !!room;
+  }
+
+  if (!isAdmin && !isRoomOwner && !isBookingOwner) {
     throw ApiError.forbidden("Access denied");
   }
 
@@ -346,7 +455,7 @@ exports.remove = asyncHandler(async (req, res) => {
   if (error) throw ApiError.internal(error.message);
 
   // Notify admins when a customer cancels booking.
-  if (req.userRole !== "admin") {
+  if (!isAdmin) {
     const cancelledBy =
       existingBooking.user_full_name ||
       existingBooking.user_email ||
@@ -356,7 +465,7 @@ exports.remove = asyncHandler(async (req, res) => {
     const adminNotification = {
       recipient_role: "admin",
       type: "booking_cancelled",
-      title: "Booking Cancelled by Customer",
+      title: "Booking Cancelled",
       body: `${cancelledBy} cancelled booking for ${existingBooking.booking_date}.`,
       data: {
         booking_id: existingBooking.id,
@@ -372,6 +481,35 @@ exports.remove = asyncHandler(async (req, res) => {
       .single();
 
     emitNotificationToRole("admin", savedNotif || adminNotification);
+
+    // Also notify room owner
+    const { data: room } = await supabaseAdmin
+      .from("rooms")
+      .select("owner_id")
+      .eq("id", existingBooking.room_id)
+      .maybeSingle();
+
+    if (room?.owner_id && room.owner_id !== req.user.id) {
+      const ownerNotification = {
+        recipient_user_id: room.owner_id,
+        type: "booking_cancelled",
+        title: "Booking Cancelled",
+        body: `${cancelledBy} cancelled booking for ${existingBooking.booking_date}.`,
+        data: {
+          booking_id: existingBooking.id,
+          room_id: existingBooking.room_id,
+          booking_date: existingBooking.booking_date,
+        },
+      };
+
+      const { data: savedOwnerNotif } = await supabaseAdmin
+        .from("notifications")
+        .insert(ownerNotification)
+        .select()
+        .single();
+
+      emitNotificationToUser(room.owner_id, savedOwnerNotif || ownerNotification);
+    }
   }
 
   res.json({ message: "Booking deleted successfully" });

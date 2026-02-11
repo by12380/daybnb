@@ -1,12 +1,11 @@
 import React, { useState } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../../../auth/useAuth.js";
-import NotificationDropdown from "../NotificationDropdown.jsx";
 import ThemeToggle from "../../../theme/ThemeToggle.jsx";
 
 const NAV_ITEMS = [
   {
-    path: "/admin",
+    path: "/owner",
     label: "Dashboard",
     icon: (
       <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -15,7 +14,16 @@ const NAV_ITEMS = [
     ),
   },
   {
-    path: "/admin/bookings",
+    path: "/owner/rooms",
+    label: "My Rooms",
+    icon: (
+      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+      </svg>
+    ),
+  },
+  {
+    path: "/owner/bookings",
     label: "Bookings",
     icon: (
       <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -24,38 +32,11 @@ const NAV_ITEMS = [
     ),
   },
   {
-    path: "/admin/users",
-    label: "Users",
+    path: "/owner/customers",
+    label: "Customers",
     icon: (
       <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-      </svg>
-    ),
-  },
-  {
-    path: "/admin/rooms",
-    label: "Rooms",
-    icon: (
-      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-      </svg>
-    ),
-  },
-  {
-    path: "/admin/owners",
-    label: "Owners",
-    icon: (
-      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8.25 21v-4.875c0-.621.504-1.125 1.125-1.125h5.25c.621 0 1.125.504 1.125 1.125V21m0 0h4.5V3.545M12.75 21h7.5V10.75M2.25 21h1.5m18 0h-18M2.25 9l4.5-1.636M18.75 3l-1.5.545m0 6.205l3 1m1.5.5l-1.5-.5M6.75 7.364V3h-3v18m3-13.636l10.5-3.819" />
-      </svg>
-    ),
-  },
-  {
-    path: "/admin/messages",
-    label: "Messages",
-    icon: (
-      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
       </svg>
     ),
   },
@@ -66,42 +47,31 @@ const Sidebar = React.memo(({ isOpen, onClose }) => {
 
   return (
     <>
-      {/* Mobile overlay */}
       {isOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
-          onClick={onClose}
-        />
+        <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={onClose} />
       )}
-
-      {/* Sidebar */}
       <aside
         className={`fixed inset-y-0 left-0 z-50 w-64 transform overflow-hidden bg-panel shadow-xl transition-all duration-200 ease-in-out lg:static lg:translate-x-0 ${
           isOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
         <div className="flex h-full flex-col">
-          {/* Logo */}
           <div className="flex h-16 items-center justify-between border-b border-border px-6 dark:border-dark-border">
-            <Link to="/admin" className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-600 text-white">
+            <Link to="/owner" className="flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-600 text-white">
                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.25 21v-4.875c0-.621.504-1.125 1.125-1.125h5.25c.621 0 1.125.504 1.125 1.125V21m0 0h4.5V3.545M12.75 21h7.5V10.75M2.25 21h1.5m18 0h-18M2.25 9l4.5-1.636M18.75 3l-1.5.545m0 6.205l3 1m1.5.5l-1.5-.5M6.75 7.364V3h-3v18m3-13.636l10.5-3.819" />
                 </svg>
               </div>
-              <span className="text-lg font-bold text-gradient dark:text-gradient-dark">DayBnB Admin</span>
+              <span className="text-lg font-bold text-gradient dark:text-gradient-dark">Owner Panel</span>
             </Link>
-            <button
-              onClick={onClose}
-              className="rounded-lg p-1 text-muted hover:bg-surface/60 lg:hidden"
-            >
+            <button onClick={onClose} className="rounded-lg p-1 text-muted hover:bg-surface/60 lg:hidden">
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
           </div>
 
-          {/* Navigation */}
           <nav className="flex-1 space-y-1 overflow-y-auto overscroll-contain px-3 py-4">
             {NAV_ITEMS.map((item) => {
               const isActive = location.pathname === item.path;
@@ -112,7 +82,7 @@ const Sidebar = React.memo(({ isOpen, onClose }) => {
                   onClick={onClose}
                   className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors ${
                     isActive
-                      ? "bg-brand-50 text-brand-700 dark:bg-brand-900/30 dark:text-brand-300"
+                      ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
                       : "text-muted hover:bg-surface/60 hover:text-ink"
                   }`}
                 >
@@ -123,7 +93,6 @@ const Sidebar = React.memo(({ isOpen, onClose }) => {
             })}
           </nav>
 
-          {/* Back to site */}
           <div className="mt-auto border-t border-border p-4 dark:border-dark-border">
             <Link
               to="/"
@@ -146,25 +115,21 @@ const Header = React.memo(({ onMenuClick }) => {
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-panel/80 px-4 backdrop-blur transition-colors duration-300 lg:px-6">
-      <button
-        onClick={onMenuClick}
-        className="rounded-lg p-2 text-muted hover:bg-surface/60 lg:hidden"
-      >
+      <button onClick={onMenuClick} className="rounded-lg p-2 text-muted hover:bg-surface/60 lg:hidden">
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
         </svg>
       </button>
 
       <div className="hidden lg:block">
-        <h1 className="text-lg font-semibold text-ink dark:text-dark-ink">Admin Panel</h1>
+        <h1 className="text-lg font-semibold text-ink dark:text-dark-ink">Owner Panel</h1>
       </div>
 
       <div className="flex items-center gap-4">
         <ThemeToggle />
-        <NotificationDropdown />
         <div className="text-right">
-          <p className="text-sm font-medium text-ink dark:text-dark-ink">{user?.email || "Admin"}</p>
-          <p className="text-xs text-muted dark:text-dark-muted">Administrator</p>
+          <p className="text-sm font-medium text-ink dark:text-dark-ink">{user?.email || "Owner"}</p>
+          <p className="text-xs text-muted dark:text-dark-muted">Property Owner</p>
         </div>
         <button
           onClick={signOut}
@@ -177,7 +142,7 @@ const Header = React.memo(({ onMenuClick }) => {
   );
 });
 
-export default function AdminLayout() {
+export default function OwnerLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (

@@ -5,7 +5,7 @@ const ApiError = require("../utils/ApiError");
 /**
  * GET /api/rooms
  * List all rooms. Supports optional query params:
- *   ?type=suite&search=ocean&limit=20&offset=0
+ *   ?type=suite&search=ocean&limit=20&offset=0&owner_id=xxx
  */
 exports.getAll = asyncHandler(async (req, res) => {
   if (!supabase) throw ApiError.internal("Supabase is not configured");
@@ -18,6 +18,7 @@ exports.getAll = asyncHandler(async (req, res) => {
     max_price,
     date,
     sort,
+    owner_id,
     limit = 50,
     offset = 0,
   } = req.query;
@@ -28,6 +29,11 @@ exports.getAll = asyncHandler(async (req, res) => {
 
   if (type) {
     query = query.eq("type", type);
+  }
+
+  // Filter by owner if specified
+  if (owner_id) {
+    query = query.eq("owner_id", owner_id);
   }
 
   if (search) {
@@ -106,12 +112,12 @@ exports.getById = asyncHandler(async (req, res) => {
 
 /**
  * POST /api/rooms  (admin only)
- * Create a new room.
+ * Create a new room. Admin can optionally assign an owner_id.
  */
 exports.create = asyncHandler(async (req, res) => {
   if (!supabaseAdmin) throw ApiError.internal("Supabase admin client is not configured");
 
-  const { title, location, type, guests, price_per_day, image, tags } = req.body;
+  const { title, location, type, guests, price_per_day, image, tags, owner_id } = req.body;
 
   if (!title || !location) {
     throw ApiError.badRequest("Title and location are required");
@@ -126,6 +132,7 @@ exports.create = asyncHandler(async (req, res) => {
     price_per_day: Number(price_per_day) || 0,
     image: image || null,
     tags: Array.isArray(tags) ? tags : [],
+    owner_id: owner_id || null,
   };
 
   const { data, error } = await supabaseAdmin
@@ -141,12 +148,12 @@ exports.create = asyncHandler(async (req, res) => {
 
 /**
  * PUT /api/rooms/:id  (admin only)
- * Update a room.
+ * Update a room. Admin can update any room.
  */
 exports.update = asyncHandler(async (req, res) => {
   if (!supabaseAdmin) throw ApiError.internal("Supabase admin client is not configured");
 
-  const { title, location, type, guests, price_per_day, image, tags } = req.body;
+  const { title, location, type, guests, price_per_day, image, tags, owner_id } = req.body;
 
   const updates = {};
   if (title !== undefined) updates.title = title.trim();
@@ -156,6 +163,7 @@ exports.update = asyncHandler(async (req, res) => {
   if (price_per_day !== undefined) updates.price_per_day = Number(price_per_day);
   if (image !== undefined) updates.image = image || null;
   if (tags !== undefined) updates.tags = Array.isArray(tags) ? tags : [];
+  if (owner_id !== undefined) updates.owner_id = owner_id || null;
 
   const { data, error } = await supabaseAdmin
     .from("rooms")

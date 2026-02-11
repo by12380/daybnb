@@ -4,12 +4,13 @@ const ApiError = require("../utils/ApiError");
 
 /**
  * GET /api/users  (admin only)
- * List all user profiles.
+ * List all user profiles. Supports filtering by role.
+ * Query params: ?search=...&role=owner|customer|admin&limit=50&offset=0
  */
 exports.getAll = asyncHandler(async (req, res) => {
   if (!supabaseAdmin) throw ApiError.internal("Supabase is not configured");
 
-  const { search, limit = 50, offset = 0 } = req.query;
+  const { search, role, limit = 50, offset = 0 } = req.query;
 
   let query = supabaseAdmin
     .from("profiles")
@@ -21,6 +22,10 @@ exports.getAll = asyncHandler(async (req, res) => {
     query = query.or(
       `full_name.ilike.%${search}%,email.ilike.%${search}%`
     );
+  }
+
+  if (role) {
+    query = query.eq("user_type", role);
   }
 
   const { data, error, count } = await query;
@@ -55,11 +60,12 @@ exports.getById = asyncHandler(async (req, res) => {
 exports.update = asyncHandler(async (req, res) => {
   if (!supabaseAdmin) throw ApiError.internal("Supabase is not configured");
 
-  const { full_name, phone } = req.body;
+  const { full_name, phone, user_type } = req.body;
 
   const updates = { updated_at: new Date().toISOString() };
   if (full_name !== undefined) updates.full_name = full_name?.trim() || null;
   if (phone !== undefined) updates.phone = phone?.trim() || null;
+  if (user_type !== undefined) updates.user_type = user_type;
 
   const { data, error } = await supabaseAdmin
     .from("profiles")

@@ -10,6 +10,22 @@ const api = axios.create({
   },
 });
 
+// ─── Impersonation state ─────────────────────────────────────
+// Stored in memory so it resets on page refresh (intentional safety).
+let _impersonatingOwnerId = null;
+
+export function setImpersonation(ownerId) {
+  _impersonatingOwnerId = ownerId || null;
+}
+
+export function getImpersonation() {
+  return _impersonatingOwnerId;
+}
+
+export function clearImpersonation() {
+  _impersonatingOwnerId = null;
+}
+
 // Request interceptor – attach Supabase access token to every request
 api.interceptors.request.use(
   async (config) => {
@@ -23,6 +39,12 @@ api.interceptors.request.use(
         config.headers.Authorization = `Bearer ${session.access_token}`;
       }
     }
+
+    // Attach impersonation header if active
+    if (_impersonatingOwnerId) {
+      config.headers["x-impersonate-owner"] = _impersonatingOwnerId;
+    }
+
     return config;
   },
   (error) => Promise.reject(error)

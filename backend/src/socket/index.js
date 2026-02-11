@@ -25,7 +25,7 @@ function parseBearerToken(authorizationHeader) {
 }
 
 async function getUserRole(userId) {
-  if (!supabaseAdmin || !userId) return "user";
+  if (!supabaseAdmin || !userId) return "customer";
 
   const { data } = await supabaseAdmin
     .from("profiles")
@@ -33,7 +33,7 @@ async function getUserRole(userId) {
     .eq("id", userId)
     .maybeSingle();
 
-  return data?.user_type || "user";
+  return data?.user_type || "customer";
 }
 
 async function authenticateSocket(handshake) {
@@ -93,13 +93,20 @@ function initializeSocket(httpServer) {
 
     console.log(`🔌 Socket connected: ${userEmail || userId} (role: ${role})`);
 
+    // Every user joins their personal room
     if (userId) {
       socket.join(`user:${userId}`);
     }
 
+    // Role-based rooms
     if (role === "admin") {
       socket.join("role:admin");
       console.log(`  ↳ ${userEmail || userId} joined role:admin room`);
+    }
+
+    if (role === "owner") {
+      socket.join("role:owner");
+      console.log(`  ↳ ${userEmail || userId} joined role:owner room`);
     }
 
     socket.on("disconnect", (reason) => {

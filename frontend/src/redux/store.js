@@ -8,6 +8,7 @@ import notificationReducer from "./slices/notificationSlice";
 import contactReducer from "./slices/contactSlice";
 import userReducer from "./slices/userSlice";
 import stripeReducer from "./slices/stripeSlice";
+import ownerReducer from "./slices/ownerSlice";
 
 const store = configureStore({
   reducer: {
@@ -19,6 +20,7 @@ const store = configureStore({
     contact: contactReducer,
     users: userReducer,
     stripe: stripeReducer,
+    owner: ownerReducer,
   },
 });
 

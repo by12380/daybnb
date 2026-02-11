@@ -1,0 +1,221 @@
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { Modal } from "antd";
+import { useDispatch, useSelector } from "react-redux";
+import { formatPrice } from "../../guest/utils/format.js";
+import Button from "../../guest/components/ui/Button.jsx";
+import FormInput, { INPUT_STYLES } from "../../guest/components/ui/FormInput.jsx";
+import {
+  fetchOwnerRooms,
+  createOwnerRoom,
+  updateOwnerRoom,
+  deleteOwnerRoom,
+} from "../../redux/slices/ownerSlice.js";
+
+const ROOM_TYPES = [
+  { value: "room", label: "Room" },
+  { value: "suite", label: "Suite" },
+  { value: "studio", label: "Studio" },
+  { value: "villa", label: "Villa" },
+  { value: "resort", label: "Resort" },
+];
+
+const RoomFormModal = React.memo(({ open, room, onClose, onSave, isNew }) => {
+  const dispatch = useDispatch();
+  const [title, setTitle] = useState("");
+  const [location, setLocation] = useState("");
+  const [type, setType] = useState("room");
+  const [guests, setGuests] = useState(2);
+  const [pricePerDay, setPricePerDay] = useState(100);
+  const [image, setImage] = useState("");
+  const [tags, setTags] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (open) {
+      if (room && !isNew) {
+        setTitle(room.title || ""); setLocation(room.location || ""); setType(room.type || "room");
+        setGuests(room.guests || 2); setPricePerDay(room.price_per_day || 100);
+        setImage(room.image || ""); setTags(room.tags?.join(", ") || "");
+      } else {
+        setTitle(""); setLocation(""); setType("room"); setGuests(2); setPricePerDay(100); setImage(""); setTags("");
+      }
+      setError("");
+    }
+  }, [room, open, isNew]);
+
+  const handleSave = useCallback(async () => {
+    setError("");
+    if (!title.trim()) { setError("Please enter a room title."); return; }
+    if (!location.trim()) { setError("Please enter a location."); return; }
+    setSaving(true);
+    const roomData = {
+      title: title.trim(), location: location.trim(), type,
+      guests: Number(guests) || 2, price_per_day: Number(pricePerDay) || 0,
+      image: image.trim() || null, tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
+    };
+    try {
+      if (isNew) { await dispatch(createOwnerRoom(roomData)).unwrap(); }
+      else { await dispatch(updateOwnerRoom({ id: room.id, ...roomData })).unwrap(); }
+      onSave();
+    } catch (err) { setError(err || `Failed to ${isNew ? "create" : "update"} room.`); }
+    finally { setSaving(false); }
+  }, [dispatch, title, location, type, guests, pricePerDay, image, tags, isNew, room?.id, onSave]);
+
+  return (
+    <Modal title={isNew ? "Add New Room" : "Edit Room"} open={open} onCancel={onClose} footer={null} destroyOnClose width={600}>
+      <div className="space-y-4 pt-4">
+        <FormInput label="Room Title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g., Seaside Premium Suite" />
+        <FormInput label="Location" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="e.g., Washington" />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="flex flex-col gap-2">
+            <span className="text-sm font-medium text-muted">Room Type</span>
+            <select value={type} onChange={(e) => setType(e.target.value)} className={INPUT_STYLES}>
+              {ROOM_TYPES.map((t) => (<option key={t.value} value={t.value}>{t.label}</option>))}
+            </select>
+          </label>
+          <FormInput label="Max Guests" type="number" min={1} max={20} value={guests} onChange={(e) => setGuests(e.target.value)} />
+        </div>
+        <FormInput label="Price per Day ($)" type="number" min={0} step={0.01} value={pricePerDay} onChange={(e) => setPricePerDay(e.target.value)} />
+        <FormInput label="Image URL" value={image} onChange={(e) => setImage(e.target.value)} placeholder="https://example.com/image.jpg" />
+        {image && (
+          <div className="overflow-hidden rounded-xl border border-border">
+            <img src={image} alt="Preview" className="h-32 w-full object-cover" onError={(e) => { e.target.style.display = "none"; }} />
+          </div>
+        )}
+        <FormInput label="Tags (comma-separated)" value={tags} onChange={(e) => setTags(e.target.value)} placeholder="e.g., Ocean view, Wi-Fi, Workspace" />
+        {error && <p className="text-sm text-red-600">{error}</p>}
+        <div className="flex justify-end gap-3 pt-2">
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={handleSave} disabled={saving}>{saving ? "Saving..." : isNew ? "Create Room" : "Save Changes"}</Button>
+        </div>
+      </div>
+    </Modal>
+  );
+});
+
+const DeleteRoomModal = React.memo(({ open, room, onClose, onConfirm }) => {
+  const dispatch = useDispatch();
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleDelete = useCallback(async () => {
+    setError(""); setDeleting(true);
+    try { await dispatch(deleteOwnerRoom(room.id)).unwrap(); onConfirm(); }
+    catch (err) { setError(err || "Failed to delete room."); }
+    finally { setDeleting(false); }
+  }, [dispatch, room?.id, onConfirm]);
+
+  return (
+    <Modal title="Delete Room" open={open} onCancel={onClose} footer={null} destroyOnClose>
+      <div className="space-y-4 pt-4">
+        <p className="text-sm text-muted">Are you sure you want to delete this room? This action cannot be undone.</p>
+        {room && (
+          <div className="rounded-xl border border-red-100 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/30">
+            <div className="flex items-center gap-3">
+              {room.image && <img src={room.image} alt={room.title} className="h-12 w-12 rounded-lg object-cover" />}
+              <div><p className="font-medium text-ink">{room.title}</p><p className="text-sm text-muted">{room.location}</p></div>
+            </div>
+          </div>
+        )}
+        {error && <p className="text-sm text-red-600">{error}</p>}
+        <div className="flex justify-end gap-3 pt-2">
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button className="!bg-red-600 hover:!bg-red-700" onClick={handleDelete} disabled={deleting}>{deleting ? "Deleting..." : "Delete Room"}</Button>
+        </div>
+      </div>
+    </Modal>
+  );
+});
+
+export default function OwnerRooms() {
+  const dispatch = useDispatch();
+  const { rooms, loading } = useSelector((state) => state.owner);
+
+  const [searchTerm, setSearchTerm] = useState("");
+  const [editingRoom, setEditingRoom] = useState(null);
+  const [deletingRoom, setDeletingRoom] = useState(null);
+  const [isCreating, setIsCreating] = useState(false);
+
+  useEffect(() => { dispatch(fetchOwnerRooms()); }, [dispatch]);
+
+  const filteredRooms = useMemo(() => {
+    if (!searchTerm) return rooms || [];
+    const search = searchTerm.toLowerCase();
+    return (rooms || []).filter((room) => room.title?.toLowerCase().includes(search) || room.location?.toLowerCase().includes(search));
+  }, [rooms, searchTerm]);
+
+  const handleSave = useCallback(() => { setEditingRoom(null); setIsCreating(false); dispatch(fetchOwnerRooms()); }, [dispatch]);
+  const handleDeleteConfirm = useCallback(() => { setDeletingRoom(null); }, []);
+
+  if (loading && (!rooms || rooms.length === 0)) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <div className="text-center">
+          <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-emerald-200 border-t-emerald-600" />
+          <p className="mt-4 text-sm text-muted">Loading rooms...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-ink">My Rooms</h1>
+          <p className="mt-1 text-sm text-muted">Manage your property listings ({(rooms || []).length} total)</p>
+        </div>
+        <Button onClick={() => setIsCreating(true)}>
+          <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+          Add Room
+        </Button>
+      </div>
+
+      <div className="flex-1">
+        <input type="text" placeholder="Search by title or location..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className={`${INPUT_STYLES} w-full max-w-md`} />
+      </div>
+
+      {filteredRooms.length === 0 ? (
+        <div className="rounded-2xl border border-border bg-panel py-12 text-center shadow-sm">
+          <p className="mt-4 text-sm font-medium text-ink">No rooms found</p>
+          <p className="mt-1 text-sm text-muted">{searchTerm ? "Try adjusting your search" : "Add your first room to get started"}</p>
+          {!searchTerm && <div className="mt-4"><Button onClick={() => setIsCreating(true)}>Add Room</Button></div>}
+        </div>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {filteredRooms.map((room) => (
+            <div key={room.id} className="overflow-hidden rounded-2xl border border-border bg-panel shadow-sm transition-shadow hover:shadow-md">
+              {room.image && <img src={room.image} alt={room.title} className="h-40 w-full object-cover" />}
+              <div className="p-5">
+                <div className="flex items-start justify-between">
+                  <div><h3 className="font-semibold text-ink">{room.title}</h3><p className="text-sm text-muted">{room.location}</p></div>
+                  <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium capitalize text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">{room.type}</span>
+                </div>
+                <div className="mt-4 flex items-center gap-4 text-sm">
+                  <div className="flex items-center gap-1 text-muted">
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                    {room.guests} guests
+                  </div>
+                </div>
+                <div className="mt-3">
+                  <span className="text-lg font-bold text-emerald-600">{formatPrice(room.price_per_day || 0)}</span>
+                  <span className="text-sm text-muted">/day</span>
+                </div>
+                <div className="mt-4 flex gap-2 border-t border-border pt-4">
+                  <button onClick={() => setEditingRoom(room)} className="flex-1 rounded-lg border border-border px-3 py-2 text-sm font-medium text-muted transition-colors hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600">Edit</button>
+                  <button onClick={() => setDeletingRoom(room)} className="rounded-lg border border-border px-3 py-2 text-sm font-medium text-muted transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600">
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <RoomFormModal open={!!editingRoom || isCreating} room={editingRoom} isNew={isCreating} onClose={() => { setEditingRoom(null); setIsCreating(false); }} onSave={handleSave} />
+      <DeleteRoomModal open={!!deletingRoom} room={deletingRoom} onClose={() => setDeletingRoom(null)} onConfirm={handleDeleteConfirm} />
+    </div>
+  );
+}

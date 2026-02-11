@@ -33,14 +33,18 @@ export function useProfile() {
     }
   }, [authLoading, fetchProfile]);
 
-  const isAdmin = profile?.user_type === "admin";
-  const isUser = profile?.user_type === "user" || (!profile?.user_type && !!user);
+  const role = profile?.user_type || null;
+  const isAdmin = role === "admin";
+  const isOwner = role === "owner";
+  const isCustomer = role === "customer" || (!role && !!user);
 
   return {
     profile,
     loading: authLoading || loading,
+    role,
     isAdmin,
-    isUser,
+    isOwner,
+    isCustomer,
     refetch: fetchProfile,
   };
 }

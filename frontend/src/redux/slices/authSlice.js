@@ -5,12 +5,13 @@ import api from "../api";
 
 export const signup = createAsyncThunk(
   "auth/signup",
-  async ({ email, password, full_name }, { rejectWithValue }) => {
+  async ({ email, password, full_name, role }, { rejectWithValue }) => {
     try {
       const { data } = await api.post("/auth/signup", {
         email,
         password,
         full_name,
+        role,
       });
       return data;
     } catch (err) {
@@ -73,6 +74,7 @@ const initialState = {
   user: null,
   profile: null,
   session: null,
+  role: null,
   loading: false,
   error: null,
 };
@@ -105,6 +107,7 @@ const authSlice = createSlice({
         state.loading = false;
         state.user = action.payload.user;
         state.session = action.payload.session;
+        state.role = action.payload.role || null;
       })
       .addCase(signup.rejected, (state, action) => {
         state.loading = false;
@@ -121,6 +124,7 @@ const authSlice = createSlice({
         state.loading = false;
         state.user = action.payload.user;
         state.session = action.payload.session;
+        state.role = action.payload.role || null;
       })
       .addCase(login.rejected, (state, action) => {
         state.loading = false;
@@ -150,6 +154,7 @@ const authSlice = createSlice({
         state.loading = false;
         state.user = action.payload.user;
         state.profile = action.payload.profile;
+        state.role = action.payload.role || action.payload.profile?.user_type || null;
       })
       .addCase(getMe.rejected, (state, action) => {
         state.loading = false;

@@ -1,41 +1,19 @@
-const { supabaseAdmin } = require("../config/supabase");
-const ApiError = require("../utils/ApiError");
+const { attachRole, requireRole, ROLES } = require("./rbac");
 
 /**
- * Middleware that checks if the authenticated user has the "admin" role.
+ * Legacy middleware that checks if the authenticated user has the "admin" role.
  * Must be placed AFTER requireAuth so that `req.user` is available.
  *
- * It looks up the user's `profiles.user_type` column in Supabase
- * (using the admin client to bypass RLS).
+ * This is now a wrapper around the new RBAC middleware for backward
+ * compatibility. Prefer using `attachRole` + `requireRole(ROLES.ADMIN)`
+ * directly in new code.
  */
-async function requireAdmin(req, _res, next) {
-  try {
-    if (!req.user) {
-      throw ApiError.unauthorized("Authentication required");
-    }
-
-    if (!supabaseAdmin) {
-      throw ApiError.internal("Supabase admin client is not configured");
-    }
-
-    const { data: profile, error } = await supabaseAdmin
-      .from("profiles")
-      .select("user_type")
-      .eq("id", req.user.id)
-      .maybeSingle();
-
-    if (error) {
-      throw ApiError.internal("Failed to verify admin status");
-    }
-
-    if (!profile || profile.user_type !== "admin") {
-      throw ApiError.forbidden("Admin access required");
-    }
-
-    next();
-  } catch (err) {
-    next(err);
-  }
+async function requireAdmin(req, res, next) {
+  // First attach the role, then check it
+  attachRole(req, res, (err) => {
+    if (err) return next(err);
+    requireRole(ROLES.ADMIN)(req, res, next);
+  });
 }
 
 module.exports = { requireAdmin };

@@ -13,6 +13,7 @@ import PaymentSuccess from "../guest/pages/PaymentSuccess.jsx";
 import PaymentCancel from "../guest/pages/PaymentCancel.jsx";
 import RequireAuth from "../auth/RequireAuth.jsx";
 import RequireAdmin from "../auth/RequireAdmin.jsx";
+import RequireOwner from "../auth/RequireOwner.jsx";
 
 // Admin imports
 import AdminLayout from "../admin/components/layout/AdminLayout.jsx";
@@ -21,6 +22,14 @@ import AdminBookings from "../admin/pages/Bookings.jsx";
 import AdminUsers from "../admin/pages/Users.jsx";
 import AdminRooms from "../admin/pages/Rooms.jsx";
 import AdminMessages from "../admin/pages/Messages.jsx";
+import AdminOwners from "../admin/pages/Owners.jsx";
+
+// Owner imports
+import OwnerLayout from "../owner/components/layout/OwnerLayout.jsx";
+import OwnerDashboard from "../owner/pages/Dashboard.jsx";
+import OwnerRooms from "../owner/pages/Rooms.jsx";
+import OwnerBookings from "../owner/pages/Bookings.jsx";
+import OwnerCustomers from "../owner/pages/Customers.jsx";
 
 export default function AppRouter() {
   return (
@@ -56,6 +65,17 @@ export default function AppRouter() {
             <Route path="/admin/users" element={<AdminUsers />} />
             <Route path="/admin/rooms" element={<AdminRooms />} />
             <Route path="/admin/messages" element={<AdminMessages />} />
+            <Route path="/admin/owners" element={<AdminOwners />} />
+          </Route>
+        </Route>
+
+        {/* Owner Routes - Protected by RequireOwner */}
+        <Route element={<RequireOwner />}>
+          <Route element={<OwnerLayout />}>
+            <Route path="/owner" element={<OwnerDashboard />} />
+            <Route path="/owner/rooms" element={<OwnerRooms />} />
+            <Route path="/owner/bookings" element={<OwnerBookings />} />
+            <Route path="/owner/customers" element={<OwnerCustomers />} />
           </Route>
         </Route>
       </Routes>

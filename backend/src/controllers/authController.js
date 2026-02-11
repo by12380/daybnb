@@ -1,17 +1,25 @@
-const { supabase } = require("../config/supabase");
+const { supabase, supabaseAdmin } = require("../config/supabase");
 const asyncHandler = require("../utils/asyncHandler");
 const ApiError = require("../utils/ApiError");
+const { ROLES } = require("../middleware/rbac");
 
 /**
  * POST /api/auth/signup
  * Register a new user with email + password.
+ * Body: { email, password, full_name, role }
+ *   - role: "owner" | "customer" (default: "customer")
  */
 exports.signup = asyncHandler(async (req, res) => {
-  const { email, password, full_name } = req.body;
+  const { email, password, full_name, role } = req.body;
 
   if (!email || !password) {
     throw ApiError.badRequest("Email and password are required");
   }
+
+  // Validate requested role — only "owner" or "customer" allowed at signup
+  const allowedSignupRoles = [ROLES.OWNER, ROLES.CUSTOMER];
+  const requestedRole =
+    role && allowedSignupRoles.includes(role) ? role : ROLES.CUSTOMER;
 
   if (!supabase) throw ApiError.internal("Supabase is not configured");
 
@@ -19,7 +27,7 @@ exports.signup = asyncHandler(async (req, res) => {
     email,
     password,
     options: {
-      data: { full_name: full_name || null },
+      data: { full_name: full_name || null, role: requestedRole },
     },
   });
 
@@ -29,12 +37,14 @@ exports.signup = asyncHandler(async (req, res) => {
     message: "Signup successful. Check your email for confirmation.",
     user: data.user,
     session: data.session,
+    role: requestedRole,
   });
 });
 
 /**
  * POST /api/auth/login
  * Sign in with email + password.
+ * Returns the user, session, and the user's role from the profiles table.
  */
 exports.login = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
@@ -52,9 +62,22 @@ exports.login = asyncHandler(async (req, res) => {
 
   if (error) throw ApiError.unauthorized(error.message);
 
+  // Fetch profile to include role
+  let role = ROLES.CUSTOMER;
+  if (supabaseAdmin && data.user) {
+    const { data: profile } = await supabaseAdmin
+      .from("profiles")
+      .select("user_type")
+      .eq("id", data.user.id)
+      .maybeSingle();
+
+    role = profile?.user_type || ROLES.CUSTOMER;
+  }
+
   res.json({
     user: data.user,
     session: data.session,
+    role,
   });
 });
 
@@ -73,7 +96,8 @@ exports.logout = asyncHandler(async (_req, res) => {
 
 /**
  * GET /api/auth/me
- * Return the currently authenticated user's profile.
+ * Return the currently authenticated user's profile including their role.
+ * When an admin is impersonating an owner, this also returns impersonation context.
  */
 exports.getMe = asyncHandler(async (req, res) => {
   if (!supabase) throw ApiError.internal("Supabase is not configured");
@@ -84,23 +108,33 @@ exports.getMe = asyncHandler(async (req, res) => {
     .eq("id", req.user.id)
     .maybeSingle();
 
-  res.json({
+  const response = {
     user: req.user,
     profile: profile || null,
-  });
+    role: profile?.user_type || ROLES.CUSTOMER,
+  };
+
+  // If admin is impersonating, include impersonation info
+  if (req.impersonating) {
+    response.impersonating = true;
+    response.impersonated_owner = req.impersonatedOwner;
+    response.effective_role = req.effectiveRole;
+  }
+
+  res.json(response);
 });
 
 /**
  * POST /api/auth/ensure-profile
  * Ensure a profile row exists for the authenticated user.
  * Creates one if missing, or updates email if already present.
- * Body: { is_signup: boolean }
+ * Body: { is_signup: boolean, role: "owner" | "customer" }
  */
 exports.ensureProfile = asyncHandler(async (req, res) => {
   if (!supabase) throw ApiError.internal("Supabase is not configured");
 
   const user = req.user;
-  const { is_signup } = req.body;
+  const { is_signup, role } = req.body;
 
   // Check if profile already exists
   const { data: existing, error: selectError } = await supabase
@@ -130,6 +164,15 @@ exports.ensureProfile = asyncHandler(async (req, res) => {
     return res.json({ profile: updated || existing });
   }
 
+  // Determine role for new profile
+  const allowedSignupRoles = [ROLES.OWNER, ROLES.CUSTOMER];
+  const userRole =
+    is_signup && role && allowedSignupRoles.includes(role)
+      ? role
+      : user.user_metadata?.role && allowedSignupRoles.includes(user.user_metadata.role)
+        ? user.user_metadata.role
+        : ROLES.CUSTOMER;
+
   // Create a new profile row
   const { data: created, error: insertError } = await supabase
     .from("profiles")
@@ -142,7 +185,7 @@ exports.ensureProfile = asyncHandler(async (req, res) => {
         user.user_metadata?.display_name ||
         null,
       phone: user.phone || user.user_metadata?.phone || null,
-      user_type: is_signup ? "user" : null,
+      user_type: userRole,
       updated_at: new Date().toISOString(),
     })
     .select()
