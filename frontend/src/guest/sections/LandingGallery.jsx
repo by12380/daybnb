@@ -11,6 +11,12 @@ import { fetchRatingsForRooms } from "../utils/roomReviews.js";
 
 const PAGE_SIZE = 10;
 
+const SORT_OPTIONS = [
+  { value: "", label: "Newest" },
+  { value: "price_asc", label: "Price: Low to High" },
+  { value: "price_desc", label: "Price: High to Low" },
+];
+
 const LandingGallery = React.memo(
   ({ location = "", guests = 0, date = "", minPrice = "", maxPrice = "" }) => {
   const dispatch = useDispatch();
@@ -25,15 +31,16 @@ const LandingGallery = React.memo(
   } = useSelector((state) => state.rooms);
 
   const [currentPage, setCurrentPage] = useState(1);
+  const [sortOrder, setSortOrder] = useState("");
   const [likedIds, setLikedIds] = useState(() => new Set());
   const [ratingsByRoomId, setRatingsByRoomId] = useState({});
 
   const totalPages = Math.ceil((totalCount || 0) / PAGE_SIZE);
 
-  // Reset to first page whenever any filter changes
+  // Reset to first page whenever any filter or sort changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [location, guests, date, minPrice, maxPrice]);
+  }, [location, guests, date, minPrice, maxPrice, sortOrder]);
 
   // Fetch filtered rooms via API
   useEffect(() => {
@@ -45,9 +52,10 @@ const LandingGallery = React.memo(
     if (date) params.date = date;
     if (minPrice !== "" && Number(minPrice) >= 0) params.min_price = Number(minPrice);
     if (maxPrice !== "" && Number(maxPrice) >= 0) params.max_price = Number(maxPrice);
+    if (sortOrder) params.sort = sortOrder;
 
     dispatch(fetchRooms(params));
-  }, [dispatch, currentPage, location, guests, date, minPrice, maxPrice]);
+  }, [dispatch, currentPage, location, guests, date, minPrice, maxPrice, sortOrder]);
 
   const handlePageChange = useCallback((page) => {
     setCurrentPage(page);
@@ -111,10 +119,29 @@ const LandingGallery = React.memo(
 
   return (
     <div>
-      <div className="flex items-end justify-between gap-4">
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h2 className="text-2xl font-semibold text-brand-700 dark:text-brand-400">Explore day-use spaces</h2>
           <p className="mt-1 text-sm text-muted dark:text-dark-muted">A quick preview of the types of rooms guests book during the day.</p>
+        </div>
+
+        {/* Sort buttons */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted dark:text-dark-muted">Sort:</span>
+          {SORT_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => setSortOrder(opt.value)}
+              className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+                sortOrder === opt.value
+                  ? "border-brand-500 bg-brand-50 text-brand-700 dark:border-brand-400 dark:bg-brand-900/30 dark:text-brand-300"
+                  : "border-border bg-surface/60 text-muted hover:border-brand-200 hover:text-ink dark:border-dark-border dark:bg-dark-surface/60 dark:text-dark-muted dark:hover:border-brand-700"
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
         </div>
       </div>
 

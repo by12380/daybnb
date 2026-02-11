@@ -17,6 +17,7 @@ exports.getAll = asyncHandler(async (req, res) => {
     min_price,
     max_price,
     date,
+    sort,
     limit = 50,
     offset = 0,
   } = req.query;
@@ -67,9 +68,16 @@ exports.getAll = asyncHandler(async (req, res) => {
     }
   }
 
-  query = query
-    .order("created_at", { ascending: false })
-    .range(Number(offset), Number(offset) + Number(limit) - 1);
+  // Sorting – supports price_asc, price_desc; default is newest first
+  if (sort === "price_asc") {
+    query = query.order("price_per_day", { ascending: true });
+  } else if (sort === "price_desc") {
+    query = query.order("price_per_day", { ascending: false });
+  } else {
+    query = query.order("created_at", { ascending: false });
+  }
+
+  query = query.range(Number(offset), Number(offset) + Number(limit) - 1);
 
   const { data, error, count } = await query;
   if (error) throw ApiError.internal(error.message);
