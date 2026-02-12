@@ -1,11 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Modal } from "antd";
 import { useDispatch, useSelector } from "react-redux";
+import { useAuth } from "../../auth/useAuth.js";
 import { formatPrice } from "../../guest/utils/format.js";
 import Button from "../../guest/components/ui/Button.jsx";
 import FormInput, { INPUT_STYLES } from "../../guest/components/ui/FormInput.jsx";
 import { fetchRooms, createRoom, updateRoom, deleteRoom } from "../../redux/slices/roomSlice.js";
 import { fetchBookings } from "../../redux/slices/bookingSlice.js";
+import api from "../../redux/api.js";
 
 const ROOM_TYPES = [
   { value: "room", label: "Room" },
@@ -120,11 +122,14 @@ const DeleteRoomModal = React.memo(({ open, room, onClose, onConfirm }) => {
 
 export default function AdminRooms() {
   const dispatch = useDispatch();
+  const { user } = useAuth();
   const { rooms, loading } = useSelector((state) => state.rooms);
   const { bookings } = useSelector((state) => state.bookings);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
+  const [ownerFilter, setOwnerFilter] = useState("admin"); // "admin" | "all" | owner_id
+  const [owners, setOwners] = useState([]);
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState("");
 
@@ -136,6 +141,9 @@ export default function AdminRooms() {
   useEffect(() => {
     dispatch(fetchRooms());
     dispatch(fetchBookings({ limit: 1000 }));
+    api.get("/admin/owners", { params: { limit: 200 } })
+      .then(({ data }) => setOwners(data.owners || []))
+      .catch(() => {});
   }, [dispatch]);
 
   const roomBookingsCount = useMemo(() => {
@@ -146,6 +154,14 @@ export default function AdminRooms() {
 
   const filteredRooms = useMemo(() => {
     return (rooms || []).filter((room) => {
+      // Owner filter
+      if (ownerFilter !== "all") {
+        if (ownerFilter === "admin") {
+          if (room.owner_id && room.owner_id !== user?.id) return false;
+        } else {
+          if (room.owner_id !== ownerFilter) return false;
+        }
+      }
       if (typeFilter !== "all" && room.type !== typeFilter) return false;
       if (searchTerm) {
         const search = searchTerm.toLowerCase();
@@ -153,7 +169,7 @@ export default function AdminRooms() {
       }
       return true;
     });
-  }, [rooms, searchTerm, typeFilter]);
+  }, [rooms, searchTerm, typeFilter, ownerFilter, user?.id]);
 
   const handleSave = useCallback(() => { setEditingRoom(null); setIsCreating(false); dispatch(fetchRooms()); }, [dispatch]);
   const handleDeleteConfirm = useCallback(() => { setDeletingRoom(null); }, []);
@@ -165,13 +181,31 @@ export default function AdminRooms() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div><h1 className="text-2xl font-bold text-ink">Rooms</h1><p className="mt-1 text-sm text-muted">Manage your property listings ({(rooms || []).length} total)</p></div>
+        <div><h1 className="text-2xl font-bold text-ink">Rooms</h1><p className="mt-1 text-sm text-muted">Manage property listings ({filteredRooms.length} shown)</p></div>
         <div className="flex gap-3">
           <Button onClick={() => setIsCreating(true)}>
             <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
             Add Room
           </Button>
         </div>
+      </div>
+
+      {/* Owner Picker */}
+      <div className="flex items-center gap-2">
+        <label className="text-sm font-medium text-muted whitespace-nowrap">Filter by owner:</label>
+        <select
+          value={ownerFilter}
+          onChange={(e) => setOwnerFilter(e.target.value)}
+          className={`${INPUT_STYLES} min-w-[200px]`}
+        >
+          <option value="admin">My Rooms (Admin)</option>
+          <option value="all">All Rooms</option>
+          {owners.map((owner) => (
+            <option key={owner.id} value={owner.id}>
+              {owner.full_name || owner.email || "Unknown Owner"}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div className="flex flex-col gap-4 sm:flex-row">

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Modal, DatePicker } from "antd";
 import dayjs from "dayjs";
 import { useDispatch, useSelector } from "react-redux";
+import { useAuth } from "../../auth/useAuth.js";
 import { formatPrice } from "../../guest/utils/format.js";
 import Button from "../../guest/components/ui/Button.jsx";
 import FormInput, { INPUT_STYLES } from "../../guest/components/ui/FormInput.jsx";
@@ -14,6 +15,7 @@ import {
 } from "../../redux/slices/bookingSlice.js";
 import { fetchRooms } from "../../redux/slices/roomSlice.js";
 import { fetchUsers } from "../../redux/slices/userSlice.js";
+import api from "../../redux/api.js";
 
 function formatDate(dateStr) {
   if (!dateStr) return "N/A";
@@ -84,7 +86,6 @@ const EditBookingModal = React.memo(({ open, booking, room, onClose, onSave }) =
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  // Use the price stored at booking time, not the current room price
   const pricePerDay = booking?.price_per_day ?? room?.price_per_day ?? room?.price_per_hour ?? 0;
   const totalPrice = booking?.total_price ?? pricePerDay;
 
@@ -196,12 +197,15 @@ const RejectBookingModal = React.memo(({ open, booking, room, onClose, onConfirm
 
 export default function AdminBookings() {
   const dispatch = useDispatch();
+  const { user } = useAuth();
   const { bookings, loading } = useSelector((state) => state.bookings);
   const { rooms: roomsList } = useSelector((state) => state.rooms);
   const { users: usersList } = useSelector((state) => state.users);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [ownerFilter, setOwnerFilter] = useState("admin"); // "admin" | "all" | owner_id
+  const [owners, setOwners] = useState([]);
   const [viewingBooking, setViewingBooking] = useState(null);
   const [editingBooking, setEditingBooking] = useState(null);
   const [deletingBooking, setDeletingBooking] = useState(null);
@@ -212,6 +216,10 @@ export default function AdminBookings() {
     dispatch(fetchBookings({ limit: 200 }));
     dispatch(fetchRooms());
     dispatch(fetchUsers());
+    // Fetch owners for the picker
+    api.get("/admin/owners", { params: { limit: 200 } })
+      .then(({ data }) => setOwners(data.owners || []))
+      .catch(() => {});
   }, [dispatch]);
 
   const roomsMap = useMemo(() => { const m = {}; (roomsList || []).forEach((r) => { m[r.id] = r; }); return m; }, [roomsList]);
@@ -222,6 +230,18 @@ export default function AdminBookings() {
     const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 
     return (bookings || []).filter((booking) => {
+      // Owner filter
+      if (ownerFilter !== "all") {
+        const room = roomsMap[booking.room_id];
+        if (ownerFilter === "admin") {
+          // Show bookings on rooms with no owner or owned by admin
+          if (room?.owner_id && room.owner_id !== user?.id) return false;
+        } else {
+          // Show bookings on rooms owned by the selected owner
+          if (room?.owner_id !== ownerFilter) return false;
+        }
+      }
+
       if (statusFilter === "pending" && booking.status !== "pending") return false;
       if (statusFilter === "approved" && booking.status !== "approved") return false;
       if (statusFilter === "rejected" && booking.status !== "rejected") return false;
@@ -238,9 +258,9 @@ export default function AdminBookings() {
       }
       return true;
     });
-  }, [bookings, roomsMap, usersMap, searchTerm, statusFilter]);
+  }, [bookings, roomsMap, usersMap, searchTerm, statusFilter, ownerFilter, user?.id]);
 
-  const pendingCount = useMemo(() => (bookings || []).filter((b) => b.status === "pending").length, [bookings]);
+  const pendingCount = useMemo(() => filteredBookings.filter((b) => b.status === "pending").length, [filteredBookings]);
 
   const refreshData = useCallback(() => { dispatch(fetchBookings({ limit: 200 })); }, [dispatch]);
 
@@ -258,9 +278,29 @@ export default function AdminBookings() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-ink dark:text-dark-ink">Bookings</h1>
-          <p className="mt-1 text-sm text-muted">Manage all reservations ({(bookings || []).length} total)
+          <p className="mt-1 text-sm text-muted">Manage all reservations ({filteredBookings.length} shown)
             {pendingCount > 0 && <span className="ml-2 inline-flex items-center rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-800">{pendingCount} pending approval</span>}
           </p>
+        </div>
+      </div>
+
+      {/* Owner Picker */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+        <div className="flex items-center gap-2">
+          <label className="text-sm font-medium text-muted whitespace-nowrap">Filter by owner:</label>
+          <select
+            value={ownerFilter}
+            onChange={(e) => setOwnerFilter(e.target.value)}
+            className={`${INPUT_STYLES} min-w-[200px]`}
+          >
+            <option value="admin">My Rooms (Admin)</option>
+            <option value="all">All Bookings</option>
+            {owners.map((owner) => (
+              <option key={owner.id} value={owner.id}>
+                {owner.full_name || owner.email || "Unknown Owner"}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
@@ -278,7 +318,7 @@ export default function AdminBookings() {
 
       <div className="overflow-hidden rounded-2xl border border-border bg-panel shadow-sm">
         {filteredBookings.length === 0 ? (
-          <div className="py-12 text-center"><p className="mt-4 text-sm font-medium text-ink">No bookings found</p><p className="mt-1 text-sm text-muted">{searchTerm || statusFilter !== "all" ? "Try adjusting your filters" : "Bookings will appear here when guests make reservations"}</p></div>
+          <div className="py-12 text-center"><p className="mt-4 text-sm font-medium text-ink">No bookings found</p><p className="mt-1 text-sm text-muted">{searchTerm || statusFilter !== "all" || ownerFilter !== "all" ? "Try adjusting your filters" : "Bookings will appear here when guests make reservations"}</p></div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">

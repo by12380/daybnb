@@ -235,7 +235,7 @@ exports.approveBooking = asyncHandler(async (req, res) => {
     .from("bookings")
     .update({ status: "approved" })
     .eq("id", req.params.id)
-    .select()
+    .select("*, room:rooms(*)")
     .single();
 
   if (error) throw ApiError.internal(error.message);
@@ -296,7 +296,7 @@ exports.rejectBooking = asyncHandler(async (req, res) => {
     .from("bookings")
     .update({ status: "rejected" })
     .eq("id", req.params.id)
-    .select()
+    .select("*, room:rooms(*)")
     .single();
 
   if (error) throw ApiError.internal(error.message);

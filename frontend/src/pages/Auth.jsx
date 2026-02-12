@@ -51,20 +51,23 @@ const Auth = React.memo(() => {
 
   const ensureProfileRow = useCallback(
     async ({ user, isSignUp, role }) => {
-      if (!user?.id) return;
+      if (!user?.id) return null;
 
       try {
-        await api.post("/auth/ensure-profile", {
+        const { data } = await api.post("/auth/ensure-profile", {
           is_signup: isSignUp,
           role: role || "customer",
         });
+        return data?.profile?.user_type || role || null;
       } catch (err) {
         console.warn("Could not ensure profile:", err);
+        return null;
       }
     },
     []
   );
 
+  // Redirect if user is already logged in when visiting the auth page
   useEffect(() => {
     if (!loading && !profileLoading && session) {
       if (redirectTo && !isAdmin && !isOwner) {
@@ -79,6 +82,22 @@ const Auth = React.memo(() => {
     }
   }, [loading, profileLoading, navigate, redirectTo, session, isAdmin, isOwner]);
 
+  /** Navigate immediately based on the resolved role after login/signup */
+  const navigateByRole = useCallback(
+    (role) => {
+      if (role === "admin") {
+        navigate("/admin", { replace: true });
+      } else if (role === "owner") {
+        navigate("/owner", { replace: true });
+      } else if (redirectTo) {
+        navigate(redirectTo, { replace: true });
+      } else {
+        navigate("/", { replace: true });
+      }
+    },
+    [navigate, redirectTo]
+  );
+
   const onSubmit = useCallback(
     async (e) => {
       e.preventDefault();
@@ -89,15 +108,17 @@ const Auth = React.memo(() => {
         if (mode === "signup") {
           const result = await signUp({ email, password });
           const authedUser = result?.data?.user || result?.data?.session?.user || null;
-          await ensureProfileRow({
+          const resolvedRole = await ensureProfileRow({
             user: authedUser,
             isSignUp: true,
             role: selectedRole,
           });
+          navigateByRole(resolvedRole || selectedRole);
         } else {
           const result = await signIn({ email, password });
           const authedUser = result?.data?.user || result?.data?.session?.user || null;
-          await ensureProfileRow({ user: authedUser, isSignUp: false });
+          const resolvedRole = await ensureProfileRow({ user: authedUser, isSignUp: false });
+          navigateByRole(resolvedRole);
         }
       } catch (err) {
         setError(err?.message || "Authentication failed.");
@@ -105,7 +126,7 @@ const Auth = React.memo(() => {
         setSubmitting(false);
       }
     },
-    [email, mode, password, signIn, signUp, ensureProfileRow, selectedRole]
+    [email, mode, password, signIn, signUp, ensureProfileRow, selectedRole, navigateByRole]
   );
 
   const toggleMode = useCallback(() => {

@@ -109,6 +109,32 @@ function initializeSocket(httpServer) {
       console.log(`  ↳ ${userEmail || userId} joined role:owner room`);
     }
 
+    // ── Impersonation: allow admins to join an owner's personal room ──
+    socket.on("impersonate:start", (ownerId) => {
+      if (role !== "admin" || !ownerId) return;
+
+      // Leave any previously impersonated room
+      if (socket.data.impersonatingOwnerId) {
+        const prevRoom = `user:${socket.data.impersonatingOwnerId}`;
+        socket.leave(prevRoom);
+        console.log(`  ↳ ${userEmail || userId} left impersonated room ${prevRoom}`);
+      }
+
+      const ownerRoom = `user:${ownerId}`;
+      socket.join(ownerRoom);
+      socket.data.impersonatingOwnerId = ownerId;
+      console.log(`  ↳ ${userEmail || userId} impersonating owner ${ownerId}, joined ${ownerRoom}`);
+    });
+
+    socket.on("impersonate:stop", () => {
+      if (role !== "admin" || !socket.data.impersonatingOwnerId) return;
+
+      const ownerRoom = `user:${socket.data.impersonatingOwnerId}`;
+      socket.leave(ownerRoom);
+      console.log(`  ↳ ${userEmail || userId} stopped impersonation, left ${ownerRoom}`);
+      socket.data.impersonatingOwnerId = null;
+    });
+
     socket.on("disconnect", (reason) => {
       console.log(`🔌 Socket disconnected: ${userEmail || userId} — ${reason}`);
     });

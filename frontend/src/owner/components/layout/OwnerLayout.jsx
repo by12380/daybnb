@@ -1,6 +1,9 @@
 import React, { useState } from "react";
-import { Link, Outlet, useLocation } from "react-router-dom";
+import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../../auth/useAuth.js";
+import { useProfile } from "../../../auth/useProfile.js";
+import { getImpersonation, clearImpersonation } from "../../../redux/api.js";
+import OwnerNotificationDropdown from "../NotificationDropdown.jsx";
 import ThemeToggle from "../../../theme/ThemeToggle.jsx";
 
 const NAV_ITEMS = [
@@ -93,7 +96,7 @@ const Sidebar = React.memo(({ isOpen, onClose }) => {
             })}
           </nav>
 
-          <div className="mt-auto border-t border-border p-4 dark:border-dark-border">
+          {/* <div className="mt-auto border-t border-border p-4 dark:border-dark-border">
             <Link
               to="/"
               className="flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium text-muted transition-colors hover:bg-surface/60 hover:text-ink"
@@ -103,7 +106,7 @@ const Sidebar = React.memo(({ isOpen, onClose }) => {
               </svg>
               Back to Site
             </Link>
-          </div>
+          </div> */}
         </div>
       </aside>
     </>
@@ -112,31 +115,58 @@ const Sidebar = React.memo(({ isOpen, onClose }) => {
 
 const Header = React.memo(({ onMenuClick }) => {
   const { user, signOut } = useAuth();
+  const { isAdmin } = useProfile();
+  const navigate = useNavigate();
+  const isImpersonating = isAdmin && !!getImpersonation();
+
+  const handleBackToAdmin = () => {
+    clearImpersonation();
+    navigate("/admin/owners");
+  };
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-panel/80 px-4 backdrop-blur transition-colors duration-300 lg:px-6">
-      <button onClick={onMenuClick} className="rounded-lg p-2 text-muted hover:bg-surface/60 lg:hidden">
-        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-        </svg>
-      </button>
+      <div className="flex items-center gap-3">
+        <button onClick={onMenuClick} className="rounded-lg p-2 text-muted hover:bg-surface/60 lg:hidden">
+          <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
 
-      <div className="hidden lg:block">
-        <h1 className="text-lg font-semibold text-ink dark:text-dark-ink">Owner Panel</h1>
+        <div className="hidden lg:block">
+          <h1 className="text-lg font-semibold text-ink dark:text-dark-ink">Owner Panel</h1>
+        </div>
+
+        {isImpersonating && (
+          <button
+            onClick={handleBackToAdmin}
+            className="flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-700 transition-colors hover:bg-amber-100 dark:border-amber-600 dark:bg-amber-900/30 dark:text-amber-300 dark:hover:bg-amber-900/50"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            Back to Admin Panel
+          </button>
+        )}
       </div>
 
       <div className="flex items-center gap-4">
         <ThemeToggle />
+        <OwnerNotificationDropdown />
         <div className="text-right">
           <p className="text-sm font-medium text-ink dark:text-dark-ink">{user?.email || "Owner"}</p>
-          <p className="text-xs text-muted dark:text-dark-muted">Property Owner</p>
+          <p className="text-xs text-muted dark:text-dark-muted">
+            {isImpersonating ? "Impersonating Owner" : "Property Owner"}
+          </p>
         </div>
-        <button
-          onClick={signOut}
-          className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-muted transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600 dark:border-dark-border dark:text-dark-muted dark:hover:border-red-700 dark:hover:bg-red-900/20 dark:hover:text-red-400"
-        >
-          Sign Out
-        </button>
+        {!isImpersonating && (
+          <button
+            onClick={signOut}
+            className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-muted transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600 dark:border-dark-border dark:text-dark-muted dark:hover:border-red-700 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+          >
+            Sign Out
+          </button>
+        )}
       </div>
     </header>
   );
@@ -146,11 +176,11 @@ export default function OwnerLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="flex min-h-screen bg-surface transition-colors duration-300 dark:bg-dark-navy">
+    <div className="flex h-screen overflow-hidden bg-surface transition-colors duration-300 dark:bg-dark-navy">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-      <div className="flex flex-1 flex-col">
+      <div className="flex flex-1 flex-col overflow-hidden">
         <Header onMenuClick={() => setSidebarOpen(true)} />
-        <main className="flex-1 p-4 lg:p-6">
+        <main className="flex-1 overflow-y-auto p-4 lg:p-6 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
           <Outlet />
         </main>
       </div>

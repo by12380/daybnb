@@ -6,6 +6,8 @@ import Button from "../../guest/components/ui/Button.jsx";
 import FormInput, { INPUT_STYLES } from "../../guest/components/ui/FormInput.jsx";
 import { fetchUsers, updateUser, deleteUser } from "../../redux/slices/userSlice.js";
 import { fetchBookings } from "../../redux/slices/bookingSlice.js";
+import { fetchRooms } from "../../redux/slices/roomSlice.js";
+import api from "../../redux/api.js";
 
 const ViewUserModal = React.memo(({ open, user, bookings, onClose }) => {
   if (!user) return null;
@@ -13,7 +15,7 @@ const ViewUserModal = React.memo(({ open, user, bookings, onClose }) => {
   const upcomingBookings = bookings.filter((b) => new Date(b.booking_date) >= new Date(new Date().toDateString()));
 
   return (
-    <Modal title="User Details" open={open} onCancel={onClose} footer={<Button variant="outline" onClick={onClose}>Close</Button>} destroyOnClose width={600}>
+    <Modal title="Customer Details" open={open} onCancel={onClose} footer={<Button variant="outline" onClick={onClose}>Close</Button>} destroyOnClose width={600}>
       <div className="space-y-6 pt-4">
         <div className="flex items-start gap-4">
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-brand-100 text-2xl font-bold text-brand-600">{(user.full_name || user.email || "U").charAt(0).toUpperCase()}</div>
@@ -27,7 +29,7 @@ const ViewUserModal = React.memo(({ open, user, bookings, onClose }) => {
         <div className="space-y-3 rounded-xl border border-border bg-surface/60 p-4">
           <h4 className="font-medium text-ink">Account Information</h4>
           <div className="grid gap-2 text-sm">
-            <div className="flex justify-between"><span className="text-muted">Role</span><span className="font-medium text-ink capitalize">{user.user_type || "user"}</span></div>
+            <div className="flex justify-between"><span className="text-muted">Role</span><span className="font-medium text-ink capitalize">{user.user_type || "customer"}</span></div>
             <div className="flex justify-between"><span className="text-muted">User ID</span><span className="font-mono text-xs text-ink">{user.id}</span></div>
             {user.created_at && <div className="flex justify-between"><span className="text-muted">Joined</span><span className="text-ink">{new Date(user.created_at).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</span></div>}
           </div>
@@ -65,12 +67,12 @@ const EditUserModal = React.memo(({ open, user, onClose, onSave }) => {
   const handleSave = useCallback(async () => {
     setError(""); setSaving(true);
     try { await dispatch(updateUser({ id: user.id, full_name: fullName.trim() || null, phone: phone.trim() || null })).unwrap(); onSave(); }
-    catch (err) { setError(err || "Failed to update user."); }
+    catch (err) { setError(err || "Failed to update customer."); }
     finally { setSaving(false); }
   }, [dispatch, fullName, onSave, phone, user?.id]);
 
   return (
-    <Modal title="Edit User" open={open} onCancel={onClose} footer={null} destroyOnClose>
+    <Modal title="Edit Customer" open={open} onCancel={onClose} footer={null} destroyOnClose>
       <div className="space-y-4 pt-4">
         <div className="flex items-center gap-3 rounded-xl border border-border bg-surface/60 p-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-100 text-lg font-bold text-brand-600">{(user?.full_name || user?.email || "U").charAt(0).toUpperCase()}</div>
@@ -93,14 +95,14 @@ const DeleteUserModal = React.memo(({ open, user, onClose, onConfirm }) => {
   const handleDelete = useCallback(async () => {
     setError(""); setDeleting(true);
     try { await dispatch(deleteUser(user.id)).unwrap(); onConfirm(); }
-    catch (err) { setError(err || "Failed to delete user profile."); }
+    catch (err) { setError(err || "Failed to delete customer profile."); }
     finally { setDeleting(false); }
   }, [dispatch, user?.id, onConfirm]);
 
   return (
-    <Modal title="Delete User Profile" open={open} onCancel={onClose} footer={null} destroyOnClose>
+    <Modal title="Delete Customer Profile" open={open} onCancel={onClose} footer={null} destroyOnClose>
       <div className="space-y-4 pt-4">
-        <p className="text-sm text-muted">Are you sure you want to delete this user's profile?</p>
+        <p className="text-sm text-muted">Are you sure you want to delete this customer's profile?</p>
         {user && (<div className="rounded-xl border border-red-100 bg-red-50 p-4"><p className="font-medium text-ink">{user.full_name || "No name"}</p><p className="text-sm text-muted">{user.email}</p></div>)}
         {error && <p className="text-sm text-red-600">{error}</p>}
         <div className="flex justify-end gap-3 pt-2"><Button variant="outline" onClick={onClose}>Cancel</Button><Button className="!bg-red-600 hover:!bg-red-700" onClick={handleDelete} disabled={deleting}>{deleting ? "Deleting..." : "Delete Profile"}</Button></div>
@@ -113,16 +115,30 @@ export default function AdminUsers() {
   const dispatch = useDispatch();
   const { users, loading } = useSelector((state) => state.users);
   const { bookings } = useSelector((state) => state.bookings);
+  const { rooms: roomsList } = useSelector((state) => state.rooms);
 
   const [searchTerm, setSearchTerm] = useState("");
+  const [ownerFilter, setOwnerFilter] = useState("all"); // "all" | owner_id
+  const [owners, setOwners] = useState([]);
   const [viewingUser, setViewingUser] = useState(null);
   const [editingUser, setEditingUser] = useState(null);
   const [deletingUser, setDeletingUser] = useState(null);
 
   useEffect(() => {
-    dispatch(fetchUsers());
+    dispatch(fetchUsers({ role: "customer" }));
     dispatch(fetchBookings({ limit: 1000 }));
+    dispatch(fetchRooms());
+    api.get("/admin/owners", { params: { limit: 200 } })
+      .then(({ data }) => setOwners(data.owners || []))
+      .catch(() => {});
   }, [dispatch]);
+
+  // Map of room_id -> room (to look up owner_id)
+  const roomsMap = useMemo(() => {
+    const m = {};
+    (roomsList || []).forEach((r) => { m[r.id] = r; });
+    return m;
+  }, [roomsList]);
 
   const userBookingsMap = useMemo(() => {
     const map = {};
@@ -130,26 +146,79 @@ export default function AdminUsers() {
     return map;
   }, [bookings]);
 
-  const filteredUsers = useMemo(() => {
-    if (!searchTerm) return users || [];
-    const search = searchTerm.toLowerCase();
-    return (users || []).filter((user) => user.full_name?.toLowerCase().includes(search) || user.email?.toLowerCase().includes(search) || user.phone?.includes(search));
-  }, [users, searchTerm]);
+  // When an owner is selected, only show customers who booked on that owner's rooms
+  const ownerCustomerIds = useMemo(() => {
+    if (ownerFilter === "all") return null; // null = no filter
 
-  const handleEditSave = useCallback(() => { setEditingUser(null); dispatch(fetchUsers()); }, [dispatch]);
+    // Get room IDs owned by the selected owner
+    const ownerRoomIds = new Set(
+      (roomsList || []).filter((r) => r.owner_id === ownerFilter).map((r) => r.id)
+    );
+
+    // Get user IDs who have bookings on those rooms
+    const customerIds = new Set();
+    (bookings || []).forEach((b) => {
+      if (ownerRoomIds.has(b.room_id) && b.user_id) {
+        customerIds.add(b.user_id);
+      }
+    });
+
+    return customerIds;
+  }, [ownerFilter, roomsList, bookings]);
+
+  // Filter to only show customers (not owners or admins)
+  const filteredUsers = useMemo(() => {
+    return (users || []).filter((user) => {
+      // Only show customers
+      if (user.user_type && user.user_type !== "customer") return false;
+
+      // Owner filter: only show customers who booked on selected owner's rooms
+      if (ownerCustomerIds !== null && !ownerCustomerIds.has(user.id)) return false;
+
+      if (searchTerm) {
+        const search = searchTerm.toLowerCase();
+        if (
+          !user.full_name?.toLowerCase().includes(search) &&
+          !user.email?.toLowerCase().includes(search) &&
+          !user.phone?.includes(search)
+        ) return false;
+      }
+      return true;
+    });
+  }, [users, searchTerm, ownerCustomerIds]);
+
+  const handleEditSave = useCallback(() => { setEditingUser(null); dispatch(fetchUsers({ role: "customer" })); }, [dispatch]);
   const handleDeleteConfirm = useCallback(() => { setDeletingUser(null); }, []);
 
   if (loading) {
-    return (<div className="flex h-64 items-center justify-center"><div className="text-center"><div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-brand-200 border-t-brand-600" /><p className="mt-4 text-sm text-muted">Loading users...</p></div></div>);
+    return (<div className="flex h-64 items-center justify-center"><div className="text-center"><div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-brand-200 border-t-brand-600" /><p className="mt-4 text-sm text-muted">Loading customers...</p></div></div>);
   }
 
   return (
     <div className="space-y-6">
-      <div><h1 className="text-2xl font-bold text-ink">Users</h1><p className="mt-1 text-sm text-muted">Manage user profiles ({(users || []).length} total)</p></div>
+      <div><h1 className="text-2xl font-bold text-ink">Customers</h1><p className="mt-1 text-sm text-muted">Manage customer profiles ({filteredUsers.length} shown)</p></div>
+
+      {/* Owner Picker */}
+      <div className="flex items-center gap-2">
+        <label className="text-sm font-medium text-muted whitespace-nowrap">Filter by owner:</label>
+        <select
+          value={ownerFilter}
+          onChange={(e) => setOwnerFilter(e.target.value)}
+          className={`${INPUT_STYLES} min-w-[200px]`}
+        >
+          <option value="all">All Customers</option>
+          {owners.map((owner) => (
+            <option key={owner.id} value={owner.id}>
+              {owner.full_name || owner.email || "Unknown Owner"}
+            </option>
+          ))}
+        </select>
+      </div>
+
       <div className="flex-1"><input type="text" placeholder="Search by name, email, or phone..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className={`${INPUT_STYLES} w-full max-w-md`} /></div>
 
       {filteredUsers.length === 0 ? (
-        <div className="rounded-2xl border border-border bg-panel py-12 text-center shadow-sm"><p className="mt-4 text-sm font-medium text-ink">No users found</p><p className="mt-1 text-sm text-muted">{searchTerm ? "Try adjusting your search" : "Users will appear here when they sign up"}</p></div>
+        <div className="rounded-2xl border border-border bg-panel py-12 text-center shadow-sm"><p className="mt-4 text-sm font-medium text-ink">No customers found</p><p className="mt-1 text-sm text-muted">{searchTerm || ownerFilter !== "all" ? "Try adjusting your filters" : "Customers will appear here when they sign up"}</p></div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filteredUsers.map((user) => {
@@ -162,7 +231,7 @@ export default function AdminUsers() {
                     <div className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-100 text-xl font-bold text-brand-600">{(user.full_name || user.email || "U").charAt(0).toUpperCase()}</div>
                     <div><p className="font-semibold text-ink">{user.full_name || "No name"}</p><p className="text-sm text-muted">{user.email}</p></div>
                   </div>
-                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${user.user_type === "admin" ? "bg-purple-50 text-purple-700" : "bg-surface/60 text-ink"}`}>{user.user_type || "user"}</span>
+                  <span className="rounded-full bg-surface/60 px-2 py-0.5 text-xs font-medium text-ink">Customer</span>
                 </div>
                 <div className="mt-4 flex items-center gap-4 text-sm">
                   <div><span className="text-muted">Bookings: </span><span className="font-medium text-ink">{userBookings.length}</span></div>

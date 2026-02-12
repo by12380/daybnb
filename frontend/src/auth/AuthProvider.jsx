@@ -63,8 +63,13 @@ export default function AuthProvider({ children }) {
 
   const signOut = useCallback(async () => {
     if (!supabase) throw new Error("Supabase not configured");
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
+    const { error } = await supabase.auth.signOut({ scope: "local" });
+    // If the server session is already gone (expired/invalidated),
+    // that's fine — clear local state anyway.
+    if (error && error.code !== "session_not_found") {
+      throw error;
+    }
+    setSession(null);
   }, []);
 
   const value = useMemo(() => {

@@ -25,7 +25,7 @@ const NAV_ITEMS = [
   },
   {
     path: "/admin/users",
-    label: "Users",
+    label: "Customers",
     icon: (
       <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
@@ -124,7 +124,7 @@ const Sidebar = React.memo(({ isOpen, onClose }) => {
           </nav>
 
           {/* Back to site */}
-          <div className="mt-auto border-t border-border p-4 dark:border-dark-border">
+          {/* <div className="mt-auto border-t border-border p-4 dark:border-dark-border">
             <Link
               to="/"
               className="flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium text-muted transition-colors hover:bg-surface/60 hover:text-ink"
@@ -134,7 +134,7 @@ const Sidebar = React.memo(({ isOpen, onClose }) => {
               </svg>
               Back to Site
             </Link>
-          </div>
+          </div> */}
         </div>
       </aside>
     </>
@@ -181,11 +181,11 @@ export default function AdminLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="flex min-h-screen bg-surface transition-colors duration-300 dark:bg-dark-navy">
+    <div className="flex h-screen overflow-hidden bg-surface transition-colors duration-300 dark:bg-dark-navy">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-      <div className="flex flex-1 flex-col">
+      <div className="flex flex-1 flex-col overflow-hidden">
         <Header onMenuClick={() => setSidebarOpen(true)} />
-        <main className="flex-1 p-4 lg:p-6">
+        <main className="flex-1 overflow-y-auto p-4 lg:p-6 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
           <Outlet />
         </main>
       </div>

@@ -13,7 +13,7 @@ import { useProfile } from "../../auth/useProfile.js";
 
 const Landing = React.memo(() => {
   const navigate = useNavigate();
-  const { isAdmin, loading } = useProfile();
+  const { isAdmin, isOwner, loading } = useProfile();
   const [searchFilters, setSearchFilters] = useState({
     location: "",
     guests: 0,
@@ -22,12 +22,14 @@ const Landing = React.memo(() => {
     maxPrice: "",
   });
 
-  // Redirect admin users to admin dashboard
+  // Redirect admin/owner users to their respective panels
   useEffect(() => {
     if (!loading && isAdmin) {
       navigate("/admin", { replace: true });
+    } else if (!loading && isOwner) {
+      navigate("/owner", { replace: true });
     }
-  }, [loading, isAdmin, navigate]);
+  }, [loading, isAdmin, isOwner, navigate]);
 
   const onSearch = useCallback((params) => {
     setSearchFilters({

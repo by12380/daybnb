@@ -154,34 +154,27 @@ exports.create = asyncHandler(async (req, res) => {
 
   if (error) throw ApiError.internal(error.message);
 
-  // Notify admins about the new booking via socket
-  const adminNotification = {
-    recipient_role: "admin",
-    type: "booking_created",
-    title: "New Booking Request",
-    body: `New booking for ${data.booking_date} from ${data.user_email || "a user"}.`,
-    data: { booking_id: data.id, room_id: data.room_id, booking_date: data.booking_date },
-    created_at: new Date().toISOString(),
-  };
-
-  // Save to DB
-  const { data: savedNotif } = await supabaseAdmin
-    .from("notifications")
-    .insert(adminNotification)
-    .select()
-    .single();
-
-  // Push via socket to all connected admins
-  emitNotificationToRole("admin", savedNotif || adminNotification);
-
-  // Also notify the room owner if the room has one
+  // Notify the room owner about the new booking.
+  // If the room belongs to an owner → notify only that owner.
+  // If the room belongs to an admin (or has no owner) → notify admins.
   const { data: room } = await supabaseAdmin
     .from("rooms")
     .select("owner_id")
     .eq("id", data.room_id)
     .maybeSingle();
 
+  let ownerRole = null;
   if (room?.owner_id) {
+    const { data: ownerProfile } = await supabaseAdmin
+      .from("profiles")
+      .select("user_type")
+      .eq("id", room.owner_id)
+      .maybeSingle();
+    ownerRole = ownerProfile?.user_type || null;
+  }
+
+  if (room?.owner_id && ownerRole === ROLES.OWNER) {
+    // Room belongs to an owner – notify only the owner
     const ownerNotification = {
       recipient_user_id: room.owner_id,
       type: "booking_created",
@@ -198,6 +191,24 @@ exports.create = asyncHandler(async (req, res) => {
       .single();
 
     emitNotificationToUser(room.owner_id, savedOwnerNotif || ownerNotification);
+  } else {
+    // Room belongs to admin or has no owner – notify admins
+    const adminNotification = {
+      recipient_role: "admin",
+      type: "booking_created",
+      title: "New Booking Request",
+      body: `New booking for ${data.booking_date} from ${data.user_email || "a user"}.`,
+      data: { booking_id: data.id, room_id: data.room_id, booking_date: data.booking_date },
+      created_at: new Date().toISOString(),
+    };
+
+    const { data: savedNotif } = await supabaseAdmin
+      .from("notifications")
+      .insert(adminNotification)
+      .select()
+      .single();
+
+    emitNotificationToRole("admin", savedNotif || adminNotification);
   }
 
   res.status(201).json({ booking: data });
@@ -260,7 +271,7 @@ exports.update = asyncHandler(async (req, res) => {
 
   if (error) throw ApiError.internal(error.message);
 
-  // If customer edited booking details, re-notify admins and room owner
+  // If customer edited booking details, notify the room owner
   if (!isAdmin && !isRoomOwner) {
     const oldDate = existingBooking.booking_date;
     const newDate = data.booking_date;
@@ -276,34 +287,26 @@ exports.update = asyncHandler(async (req, res) => {
       existingBooking.user_email ||
       "a customer";
 
-    const adminNotification = {
-      recipient_role: "admin",
-      type: "booking_updated",
-      title: "Booking Updated by Customer",
-      body: `${editedBy} updated booking details. ${changedDateText}`,
-      data: {
-        booking_id: data.id,
-        room_id: data.room_id || existingBooking.room_id,
-        booking_date: newDate || oldDate,
-      },
-    };
+    const roomId = data.room_id || existingBooking.room_id;
 
-    const { data: savedNotif } = await supabaseAdmin
-      .from("notifications")
-      .insert(adminNotification)
-      .select()
-      .single();
-
-    emitNotificationToRole("admin", savedNotif || adminNotification);
-
-    // Also notify room owner
     const { data: room } = await supabaseAdmin
       .from("rooms")
       .select("owner_id")
-      .eq("id", data.room_id || existingBooking.room_id)
+      .eq("id", roomId)
       .maybeSingle();
 
+    let ownerRole = null;
     if (room?.owner_id) {
+      const { data: ownerProfile } = await supabaseAdmin
+        .from("profiles")
+        .select("user_type")
+        .eq("id", room.owner_id)
+        .maybeSingle();
+      ownerRole = ownerProfile?.user_type || null;
+    }
+
+    if (room?.owner_id && ownerRole === ROLES.OWNER) {
+      // Room belongs to an owner – notify only the owner
       const ownerNotification = {
         recipient_user_id: room.owner_id,
         type: "booking_updated",
@@ -311,7 +314,7 @@ exports.update = asyncHandler(async (req, res) => {
         body: `${editedBy} updated booking details. ${changedDateText}`,
         data: {
           booking_id: data.id,
-          room_id: data.room_id || existingBooking.room_id,
+          room_id: roomId,
           booking_date: newDate || oldDate,
         },
       };
@@ -323,6 +326,27 @@ exports.update = asyncHandler(async (req, res) => {
         .single();
 
       emitNotificationToUser(room.owner_id, savedOwnerNotif || ownerNotification);
+    } else {
+      // Room belongs to admin or has no owner – notify admins
+      const adminNotification = {
+        recipient_role: "admin",
+        type: "booking_updated",
+        title: "Booking Updated by Customer",
+        body: `${editedBy} updated booking details. ${changedDateText}`,
+        data: {
+          booking_id: data.id,
+          room_id: roomId,
+          booking_date: newDate || oldDate,
+        },
+      };
+
+      const { data: savedNotif } = await supabaseAdmin
+        .from("notifications")
+        .insert(adminNotification)
+        .select()
+        .single();
+
+      emitNotificationToRole("admin", savedNotif || adminNotification);
     }
   }
 
@@ -454,7 +478,7 @@ exports.remove = asyncHandler(async (req, res) => {
 
   if (error) throw ApiError.internal(error.message);
 
-  // Notify admins when a customer cancels booking.
+  // Notify the room owner when a customer cancels booking.
   if (!isAdmin) {
     const cancelledBy =
       existingBooking.user_full_name ||
@@ -462,34 +486,24 @@ exports.remove = asyncHandler(async (req, res) => {
       req.user.email ||
       "a customer";
 
-    const adminNotification = {
-      recipient_role: "admin",
-      type: "booking_cancelled",
-      title: "Booking Cancelled",
-      body: `${cancelledBy} cancelled booking for ${existingBooking.booking_date}.`,
-      data: {
-        booking_id: existingBooking.id,
-        room_id: existingBooking.room_id,
-        booking_date: existingBooking.booking_date,
-      },
-    };
-
-    const { data: savedNotif } = await supabaseAdmin
-      .from("notifications")
-      .insert(adminNotification)
-      .select()
-      .single();
-
-    emitNotificationToRole("admin", savedNotif || adminNotification);
-
-    // Also notify room owner
     const { data: room } = await supabaseAdmin
       .from("rooms")
       .select("owner_id")
       .eq("id", existingBooking.room_id)
       .maybeSingle();
 
-    if (room?.owner_id && room.owner_id !== req.user.id) {
+    let ownerRole = null;
+    if (room?.owner_id) {
+      const { data: ownerProfile } = await supabaseAdmin
+        .from("profiles")
+        .select("user_type")
+        .eq("id", room.owner_id)
+        .maybeSingle();
+      ownerRole = ownerProfile?.user_type || null;
+    }
+
+    if (room?.owner_id && ownerRole === ROLES.OWNER && room.owner_id !== req.user.id) {
+      // Room belongs to an owner – notify only the owner
       const ownerNotification = {
         recipient_user_id: room.owner_id,
         type: "booking_cancelled",
@@ -509,6 +523,27 @@ exports.remove = asyncHandler(async (req, res) => {
         .single();
 
       emitNotificationToUser(room.owner_id, savedOwnerNotif || ownerNotification);
+    } else if (!room?.owner_id || ownerRole === ROLES.ADMIN) {
+      // Room belongs to admin or has no owner – notify admins
+      const adminNotification = {
+        recipient_role: "admin",
+        type: "booking_cancelled",
+        title: "Booking Cancelled",
+        body: `${cancelledBy} cancelled booking for ${existingBooking.booking_date}.`,
+        data: {
+          booking_id: existingBooking.id,
+          room_id: existingBooking.room_id,
+          booking_date: existingBooking.booking_date,
+        },
+      };
+
+      const { data: savedNotif } = await supabaseAdmin
+        .from("notifications")
+        .insert(adminNotification)
+        .select()
+        .single();
+
+      emitNotificationToRole("admin", savedNotif || adminNotification);
     }
   }
 
