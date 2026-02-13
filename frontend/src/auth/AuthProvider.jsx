@@ -51,11 +51,12 @@ export default function AuthProvider({ children }) {
     return data;
   }, []);
 
-  const signUp = useCallback(async ({ email, password }) => {
+  const signUp = useCallback(async ({ email, password, options }) => {
     if (!supabase) throw new Error("Supabase not configured");
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
+      options,
     });
     if (error) throw error;
     return data;

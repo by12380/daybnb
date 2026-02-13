@@ -174,10 +174,10 @@ exports.getMyBookings = asyncHandler(async (req, res) => {
 
   const { status, limit = 50, offset = 0 } = req.query;
 
-  // First get the owner's room IDs
+  // Get the owner's rooms (full data, used to attach to each booking)
   const { data: ownerRooms, error: roomError } = await supabaseAdmin
     .from("rooms")
-    .select("id")
+    .select("*")
     .eq("owner_id", ownerId);
 
   if (roomError) throw ApiError.internal(roomError.message);
@@ -188,9 +188,14 @@ exports.getMyBookings = asyncHandler(async (req, res) => {
     return res.json({ bookings: [], total: 0 });
   }
 
+  // Build a lookup map for rooms
+  const roomsMap = {};
+  (ownerRooms || []).forEach((r) => { roomsMap[r.id] = r; });
+
+  // Fetch bookings without the join (avoids FK dependency)
   let query = supabaseAdmin
     .from("bookings")
-    .select("*, room:rooms(*)", { count: "exact" })
+    .select("*", { count: "exact" })
     .in("room_id", roomIds)
     .order("booking_date", { ascending: false })
     .range(Number(offset), Number(offset) + Number(limit) - 1);
@@ -200,7 +205,13 @@ exports.getMyBookings = asyncHandler(async (req, res) => {
   const { data, error, count } = await query;
   if (error) throw ApiError.internal(error.message);
 
-  res.json({ bookings: data, total: count });
+  // Attach room data to each booking
+  const bookingsWithRoom = (data || []).map((booking) => ({
+    ...booking,
+    room: roomsMap[booking.room_id] || null,
+  }));
+
+  res.json({ bookings: bookingsWithRoom, total: count });
 });
 
 /**
@@ -224,7 +235,7 @@ exports.approveBooking = asyncHandler(async (req, res) => {
 
   const { data: room } = await supabaseAdmin
     .from("rooms")
-    .select("id, owner_id")
+    .select("*")
     .eq("id", booking.room_id)
     .eq("owner_id", ownerId)
     .maybeSingle();
@@ -235,10 +246,13 @@ exports.approveBooking = asyncHandler(async (req, res) => {
     .from("bookings")
     .update({ status: "approved" })
     .eq("id", req.params.id)
-    .select("*, room:rooms(*)")
+    .select()
     .single();
 
   if (error) throw ApiError.internal(error.message);
+
+  // Attach room data
+  data.room = room;
 
   // Notify the customer
   const { emitNotificationToUser } = require("../socket");
@@ -285,7 +299,7 @@ exports.rejectBooking = asyncHandler(async (req, res) => {
 
   const { data: room } = await supabaseAdmin
     .from("rooms")
-    .select("id, owner_id")
+    .select("*")
     .eq("id", booking.room_id)
     .eq("owner_id", ownerId)
     .maybeSingle();
@@ -296,10 +310,13 @@ exports.rejectBooking = asyncHandler(async (req, res) => {
     .from("bookings")
     .update({ status: "rejected" })
     .eq("id", req.params.id)
-    .select("*, room:rooms(*)")
+    .select()
     .single();
 
   if (error) throw ApiError.internal(error.message);
+
+  // Attach room data
+  data.room = room;
 
   // Notify the customer
   const { emitNotificationToUser } = require("../socket");
@@ -448,10 +465,10 @@ exports.getCustomerBookings = asyncHandler(async (req, res) => {
   const ownerId = resolveOwnerId(req);
   if (!ownerId) throw ApiError.forbidden("Owner context required");
 
-  // Get owner's room IDs
+  // Get owner's rooms (full data for attaching to bookings)
   const { data: ownerRooms } = await supabaseAdmin
     .from("rooms")
-    .select("id")
+    .select("*")
     .eq("owner_id", ownerId);
 
   const roomIds = (ownerRooms || []).map((r) => r.id);
@@ -460,16 +477,24 @@ exports.getCustomerBookings = asyncHandler(async (req, res) => {
     return res.json({ bookings: [] });
   }
 
+  const roomsMap = {};
+  (ownerRooms || []).forEach((r) => { roomsMap[r.id] = r; });
+
   const { data, error } = await supabaseAdmin
     .from("bookings")
-    .select("*, room:rooms(*)")
+    .select("*")
     .eq("user_id", req.params.customerId)
     .in("room_id", roomIds)
     .order("booking_date", { ascending: false });
 
   if (error) throw ApiError.internal(error.message);
 
-  res.json({ bookings: data || [] });
+  const bookingsWithRoom = (data || []).map((b) => ({
+    ...b,
+    room: roomsMap[b.room_id] || null,
+  }));
+
+  res.json({ bookings: bookingsWithRoom });
 });
 
 /**

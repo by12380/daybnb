@@ -7,6 +7,8 @@ import { useAuth } from "../auth/useAuth.js";
 import { useProfile } from "../auth/useProfile.js";
 import api from "../redux/api.js";
 
+// ── Role picker options ──────────────────────────────────────
+
 const ROLE_OPTIONS = [
   {
     value: "customer",
@@ -30,9 +32,44 @@ const ROLE_OPTIONS = [
   },
 ];
 
+// ── Step indicator ────────────────────────────────────────────
+
+const StepIndicator = React.memo(({ current, total }) => (
+  <div className="flex items-center justify-center gap-2 mb-6">
+    {Array.from({ length: total }, (_, i) => (
+      <React.Fragment key={i}>
+        <div
+          className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold transition-all duration-300 ${
+            i < current
+              ? "bg-green-500 text-white"
+              : i === current
+                ? "bg-brand-600 text-white shadow-lg shadow-brand-500/30 scale-110"
+                : "bg-surface/80 text-muted border border-border"
+          }`}
+        >
+          {i < current ? (
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+            </svg>
+          ) : (
+            i + 1
+          )}
+        </div>
+        {i < total - 1 && (
+          <div className={`h-0.5 w-8 rounded-full transition-colors duration-300 ${
+            i < current ? "bg-green-500" : "bg-border"
+          }`} />
+        )}
+      </React.Fragment>
+    ))}
+  </div>
+));
+
+// ── Main Auth component ───────────────────────────────────────
+
 const Auth = React.memo(() => {
   const { session, loading, signIn, signUp } = useAuth();
-  const { isAdmin, isOwner, loading: profileLoading } = useProfile();
+  const { profile, isAdmin, isOwner, loading: profileLoading, refetch: refetchProfile } = useProfile();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -41,6 +78,7 @@ const Auth = React.memo(() => {
     return redirect && redirect.startsWith("/") ? redirect : null;
   }, [searchParams]);
 
+  // ── Shared state ──────────────────────────────────────────
   const [mode, setMode] = useState("login"); // login | signup
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -49,40 +87,22 @@ const Auth = React.memo(() => {
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
 
-  const ensureProfileRow = useCallback(
-    async ({ user, isSignUp, role }) => {
-      if (!user?.id) return null;
+  // ── Signup multi-step state ───────────────────────────────
+  // Steps: 0 = email+password+role, 1 = check-your-email, 2 = basic details
+  const [signupStep, setSignupStep] = useState(0);
 
-      try {
-        const { data } = await api.post("/auth/ensure-profile", {
-          is_signup: isSignUp,
-          role: role || "customer",
-        });
-        return data?.profile?.user_type || role || null;
-      } catch (err) {
-        console.warn("Could not ensure profile:", err);
-        return null;
-      }
-    },
-    []
-  );
+  // Details form
+  const [fullName, setFullName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [addressLine1, setAddressLine1] = useState("");
+  const [city, setCity] = useState("");
+  const [stateRegion, setStateRegion] = useState("");
+  const [postalCode, setPostalCode] = useState("");
 
-  // Redirect if user is already logged in when visiting the auth page
-  useEffect(() => {
-    if (!loading && !profileLoading && session) {
-      if (redirectTo && !isAdmin && !isOwner) {
-        navigate(redirectTo, { replace: true });
-      } else if (isAdmin) {
-        navigate("/admin", { replace: true });
-      } else if (isOwner) {
-        navigate("/owner", { replace: true });
-      } else {
-        navigate("/", { replace: true });
-      }
-    }
-  }, [loading, profileLoading, navigate, redirectTo, session, isAdmin, isOwner]);
+  // Track whether we're in "needs details" mode (profile incomplete)
+  const [needsDetails, setNeedsDetails] = useState(false);
 
-  /** Navigate immediately based on the resolved role after login/signup */
+  // ── Navigate by role ──────────────────────────────────────
   const navigateByRole = useCallback(
     (role) => {
       if (role === "admin") {
@@ -98,87 +118,312 @@ const Auth = React.memo(() => {
     [navigate, redirectTo]
   );
 
-  const onSubmit = useCallback(
+  // ── Redirect if already logged in ─────────────────────────
+  // If user has a session AND profile is complete → redirect
+  // If user has a session BUT profile has no full_name → show details form
+  useEffect(() => {
+    if (loading || profileLoading) return;
+    if (!session) return;
+
+    // User is logged in — check if profile is complete
+    if (profile && !profile.full_name) {
+      // Profile exists but is incomplete — show details form
+      setNeedsDetails(true);
+      setMode("signup");
+      setSignupStep(2);
+      return;
+    }
+
+    if (!profile) {
+      // No profile at all yet — try to ensure one and then check again
+      // This covers the case where user just confirmed their email
+      setNeedsDetails(true);
+      setMode("signup");
+      setSignupStep(2);
+      return;
+    }
+
+    // Profile is complete — redirect normally
+    if (redirectTo && !isAdmin && !isOwner) {
+      navigate(redirectTo, { replace: true });
+    } else if (isAdmin) {
+      navigate("/admin", { replace: true });
+    } else if (isOwner) {
+      navigate("/owner", { replace: true });
+    } else {
+      navigate("/", { replace: true });
+    }
+  }, [loading, profileLoading, navigate, redirectTo, session, profile, isAdmin, isOwner]);
+
+  // ── Login handler ─────────────────────────────────────────
+  const onLogin = useCallback(
     async (e) => {
       e.preventDefault();
       setSubmitting(true);
       setError("");
       setInfo("");
       try {
-        if (mode === "signup") {
-          const result = await signUp({ email, password });
-          const authedUser = result?.data?.user || result?.data?.session?.user || null;
-          const resolvedRole = await ensureProfileRow({
-            user: authedUser,
-            isSignUp: true,
-            role: selectedRole,
-          });
-          navigateByRole(resolvedRole || selectedRole);
-        } else {
-          const result = await signIn({ email, password });
-          const authedUser = result?.data?.user || result?.data?.session?.user || null;
-          const resolvedRole = await ensureProfileRow({ user: authedUser, isSignUp: false });
-          navigateByRole(resolvedRole);
-        }
+        await signIn({ email, password });
+
+        // Ensure profile exists
+        try {
+          await api.post("/auth/ensure-profile", { is_signup: false });
+        } catch {}
+
+        // Fetch role from profile
+        let role = "customer";
+        try {
+          const { data: meData } = await api.get("/auth/me");
+          role = meData?.role || meData?.profile?.user_type || "customer";
+        } catch {}
+
+        navigateByRole(role);
       } catch (err) {
         setError(err?.message || "Authentication failed.");
       } finally {
         setSubmitting(false);
       }
     },
-    [email, mode, password, signIn, signUp, ensureProfileRow, selectedRole, navigateByRole]
+    [email, password, signIn, navigateByRole]
   );
 
+  // ── Signup: submit email + password + role ────────────────
+  const onSignup = useCallback(
+    async (e) => {
+      e.preventDefault();
+      setSubmitting(true);
+      setError("");
+      setInfo("");
+      try {
+        const result = await signUp({
+          email,
+          password,
+          options: {
+            data: { role: selectedRole },
+          },
+        });
+        const user = result?.user;
+
+        // Supabase signUp with email confirmation enabled returns a user
+        // but no session (user.identities will be empty array if email exists)
+        if (user?.identities?.length === 0) {
+          setError("An account with this email already exists. Please sign in.");
+          return;
+        }
+
+        // If we got a session, email confirmation is disabled — go to details
+        if (result?.session) {
+          // Ensure profile row
+          try {
+            await api.post("/auth/ensure-profile", {
+              is_signup: true,
+              role: selectedRole,
+            });
+          } catch {}
+          setSignupStep(2);
+          return;
+        }
+
+        // No session means email confirmation is required
+        setSignupStep(1);
+        setInfo("We've sent a confirmation link to your email. Please check your inbox.");
+      } catch (err) {
+        setError(err?.message || "Signup failed.");
+      } finally {
+        setSubmitting(false);
+      }
+    },
+    [email, password, selectedRole, signUp]
+  );
+
+  // ── Complete profile details ──────────────────────────────
+  const onCompleteDetails = useCallback(
+    async (e) => {
+      e.preventDefault();
+      setSubmitting(true);
+      setError("");
+      setInfo("");
+      try {
+        // Ensure profile row exists first
+        try {
+          await api.post("/auth/ensure-profile", {
+            is_signup: true,
+            role: selectedRole,
+          });
+        } catch {}
+
+        // Update profile with the details
+        await api.put("/auth/profile", {
+          full_name: fullName,
+          phone,
+          address_line1: addressLine1,
+          city,
+          state_region: stateRegion,
+          postal_code: postalCode,
+        });
+
+        // Refetch profile so role is up to date
+        await refetchProfile();
+
+        // Fetch role and navigate
+        let role = selectedRole;
+        try {
+          const { data: meData } = await api.get("/auth/me");
+          role = meData?.role || meData?.profile?.user_type || selectedRole;
+        } catch {}
+
+        navigateByRole(role);
+      } catch (err) {
+        setError(err?.message || "Failed to save details.");
+      } finally {
+        setSubmitting(false);
+      }
+    },
+    [fullName, phone, addressLine1, city, stateRegion, postalCode, selectedRole, navigateByRole, refetchProfile]
+  );
+
+  // ── Mode toggle ───────────────────────────────────────────
   const toggleMode = useCallback(() => {
     setMode((m) => (m === "login" ? "signup" : "login"));
     setError("");
     setInfo("");
+    setSignupStep(0);
+    setNeedsDetails(false);
   }, []);
+
+  // ── Go back to previous step ──────────────────────────────
+  const goBack = useCallback(() => {
+    setError("");
+    setInfo("");
+    if (signupStep > 0 && !needsDetails) {
+      setSignupStep((s) => s - 1);
+    }
+  }, [signupStep, needsDetails]);
+
+  // ── Left panel content ────────────────────────────────────
+  const leftPanelContent = useMemo(() => {
+    if (mode === "login") {
+      return {
+        title: "Welcome back",
+        subtitle: "Sign in to access your account.",
+        detail: "Email + password authentication via Supabase.",
+      };
+    }
+    if (signupStep === 0) {
+      return {
+        title: "Create your account",
+        subtitle: "Choose how you'd like to use DayBnB.",
+        detail: "Enter your email and password to get started.",
+      };
+    }
+    if (signupStep === 1) {
+      return {
+        title: "Check your email",
+        subtitle: `We sent a confirmation link to ${email}`,
+        detail: "Click the link in your email to verify your account, then come back here.",
+      };
+    }
+    return {
+      title: "Almost there!",
+      subtitle: "Tell us a bit about yourself.",
+      detail: "This helps us personalize your experience.",
+    };
+  }, [mode, signupStep, email]);
+
+  // ── Render ────────────────────────────────────────────────
 
   return (
     <div className="mx-auto grid w-full max-w-3xl gap-6 md:grid-cols-2">
+      {/* Left panel */}
       <Card className="md:col-span-1">
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gradient dark:text-gradient-dark">
           Daybnb
         </p>
         <h1 className="mt-2 text-2xl font-semibold text-ink dark:text-dark-ink">
-          {mode === "login" ? "Welcome back" : "Create your account"}
+          {leftPanelContent.title}
         </h1>
         <p className="mt-2 text-sm text-muted dark:text-dark-muted">
-          {mode === "login"
-            ? "Sign in to access your account."
-            : "Choose how you'd like to use DayBnB."}
+          {leftPanelContent.subtitle}
         </p>
         <div className="mt-6 space-y-2 text-sm text-muted dark:text-dark-muted">
-          <p className="font-medium text-ink dark:text-dark-ink">Email + password</p>
-          <p>Simple and secure authentication via Supabase.</p>
+          <p className="font-medium text-ink dark:text-dark-ink">
+            {mode === "login" ? "Email + password" : signupStep === 1 ? "Waiting for confirmation" : `Step ${needsDetails ? 2 : signupStep + 1} of 2`}
+          </p>
+          <p>{leftPanelContent.detail}</p>
         </div>
       </Card>
 
+      {/* Right panel */}
       <Card className="md:col-span-1">
-        <form onSubmit={onSubmit} className="space-y-4">
-          <FormInput
-            label="Email"
-            type="email"
-            autoComplete="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="you@domain.com"
-          />
-          <FormInput
-            label="Password"
-            type="password"
-            autoComplete={mode === "signup" ? "new-password" : "current-password"}
-            required
-            minLength={6}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="••••••••"
-          />
+        {/* ─── LOGIN ─── */}
+        {mode === "login" && (
+          <form onSubmit={onLogin} className="space-y-4">
+            <FormInput
+              label="Email"
+              type="email"
+              autoComplete="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@domain.com"
+            />
+            <FormInput
+              label="Password"
+              type="password"
+              autoComplete="current-password"
+              required
+              minLength={6}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+            />
 
-          {/* Role selection – only shown during signup */}
-          {mode === "signup" && (
+            {error && (
+              <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-400">
+                {error}
+              </div>
+            )}
+
+            <Button className="w-full" type="submit" disabled={submitting || loading}>
+              {submitting ? "Signing in..." : "Sign in"}
+            </Button>
+
+            <button
+              type="button"
+              onClick={toggleMode}
+              className="w-full rounded-full px-4 py-2 text-sm font-semibold text-brand-700 hover:text-accent-500 dark:text-brand-400 dark:hover:text-accent-500"
+            >
+              New here? Create an account
+            </button>
+          </form>
+        )}
+
+        {/* ─── SIGNUP STEP 0: Email + Password + Role ─── */}
+        {mode === "signup" && signupStep === 0 && (
+          <form onSubmit={onSignup} className="space-y-4">
+            <StepIndicator current={0} total={2} />
+
+            <FormInput
+              label="Email"
+              type="email"
+              autoComplete="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@domain.com"
+            />
+            <FormInput
+              label="Password"
+              type="password"
+              autoComplete="new-password"
+              required
+              minLength={6}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+            />
+
+            {/* Role selection */}
             <div className="space-y-2">
               <span className="text-sm font-medium text-muted">I want to join as</span>
               <div className="grid grid-cols-2 gap-3">
@@ -210,38 +455,149 @@ const Auth = React.memo(() => {
                 ))}
               </div>
             </div>
-          )}
 
-          {error ? (
-            <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-400">
-              {error}
+            {error && (
+              <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-400">
+                {error}
+              </div>
+            )}
+
+            <Button className="w-full" type="submit" disabled={submitting || loading}>
+              {submitting ? "Creating account..." : "Continue"}
+            </Button>
+
+            <button
+              type="button"
+              onClick={toggleMode}
+              className="w-full rounded-full px-4 py-2 text-sm font-semibold text-brand-700 hover:text-accent-500 dark:text-brand-400 dark:hover:text-accent-500"
+            >
+              Already have an account? Sign in
+            </button>
+          </form>
+        )}
+
+        {/* ─── SIGNUP STEP 1: Check your email ─── */}
+        {mode === "signup" && signupStep === 1 && (
+          <div className="space-y-5 text-center">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-50 dark:bg-brand-900/30">
+              <svg className="h-8 w-8 text-brand-600 dark:text-brand-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+              </svg>
             </div>
-          ) : null}
 
-          {info ? (
-            <div className="rounded-xl border border-brand-200 bg-brand-50 px-3 py-2 text-sm text-brand-700 dark:border-brand-700 dark:bg-brand-900/30 dark:text-brand-300">
-              {info}
+            <div>
+              <p className="text-base font-semibold text-ink dark:text-dark-ink">
+                Check your email
+              </p>
+              <p className="mt-2 text-sm text-muted dark:text-dark-muted">
+                We sent a confirmation link to
+              </p>
+              <p className="mt-1 text-sm font-medium text-ink dark:text-dark-ink">
+                {email}
+              </p>
             </div>
-          ) : null}
 
-          <Button className="w-full" type="submit" disabled={submitting || loading}>
-            {submitting
-              ? "Please wait..."
-              : mode === "login"
-                ? "Sign in"
-                : `Create ${selectedRole === "owner" ? "Owner" : "Customer"} account`}
-          </Button>
+            <div className="rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-700 dark:border-brand-700 dark:bg-brand-900/30 dark:text-brand-300">
+              Click the link in your email to confirm your account. Once confirmed, come back to this page to complete your profile.
+            </div>
 
-          <button
-            type="button"
-            onClick={toggleMode}
-            className="w-full rounded-full px-4 py-2 text-sm font-semibold text-brand-700 hover:text-accent-500 dark:text-brand-400 dark:hover:text-accent-500"
-          >
-            {mode === "login"
-              ? "New here? Create an account"
-              : "Already have an account? Sign in"}
-          </button>
-        </form>
+            <p className="text-xs text-muted dark:text-dark-muted">
+              Don't see the email? Check your spam folder.
+            </p>
+
+            <button
+              type="button"
+              onClick={goBack}
+              className="text-sm font-medium text-muted hover:text-ink dark:hover:text-dark-ink"
+            >
+              &larr; Back to signup
+            </button>
+          </div>
+        )}
+
+        {/* ─── SIGNUP STEP 2: Basic Details ─── */}
+        {mode === "signup" && signupStep === 2 && (
+          <form onSubmit={onCompleteDetails} className="space-y-4">
+            <StepIndicator current={1} total={2} />
+
+            <div className="flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700 dark:border-green-800 dark:bg-green-900/30 dark:text-green-400">
+              <svg className="h-4 w-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Email verified successfully
+            </div>
+
+            <FormInput
+              label="Full Name"
+              type="text"
+              autoComplete="name"
+              required
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              placeholder="John Doe"
+            />
+
+            <FormInput
+              label="Phone Number"
+              type="tel"
+              autoComplete="tel"
+              required
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="+1 (555) 123-4567"
+            />
+
+            <FormInput
+              label="Address"
+              type="text"
+              autoComplete="street-address"
+              value={addressLine1}
+              onChange={(e) => setAddressLine1(e.target.value)}
+              placeholder="123 Main St"
+            />
+
+            <div className="grid grid-cols-2 gap-3">
+              <FormInput
+                label="City"
+                type="text"
+                autoComplete="address-level2"
+                required
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                placeholder="San Francisco"
+              />
+              <FormInput
+                label="State"
+                type="text"
+                autoComplete="address-level1"
+                required
+                value={stateRegion}
+                onChange={(e) => setStateRegion(e.target.value)}
+                placeholder="CA"
+              />
+            </div>
+
+            <FormInput
+              label="Pincode / ZIP"
+              type="text"
+              autoComplete="postal-code"
+              required
+              value={postalCode}
+              onChange={(e) => setPostalCode(e.target.value)}
+              placeholder="94102"
+            />
+
+            {error && (
+              <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-400">
+                {error}
+              </div>
+            )}
+
+            <Button className="w-full" type="submit" disabled={submitting}>
+              {submitting ? "Saving..." : "Complete Setup"}
+            </Button>
+          </form>
+        )}
       </Card>
     </div>
   );
