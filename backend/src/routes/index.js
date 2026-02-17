@@ -11,6 +11,7 @@ const stripeRoutes = require("./stripe");
 const likesRoutes = require("./likes");
 const adminRoutes = require("./admin");
 const ownerRoutes = require("./owner");
+const chatRoutes = require("./chat");
 
 const router = Router();
 
@@ -25,5 +26,6 @@ router.use("/stripe", stripeRoutes);
 router.use("/likes", likesRoutes);
 router.use("/admin", adminRoutes);
 router.use("/owner", ownerRoutes);
+router.use("/chat", chatRoutes);
 
 module.exports = router;

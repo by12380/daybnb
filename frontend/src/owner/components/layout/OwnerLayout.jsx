@@ -1,10 +1,12 @@
 import React, { useState } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "../../../auth/useAuth.js";
 import { useProfile } from "../../../auth/useProfile.js";
 import { getImpersonation, clearImpersonation } from "../../../redux/api.js";
 import OwnerNotificationDropdown from "../NotificationDropdown.jsx";
 import ThemeToggle from "../../../theme/ThemeToggle.jsx";
+import LanguageSelector from "../../../components/LanguageSelector.jsx";
 
 const NAV_ITEMS = [
   {
@@ -40,6 +42,15 @@ const NAV_ITEMS = [
     icon: (
       <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+      </svg>
+    ),
+  },
+  {
+    path: "/owner/chat",
+    label: "Chat",
+    icon: (
+      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
       </svg>
     ),
   },
@@ -114,6 +125,7 @@ const Sidebar = React.memo(({ isOpen, onClose }) => {
 });
 
 const Header = React.memo(({ onMenuClick }) => {
+  const { t } = useTranslation();
   const { user, signOut } = useAuth();
   const { isAdmin } = useProfile();
   const navigate = useNavigate();
@@ -134,7 +146,7 @@ const Header = React.memo(({ onMenuClick }) => {
         </button>
 
         <div className="hidden lg:block">
-          <h1 className="text-lg font-semibold text-ink dark:text-dark-ink">Owner Panel</h1>
+          <h1 className="text-lg font-semibold text-ink dark:text-dark-ink">{t("owner.ownerPanel")}</h1>
         </div>
 
         {isImpersonating && (
@@ -151,6 +163,7 @@ const Header = React.memo(({ onMenuClick }) => {
       </div>
 
       <div className="flex items-center gap-4">
+        <LanguageSelector />
         <ThemeToggle />
         <OwnerNotificationDropdown />
         <div className="text-right">
@@ -164,7 +177,7 @@ const Header = React.memo(({ onMenuClick }) => {
             onClick={signOut}
             className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-muted transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600 dark:border-dark-border dark:text-dark-muted dark:hover:border-red-700 dark:hover:bg-red-900/20 dark:hover:text-red-400"
           >
-            Sign Out
+            {t("common.signOut")}
           </button>
         )}
       </div>

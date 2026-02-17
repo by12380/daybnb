@@ -18,7 +18,7 @@ const SORT_OPTIONS = [
 ];
 
 const LandingGallery = React.memo(
-  ({ location = "", guests = 0, date = "", minPrice = "", maxPrice = "" }) => {
+  ({ searchText = "", location = "", guests = 0, date = "", minPrice = "", maxPrice = "" }) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -40,14 +40,17 @@ const LandingGallery = React.memo(
   // Reset to first page whenever any filter or sort changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [location, guests, date, minPrice, maxPrice, sortOrder]);
+  }, [searchText, location, guests, date, minPrice, maxPrice, sortOrder]);
 
   // Fetch filtered rooms via API
   useEffect(() => {
     const offset = (currentPage - 1) * PAGE_SIZE;
     const params = { limit: PAGE_SIZE, offset };
 
-    if (location?.trim()) params.search = location.trim();
+    const queryParts = [searchText, location]
+      .map((value) => String(value || "").trim())
+      .filter(Boolean);
+    if (queryParts.length > 0) params.search = queryParts.join(" ");
     if (Number(guests) > 0) params.guests = Number(guests);
     if (date) params.date = date;
     if (minPrice !== "" && Number(minPrice) >= 0) params.min_price = Number(minPrice);
@@ -55,7 +58,7 @@ const LandingGallery = React.memo(
     if (sortOrder) params.sort = sortOrder;
 
     dispatch(fetchRooms(params));
-  }, [dispatch, currentPage, location, guests, date, minPrice, maxPrice, sortOrder]);
+  }, [dispatch, currentPage, searchText, location, guests, date, minPrice, maxPrice, sortOrder]);
 
   const handlePageChange = useCallback((page) => {
     setCurrentPage(page);

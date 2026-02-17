@@ -99,9 +99,6 @@ const Auth = React.memo(() => {
   const [stateRegion, setStateRegion] = useState("");
   const [postalCode, setPostalCode] = useState("");
 
-  // Track whether we're in "needs details" mode (profile incomplete)
-  const [needsDetails, setNeedsDetails] = useState(false);
-
   // ── Navigate by role ──────────────────────────────────────
   const navigateByRole = useCallback(
     (role) => {
@@ -119,31 +116,12 @@ const Auth = React.memo(() => {
   );
 
   // ── Redirect if already logged in ─────────────────────────
-  // If user has a session AND profile is complete → redirect
-  // If user has a session BUT profile has no full_name → show details form
+  // Always navigate directly by role; profile details are optional.
   useEffect(() => {
     if (loading || profileLoading) return;
     if (!session) return;
 
-    // User is logged in — check if profile is complete
-    if (profile && !profile.full_name) {
-      // Profile exists but is incomplete — show details form
-      setNeedsDetails(true);
-      setMode("signup");
-      setSignupStep(2);
-      return;
-    }
-
-    if (!profile) {
-      // No profile at all yet — try to ensure one and then check again
-      // This covers the case where user just confirmed their email
-      setNeedsDetails(true);
-      setMode("signup");
-      setSignupStep(2);
-      return;
-    }
-
-    // Profile is complete — redirect normally
+    // User is logged in — redirect normally
     if (redirectTo && !isAdmin && !isOwner) {
       navigate(redirectTo, { replace: true });
     } else if (isAdmin) {
@@ -288,17 +266,16 @@ const Auth = React.memo(() => {
     setError("");
     setInfo("");
     setSignupStep(0);
-    setNeedsDetails(false);
   }, []);
 
   // ── Go back to previous step ──────────────────────────────
   const goBack = useCallback(() => {
     setError("");
     setInfo("");
-    if (signupStep > 0 && !needsDetails) {
+    if (signupStep > 0) {
       setSignupStep((s) => s - 1);
     }
-  }, [signupStep, needsDetails]);
+  }, [signupStep]);
 
   // ── Left panel content ────────────────────────────────────
   const leftPanelContent = useMemo(() => {
@@ -347,7 +324,7 @@ const Auth = React.memo(() => {
         </p>
         <div className="mt-6 space-y-2 text-sm text-muted dark:text-dark-muted">
           <p className="font-medium text-ink dark:text-dark-ink">
-            {mode === "login" ? "Email + password" : signupStep === 1 ? "Waiting for confirmation" : `Step ${needsDetails ? 2 : signupStep + 1} of 2`}
+            {mode === "login" ? "Email + password" : signupStep === 1 ? "Waiting for confirmation" : `Step ${signupStep + 1} of 2`}
           </p>
           <p>{leftPanelContent.detail}</p>
         </div>

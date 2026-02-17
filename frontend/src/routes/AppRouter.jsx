@@ -30,6 +30,10 @@ import OwnerDashboard from "../owner/pages/Dashboard.jsx";
 import OwnerRooms from "../owner/pages/Rooms.jsx";
 import OwnerBookings from "../owner/pages/Bookings.jsx";
 import OwnerCustomers from "../owner/pages/Customers.jsx";
+import OwnerChat from "../owner/pages/Chat.jsx";
+
+// Admin chat
+import AdminChat from "../admin/pages/Chat.jsx";
 
 export default function AppRouter() {
   return (
@@ -65,6 +69,7 @@ export default function AppRouter() {
             <Route path="/admin/users" element={<AdminUsers />} />
             <Route path="/admin/rooms" element={<AdminRooms />} />
             <Route path="/admin/messages" element={<AdminMessages />} />
+            <Route path="/admin/chat" element={<AdminChat />} />
             <Route path="/admin/owners" element={<AdminOwners />} />
           </Route>
         </Route>
@@ -76,6 +81,7 @@ export default function AppRouter() {
             <Route path="/owner/rooms" element={<OwnerRooms />} />
             <Route path="/owner/bookings" element={<OwnerBookings />} />
             <Route path="/owner/customers" element={<OwnerCustomers />} />
+            <Route path="/owner/chat" element={<OwnerChat />} />
           </Route>
         </Route>
       </Routes>

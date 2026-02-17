@@ -15,6 +15,7 @@ const Landing = React.memo(() => {
   const navigate = useNavigate();
   const { isAdmin, isOwner, loading } = useProfile();
   const [searchFilters, setSearchFilters] = useState({
+    searchText: "",
     location: "",
     guests: 0,
     date: "",
@@ -33,6 +34,7 @@ const Landing = React.memo(() => {
 
   const onSearch = useCallback((params) => {
     setSearchFilters({
+      searchText: params.searchText || "",
       location: params.location || "",
       guests: Number(params.guests) || 0,
       date: params.date || "",
@@ -69,6 +71,7 @@ const Landing = React.memo(() => {
       </section>
       <section id="gallery" className="py-8">
         <LandingGallery
+          searchText={searchFilters.searchText}
           location={searchFilters.location}
           guests={searchFilters.guests}
           date={searchFilters.date}

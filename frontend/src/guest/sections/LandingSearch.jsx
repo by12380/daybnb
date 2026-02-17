@@ -1,18 +1,19 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import { useTranslation } from "react-i18next";
 import { DatePicker } from "antd";
 import dayjs from "dayjs";
 import Card from "../components/ui/Card.jsx";
 import FormInput, { INPUT_STYLES } from "../components/ui/FormInput.jsx";
-import { BOOKING_TYPES } from "../utils/constants.js";
 import { fetchRooms } from "../../redux/slices/roomSlice.js";
 
 const LandingSearch = React.memo(({ onSearch }) => {
+  const { t } = useTranslation();
   const dispatch = useDispatch();
   const { rooms, loading: roomsLoading, error: roomsError } = useSelector((state) => state.rooms);
 
-  const [bookingType, setBookingType] = useState("hourly");
   const [formState, setFormState] = useState({
+    searchText: "",
     location: "",
     date: "",
     guests: 1,
@@ -38,12 +39,8 @@ const LandingSearch = React.memo(({ onSearch }) => {
 
   // Call onSearch whenever any filter changes
   useEffect(() => {
-    onSearch?.({ ...formState, bookingType });
-  }, [formState, bookingType, onSearch]);
-
-  const onTypeChange = useCallback((event) => {
-    setBookingType(event.target.value);
-  }, []);
+    onSearch?.(formState);
+  }, [formState, onSearch]);
 
   const onChange = useCallback((event) => {
     const { name, value } = event.target;
@@ -58,15 +55,24 @@ const LandingSearch = React.memo(({ onSearch }) => {
     <Card className="space-y-6">
       <div>
         <h2 className="text-2xl font-semibold text-brand-700 dark:text-brand-400">
-          Find your daytime stay
+          {t("search.title")}
         </h2>
         <p className="mt-1 text-sm text-muted dark:text-dark-muted">
-          Book a room for the day. Select your preferred date and location.
+          {t("search.subtitle")}
         </p>
       </div>
       <div className="grid gap-4 md:grid-cols-7">
+      <FormInput
+          label={t("search.searchLabel")}
+          name="searchText"
+          value={formState.searchText}
+          onChange={onChange}
+          type="search"
+          placeholder={t("search.searchPlaceholder")}
+          className="md:col-span-2"
+        />
         <label className="flex flex-col gap-2 md:col-span-2">
-          <span className="text-sm font-medium text-muted dark:text-dark-muted">Location</span>
+          <span className="text-sm font-medium text-muted dark:text-dark-muted">{t("search.locationLabel")}</span>
           <select
             name="location"
             value={formState.location}
@@ -76,10 +82,10 @@ const LandingSearch = React.memo(({ onSearch }) => {
           >
             <option value="">
               {roomsLoading
-                ? "Loading cities…"
+                ? t("search.loadingCities")
                 : roomsError
-                  ? "Unable to load cities"
-                  : "All locations"}
+                  ? t("search.unableToLoadCities")
+                  : t("search.allLocations")}
             </option>
             {cities.map((city) => (
               <option key={city} value={city}>
@@ -92,58 +98,35 @@ const LandingSearch = React.memo(({ onSearch }) => {
           ) : null}
         </label>
         <label className="flex flex-col gap-2 md:col-span-1">
-          <span className="text-sm font-medium text-muted dark:text-dark-muted">Date</span>
+          <span className="text-sm font-medium text-muted dark:text-dark-muted">{t("search.dateLabel")}</span>
           <DatePicker
             className={INPUT_STYLES}
-            placeholder="Select date"
+            placeholder={t("search.selectDate")}
             value={formState.date ? dayjs(formState.date) : null}
             onChange={onDateChange}
             disabledDate={(current) => current && current < dayjs().startOf("day")}
             allowClear
           />
         </label>
-        <label className="flex flex-col gap-2 md:col-span-1">
-          <span className="text-sm font-medium text-muted dark:text-dark-muted">Booking</span>
-          <select
-            name="bookingType"
-            value={bookingType}
-            onChange={onTypeChange}
-            className={INPUT_STYLES}
-          >
-            {BOOKING_TYPES.map((type) => (
-              <option key={type.value} value={type.value}>
-                {type.label}
-              </option>
-            ))}
-          </select>
-        </label>
+       
         <FormInput
-          label="Guests"
-          name="guests"
-          min="1"
-          value={formState.guests}
-          onChange={onChange}
-          type="number"
-          className="md:col-span-1"
-        />
-        <FormInput
-          label="Min Price"
+          label={t("search.minPrice")}
           name="minPrice"
           min="0"
           value={formState.minPrice}
           onChange={onChange}
           type="number"
-          placeholder="No min"
+          placeholder={t("search.noMin")}
           className="md:col-span-1"
         />
         <FormInput
-          label="Max Price"
+          label={t("search.maxPrice")}
           name="maxPrice"
           min="0"
           value={formState.maxPrice}
           onChange={onChange}
           type="number"
-          placeholder="No max"
+          placeholder={t("search.noMax")}
           className="md:col-span-1"
         />
       </div>

@@ -1,8 +1,10 @@
 import React, { useState } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "../../../auth/useAuth.js";
 import NotificationDropdown from "../NotificationDropdown.jsx";
 import ThemeToggle from "../../../theme/ThemeToggle.jsx";
+import LanguageSelector from "../../../components/LanguageSelector.jsx";
 
 const NAV_ITEMS = [
   {
@@ -56,6 +58,15 @@ const NAV_ITEMS = [
     icon: (
       <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+      </svg>
+    ),
+  },
+  {
+    path: "/admin/chat",
+    label: "Chat",
+    icon: (
+      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
       </svg>
     ),
   },
@@ -142,6 +153,7 @@ const Sidebar = React.memo(({ isOpen, onClose }) => {
 });
 
 const Header = React.memo(({ onMenuClick }) => {
+  const { t } = useTranslation();
   const { user, signOut } = useAuth();
 
   return (
@@ -156,21 +168,22 @@ const Header = React.memo(({ onMenuClick }) => {
       </button>
 
       <div className="hidden lg:block">
-        <h1 className="text-lg font-semibold text-ink dark:text-dark-ink">Admin Panel</h1>
+        <h1 className="text-lg font-semibold text-ink dark:text-dark-ink">{t("admin.adminPanel")}</h1>
       </div>
 
       <div className="flex items-center gap-4">
+        <LanguageSelector />
         <ThemeToggle />
         <NotificationDropdown />
         <div className="text-right">
           <p className="text-sm font-medium text-ink dark:text-dark-ink">{user?.email || "Admin"}</p>
-          <p className="text-xs text-muted dark:text-dark-muted">Administrator</p>
+          <p className="text-xs text-muted dark:text-dark-muted">{t("admin.administrator")}</p>
         </div>
         <button
           onClick={signOut}
           className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-muted transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600 dark:border-dark-border dark:text-dark-muted dark:hover:border-red-700 dark:hover:bg-red-900/20 dark:hover:text-red-400"
         >
-          Sign Out
+          {t("common.signOut")}
         </button>
       </div>
     </header>

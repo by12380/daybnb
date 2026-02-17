@@ -9,6 +9,7 @@ import contactReducer from "./slices/contactSlice";
 import userReducer from "./slices/userSlice";
 import stripeReducer from "./slices/stripeSlice";
 import ownerReducer from "./slices/ownerSlice";
+import chatReducer from "./slices/chatSlice";
 
 const store = configureStore({
   reducer: {
@@ -21,6 +22,7 @@ const store = configureStore({
     users: userReducer,
     stripe: stripeReducer,
     owner: ownerReducer,
+    chat: chatReducer,
   },
 });
 

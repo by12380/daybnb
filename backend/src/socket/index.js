@@ -135,6 +135,30 @@ function initializeSocket(httpServer) {
       socket.data.impersonatingOwnerId = null;
     });
 
+    // ── Chat: join a conversation room ──
+    socket.on("chat:join", (conversationId) => {
+      if (conversationId) {
+        socket.join(`chat:${conversationId}`);
+      }
+    });
+
+    socket.on("chat:leave", (conversationId) => {
+      if (conversationId) {
+        socket.leave(`chat:${conversationId}`);
+      }
+    });
+
+    // ── Chat: typing indicator ──
+    socket.on("chat:typing", ({ conversationId, isTyping }) => {
+      if (conversationId) {
+        socket.to(`chat:${conversationId}`).emit("chat:typing", {
+          userId,
+          conversationId,
+          isTyping,
+        });
+      }
+    });
+
     socket.on("disconnect", (reason) => {
       console.log(`🔌 Socket disconnected: ${userEmail || userId} — ${reason}`);
     });
@@ -154,9 +178,14 @@ function emitNotificationToRole(role, notification) {
   ioInstance.to(`role:${role}`).emit(NOTIFICATION_EVENT, notification);
 }
 
+function getIO() {
+  return ioInstance;
+}
+
 module.exports = {
   initializeSocket,
   emitNotificationToUser,
   emitNotificationToRole,
+  getIO,
   NOTIFICATION_EVENT,
 };

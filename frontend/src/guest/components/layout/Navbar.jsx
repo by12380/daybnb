@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "../../../auth/useAuth.js";
 import { useProfile } from "../../../auth/useProfile.js";
 import Button from "../ui/Button.jsx";
 import UserNotificationDropdown from "../NotificationDropdown.jsx";
 import ThemeToggle from "../../../theme/ThemeToggle.jsx";
+import LanguageSelector from "../../../components/LanguageSelector.jsx";
 
 export default function GuestNavbar() {
+  const { t } = useTranslation();
   const { user, loading, signOut } = useAuth();
   const { isAdmin } = useProfile();
   const navigate = useNavigate();
@@ -53,16 +56,17 @@ export default function GuestNavbar() {
             Daybnb
           </span>
           <span className="rounded-full border border-brand-200 bg-brand-50 px-2 py-1 text-xs font-medium text-brand-700 dark:border-brand-700 dark:bg-brand-900/30 dark:text-brand-300">
-            Day-Use Only
+            {t("common.dayUseOnly")}
           </span>
         </Link>
         <nav className="flex items-center gap-3 text-sm text-muted dark:text-dark-muted">
           <Link to="/" className="rounded-full px-3 py-1.5 hover:text-brand-600 dark:hover:text-brand-400">
-            Browse
+            {t("navbar.browse")}
           </Link>
           <Link to="/contact" className="rounded-full px-3 py-1.5 hover:text-brand-600 dark:hover:text-brand-400">
-            Contact
+            {t("navbar.contact")}
           </Link>
+          <LanguageSelector />
           <ThemeToggle />
           {loading ? (
             <div className="h-5 w-5 animate-spin rounded-full border-2 border-brand-200 border-t-brand-600 dark:border-brand-700 dark:border-t-brand-400" />
@@ -103,7 +107,7 @@ export default function GuestNavbar() {
                       <svg className="h-5 w-5 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                       </svg>
-                      My Profile
+                      {t("navbar.myProfile")}
                     </Link>
                     <Link
                       to="/my-bookings"
@@ -113,7 +117,7 @@ export default function GuestNavbar() {
                       <svg className="h-5 w-5 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                       </svg>
-                      My Bookings
+                      {t("navbar.myBookings")}
                     </Link>
                     <Link
                       to="/liked-rooms"
@@ -128,7 +132,7 @@ export default function GuestNavbar() {
                           d="M11.995 21s-7.5-4.35-9.77-8.78C.71 9.29 2.02 6.4 4.86 5.57c1.64-.48 3.41.02 4.65 1.27l2.49 2.52 2.49-2.52c1.24-1.25 3.01-1.75 4.65-1.27 2.84.83 4.15 3.72 2.63 6.65C19.495 16.65 11.995 21 11.995 21z"
                         />
                       </svg>
-                      Liked Rooms
+                      {t("navbar.likedRooms")}
                     </Link>
                     {isAdmin && (
                       <Link
@@ -139,7 +143,7 @@ export default function GuestNavbar() {
                         <svg className="h-5 w-5 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17v-2a4 4 0 014-4h2m-6 6h6m2 0a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v8a2 2 0 002 2h2" />
                         </svg>
-                        Admin Panel
+                        {t("navbar.adminPanel")}
                       </Link>
                     )}
                   </div>
@@ -152,7 +156,7 @@ export default function GuestNavbar() {
                       <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                       </svg>
-                      Sign out
+                      {t("common.signOut")}
                     </button>
                   </div>
                 </div>
@@ -162,7 +166,7 @@ export default function GuestNavbar() {
           ) : (
             <>
               <Link to="/auth">
-                <Button variant="outline">Sign in</Button>
+                <Button variant="outline">{t("common.signIn")}</Button>
               </Link>
             </>
           )}
