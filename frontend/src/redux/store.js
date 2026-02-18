@@ -10,6 +10,7 @@ import userReducer from "./slices/userSlice";
 import stripeReducer from "./slices/stripeSlice";
 import ownerReducer from "./slices/ownerSlice";
 import chatReducer from "./slices/chatSlice";
+import offerReducer from "./slices/offerSlice";
 
 const store = configureStore({
   reducer: {
@@ -23,6 +24,7 @@ const store = configureStore({
     stripe: stripeReducer,
     owner: ownerReducer,
     chat: chatReducer,
+    offers: offerReducer,
   },
 });
 

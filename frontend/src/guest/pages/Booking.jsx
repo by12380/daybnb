@@ -29,6 +29,7 @@ import {
   clearStripeError,
   resetStripeSession,
 } from "../../redux/slices/stripeSlice.js";
+import { fetchOfferForRoom, clearRoomOffer } from "../../redux/slices/offerSlice.js";
 import AvailabilityCalendar from "../components/AvailabilityCalendar.jsx";
 import { useWelcomeOffer } from "../../hooks/useWelcomeOffer.js";
 
@@ -55,6 +56,7 @@ const Booking = React.memo(() => {
   const { bookedDates, loading: bookingLoading, error: bookingError } = useSelector((state) => state.bookings);
   const { reviews, loading: reviewsLoading, error: reviewsError } = useSelector((state) => state.reviews);
   const { sessionUrl, loading: stripeLoading, error: stripeError } = useSelector((state) => state.stripe);
+  const { roomOffer } = useSelector((state) => state.offers);
 
   // Local form state
   const [date, setDate] = useState("");
@@ -85,17 +87,19 @@ const Booking = React.memo(() => {
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const [reviewSuccess, setReviewSuccess] = useState("");
 
-  // Fetch room
+  // Fetch room + its best offer
   useEffect(() => {
     if (roomId) {
       dispatch(fetchRoomById(roomId));
       dispatch(fetchReviewsByRoom(roomId));
       dispatch(fetchAvailability(roomId));
+      dispatch(fetchOfferForRoom(roomId));
     }
     return () => {
       dispatch(clearSelectedRoom());
       dispatch(clearReviews());
       dispatch(clearBookedDates());
+      dispatch(clearRoomOffer());
     };
   }, [dispatch, roomId]);
 
@@ -135,9 +139,33 @@ const Booking = React.memo(() => {
   const pricePerDay = room?.price_per_day ?? room?.price_per_hour ?? 0;
   const originalTotalPrice = pricePerDay;
 
+  // Calculate room-offer discount (admin/owner offers)
+  const roomOfferInfo = useMemo(() => {
+    if (!roomOffer || !pricePerDay) return { hasDiscount: false, discountedPrice: pricePerDay, discountAmount: 0 };
+    let discountAmount = 0;
+    if (roomOffer.discount_type === "percentage") {
+      discountAmount = pricePerDay * (roomOffer.discount_value / 100);
+    } else {
+      discountAmount = Math.min(roomOffer.discount_value, pricePerDay);
+    }
+    discountAmount = Math.round(discountAmount * 100) / 100;
+    return {
+      hasDiscount: discountAmount > 0,
+      discountedPrice: Math.round((pricePerDay - discountAmount) * 100) / 100,
+      discountAmount,
+      discountType: roomOffer.discount_type,
+      discountValue: roomOffer.discount_value,
+      title: roomOffer.title,
+      tagLabel: roomOffer.tag_label,
+    };
+  }, [roomOffer, pricePerDay]);
+
+  // Apply welcome offer on top of any room offer
+  const afterRoomOffer = roomOfferInfo.hasDiscount ? roomOfferInfo.discountedPrice : originalTotalPrice;
+
   const priceInfo = useMemo(() => {
-    return calculateDiscountedPrice(originalTotalPrice);
-  }, [calculateDiscountedPrice, originalTotalPrice]);
+    return calculateDiscountedPrice(afterRoomOffer);
+  }, [calculateDiscountedPrice, afterRoomOffer]);
 
   const totalPrice = priceInfo.discountedPrice;
 
@@ -325,6 +353,36 @@ const Booking = React.memo(() => {
               ))}
             </div>
           ) : null}
+
+          {roomOfferInfo.hasDiscount && (
+            <div className="mt-4 rounded-xl border border-orange-200 bg-gradient-to-r from-orange-50 to-amber-50 p-4 dark:border-orange-800 dark:from-orange-900/30 dark:to-amber-900/30">
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-orange-100 dark:bg-orange-800">
+                  <svg className="h-5 w-5 text-orange-600 dark:text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                  </svg>
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold text-orange-800 dark:text-orange-200">
+                      {roomOfferInfo.discountType === "percentage"
+                        ? `${roomOfferInfo.discountValue}% Off`
+                        : `$${roomOfferInfo.discountValue} Off`}
+                      {roomOfferInfo.title ? ` — ${roomOfferInfo.title}` : ""}
+                    </p>
+                    {roomOfferInfo.tagLabel && (
+                      <span className="rounded-full border border-amber-300 bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:border-amber-600 dark:bg-amber-800 dark:text-amber-300">
+                        {roomOfferInfo.tagLabel}
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-0.5 text-sm text-orange-700 dark:text-orange-300">
+                    Special offer applied to this room. Discount reflected in the price below.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </Card>
 
@@ -399,6 +457,15 @@ const Booking = React.memo(() => {
                   <span className="text-muted dark:text-dark-muted">Day Rate</span>
                   <span className="font-medium text-ink dark:text-dark-ink">{formatPrice(pricePerDay)}</span>
                 </div>
+                {roomOfferInfo.hasDiscount && (
+                  <div className="flex justify-between text-sm">
+                    <span className="flex items-center gap-1.5 text-orange-600 dark:text-orange-400">
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>
+                      {roomOfferInfo.title || "Special Offer"} ({roomOfferInfo.discountType === "percentage" ? `${roomOfferInfo.discountValue}%` : `$${roomOfferInfo.discountValue}`} off)
+                    </span>
+                    <span className="font-medium text-orange-600 dark:text-orange-400">-{formatPrice(roomOfferInfo.discountAmount)}</span>
+                  </div>
+                )}
                 {priceInfo.hasDiscount && (
                   <div className="flex justify-between text-sm">
                     <span className="flex items-center gap-1.5 text-green-600 dark:text-green-400">
@@ -412,7 +479,7 @@ const Booking = React.memo(() => {
                   <div className="flex justify-between">
                     <span className="font-semibold text-ink dark:text-dark-ink">Total</span>
                     <div className="text-right">
-                      {priceInfo.hasDiscount && <span className="mr-2 text-sm text-muted line-through dark:text-dark-muted">{formatPrice(priceInfo.originalPrice)}</span>}
+                      {(roomOfferInfo.hasDiscount || priceInfo.hasDiscount) && <span className="mr-2 text-sm text-muted line-through dark:text-dark-muted">{formatPrice(pricePerDay)}</span>}
                       <span className="text-lg font-bold text-brand-700 dark:text-brand-400">{formatPrice(totalPrice)}</span>
                     </div>
                   </div>

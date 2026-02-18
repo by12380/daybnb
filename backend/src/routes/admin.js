@@ -1,5 +1,6 @@
 const { Router } = require("express");
 const adminController = require("../controllers/adminController");
+const offerController = require("../controllers/offerController");
 const { requireAuth } = require("../middleware/auth");
 const { attachRole, requireRole, ROLES } = require("../middleware/rbac");
 
@@ -35,5 +36,11 @@ router.put(
 
 // ── Dashboard Stats ──────────────────────────────────
 router.get("/dashboard-stats", ...adminMiddleware, adminController.getDashboardStats);
+
+// ── Offers / Discounts ──────────────────────────────
+router.get("/offers", ...adminMiddleware, offerController.getAllAdmin);
+router.post("/offers", ...adminMiddleware, offerController.createAdmin);
+router.put("/offers/:id", ...adminMiddleware, offerController.updateAdmin);
+router.delete("/offers/:id", ...adminMiddleware, offerController.deleteAdmin);
 
 module.exports = router;

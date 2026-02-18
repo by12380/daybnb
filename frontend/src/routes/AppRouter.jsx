@@ -23,6 +23,7 @@ import AdminUsers from "../admin/pages/Users.jsx";
 import AdminRooms from "../admin/pages/Rooms.jsx";
 import AdminMessages from "../admin/pages/Messages.jsx";
 import AdminOwners from "../admin/pages/Owners.jsx";
+import AdminOffers from "../admin/pages/Offers.jsx";
 
 // Owner imports
 import OwnerLayout from "../owner/components/layout/OwnerLayout.jsx";
@@ -31,6 +32,7 @@ import OwnerRooms from "../owner/pages/Rooms.jsx";
 import OwnerBookings from "../owner/pages/Bookings.jsx";
 import OwnerCustomers from "../owner/pages/Customers.jsx";
 import OwnerChat from "../owner/pages/Chat.jsx";
+import OwnerOffers from "../owner/pages/Offers.jsx";
 
 // Admin chat
 import AdminChat from "../admin/pages/Chat.jsx";
@@ -71,6 +73,7 @@ export default function AppRouter() {
             <Route path="/admin/messages" element={<AdminMessages />} />
             <Route path="/admin/chat" element={<AdminChat />} />
             <Route path="/admin/owners" element={<AdminOwners />} />
+            <Route path="/admin/offers" element={<AdminOffers />} />
           </Route>
         </Route>
 
@@ -82,6 +85,7 @@ export default function AppRouter() {
             <Route path="/owner/bookings" element={<OwnerBookings />} />
             <Route path="/owner/customers" element={<OwnerCustomers />} />
             <Route path="/owner/chat" element={<OwnerChat />} />
+            <Route path="/owner/offers" element={<OwnerOffers />} />
           </Route>
         </Route>
       </Routes>

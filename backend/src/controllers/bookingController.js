@@ -146,11 +146,29 @@ exports.create = asyncHandler(async (req, res) => {
     payload.discount_applied = discount_applied || null;
   }
 
-  const { data, error } = await supabaseAdmin
+  let { data, error } = await supabaseAdmin
     .from("bookings")
     .insert(payload)
     .select()
     .single();
+
+  // Backward compatibility: some environments don't have discount columns on bookings.
+  // If so, retry insert without discount fields instead of failing the booking flow.
+  if (
+    error &&
+    /discount_amount|discount_applied|original_price/i.test(String(error.message || ""))
+  ) {
+    const fallbackPayload = { ...payload };
+    delete fallbackPayload.original_price;
+    delete fallbackPayload.discount_amount;
+    delete fallbackPayload.discount_applied;
+
+    ({ data, error } = await supabaseAdmin
+      .from("bookings")
+      .insert(fallbackPayload)
+      .select()
+      .single());
+  }
 
   if (error) throw ApiError.internal(error.message);
 

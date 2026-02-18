@@ -31,6 +31,7 @@ const RoomCard = React.memo(function RoomCard({
   ratingAvg = 0,
   ratingCount = 0,
   showLike = true,
+  offer = null,
 }) {
   const navigate = useNavigate();
 
@@ -50,6 +51,19 @@ const RoomCard = React.memo(function RoomCard({
             className="h-48 w-full object-cover"
             loading="lazy"
           />
+        )}
+
+        {offer && (
+          <div className="absolute left-3 top-3 flex flex-col gap-1">
+            <span className="rounded-full bg-gradient-to-r from-rose-500 to-orange-500 px-2.5 py-1 text-[11px] font-bold text-white shadow-md">
+              {offer.discount_type === "percentage" ? `${offer.discount_value}% OFF` : `$${offer.discount_value} OFF`}
+            </span>
+            {offer.tag_label && (
+              <span className="rounded-full border border-amber-300 bg-amber-50/90 px-2 py-0.5 text-[10px] font-semibold text-amber-700 shadow-sm backdrop-blur dark:border-amber-600 dark:bg-amber-900/80 dark:text-amber-300">
+                {offer.tag_label}
+              </span>
+            )}
+          </div>
         )}
 
         {showLike && (
@@ -78,12 +92,30 @@ const RoomCard = React.memo(function RoomCard({
           <StarsDisplay value={ratingAvg} count={ratingCount} className="shrink-0" />
         </div>
 
-        <p className="text-lg font-semibold text-brand-700 dark:text-brand-400">
-          {formatPrice(room.price_per_day || room.price_per_hour || 0)}
-          <span className="text-xs font-normal text-muted dark:text-dark-muted">
-            /{room.price_per_day ? "day" : "hour"}
-          </span>
-        </p>
+        {offer ? (() => {
+          const original = room.price_per_day || room.price_per_hour || 0;
+          const discounted = offer.discount_type === "percentage"
+            ? original * (1 - offer.discount_value / 100)
+            : Math.max(0, original - offer.discount_value);
+          return (
+            <div className="flex items-baseline gap-2">
+              <p className="text-lg font-semibold text-brand-700 dark:text-brand-400">
+                {formatPrice(Math.round(discounted * 100) / 100)}
+                <span className="text-xs font-normal text-muted dark:text-dark-muted">
+                  /{room.price_per_day ? "day" : "hour"}
+                </span>
+              </p>
+              <span className="text-sm text-muted line-through dark:text-dark-muted">{formatPrice(original)}</span>
+            </div>
+          );
+        })() : (
+          <p className="text-lg font-semibold text-brand-700 dark:text-brand-400">
+            {formatPrice(room.price_per_day || room.price_per_hour || 0)}
+            <span className="text-xs font-normal text-muted dark:text-dark-muted">
+              /{room.price_per_day ? "day" : "hour"}
+            </span>
+          </p>
+        )}
 
         {tags.length > 0 && (
           <div className="flex flex-wrap gap-2">

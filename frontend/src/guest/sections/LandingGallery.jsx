@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import Card from "../components/ui/Card.jsx";
@@ -6,6 +6,7 @@ import { useAuth } from "../../auth/useAuth.js";
 import RoomCard from "../components/RoomCard.jsx";
 import Pagination from "../components/ui/Pagination.jsx";
 import { fetchRooms } from "../../redux/slices/roomSlice.js";
+import { fetchActiveOffers } from "../../redux/slices/offerSlice.js";
 import { fetchLikedRoomIds, likeRoom, unlikeRoom } from "../utils/roomLikes.js";
 import { fetchRatingsForRooms } from "../utils/roomReviews.js";
 
@@ -29,6 +30,7 @@ const LandingGallery = React.memo(
     loading,
     error,
   } = useSelector((state) => state.rooms);
+  const { activeOffers } = useSelector((state) => state.offers);
 
   const [currentPage, setCurrentPage] = useState(1);
   const [sortOrder, setSortOrder] = useState("");
@@ -41,6 +43,40 @@ const LandingGallery = React.memo(
   useEffect(() => {
     setCurrentPage(1);
   }, [searchText, location, guests, date, minPrice, maxPrice, sortOrder]);
+
+  // Fetch active offers once
+  useEffect(() => {
+    dispatch(fetchActiveOffers());
+  }, [dispatch]);
+
+  // Build a lookup: roomId → best offer
+  const offerByRoomId = useMemo(() => {
+    const map = {};
+    (activeOffers || []).forEach((offer) => {
+      if (offer.room_id) {
+        if (!map[offer.room_id] || offer.discount_value > map[offer.room_id].discount_value) {
+          map[offer.room_id] = offer;
+        }
+      }
+    });
+    // Owner-wide offers: apply to all rooms of that owner
+    (rooms || []).forEach((room) => {
+      if (!map[room.id] && room.owner_id) {
+        const ownerOffer = (activeOffers || []).find(
+          (o) => o.owner_id === room.owner_id && !o.room_id
+        );
+        if (ownerOffer) map[room.id] = ownerOffer;
+      }
+      // Site-wide offers (no room_id, no owner_id)
+      if (!map[room.id]) {
+        const siteOffer = (activeOffers || []).find(
+          (o) => !o.room_id && !o.owner_id
+        );
+        if (siteOffer) map[room.id] = siteOffer;
+      }
+    });
+    return map;
+  }, [activeOffers, rooms]);
 
   // Fetch filtered rooms via API
   useEffect(() => {
@@ -182,7 +218,7 @@ const LandingGallery = React.memo(
           (rooms || []).map((room) => {
             const rating = ratingsByRoomId?.[room.id] || { avg: 0, count: 0 };
             return (
-              <RoomCard key={room.id} room={room} liked={likedIds.has(room.id)} onToggleLike={toggleLike} ratingAvg={rating.avg} ratingCount={rating.count} showLike />
+              <RoomCard key={room.id} room={room} liked={likedIds.has(room.id)} onToggleLike={toggleLike} ratingAvg={rating.avg} ratingCount={rating.count} showLike offer={offerByRoomId[room.id] || null} />
             );
           })
         )}

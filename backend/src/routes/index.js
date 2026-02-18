@@ -12,6 +12,7 @@ const likesRoutes = require("./likes");
 const adminRoutes = require("./admin");
 const ownerRoutes = require("./owner");
 const chatRoutes = require("./chat");
+const offerRoutes = require("./offers");
 
 const router = Router();
 
@@ -27,5 +28,6 @@ router.use("/likes", likesRoutes);
 router.use("/admin", adminRoutes);
 router.use("/owner", ownerRoutes);
 router.use("/chat", chatRoutes);
+router.use("/offers", offerRoutes);
 
 module.exports = router;

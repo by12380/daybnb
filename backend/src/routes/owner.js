@@ -1,5 +1,6 @@
 const { Router } = require("express");
 const ownerController = require("../controllers/ownerController");
+const offerController = require("../controllers/offerController");
 const { requireAuth } = require("../middleware/auth");
 const { attachRole, requireRole, ROLES } = require("../middleware/rbac");
 const { handleImpersonation } = require("../middleware/impersonate");
@@ -49,5 +50,11 @@ router.get(
   ...ownerMiddleware,
   ownerController.getCustomerBookings
 );
+
+// ── Offers / Discounts ──────────────────────────────
+router.get("/offers", ...ownerMiddleware, offerController.getAllOwner);
+router.post("/offers", ...ownerMiddleware, offerController.createOwner);
+router.put("/offers/:id", ...ownerMiddleware, offerController.updateOwner);
+router.delete("/offers/:id", ...ownerMiddleware, offerController.deleteOwner);
 
 module.exports = router;

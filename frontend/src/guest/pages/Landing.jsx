@@ -9,6 +9,7 @@ import LandingHowItWorks from "../sections/LandingHowItWorks.jsx";
 import LandingTestimonials from "../sections/LandingTestimonials.jsx";
 import LandingCTA from "../sections/LandingCTA.jsx";
 import WelcomeOfferBanner from "../components/WelcomeOfferBanner.jsx";
+import CampaignBanner from "../components/CampaignBanner.jsx";
 import { useProfile } from "../../auth/useProfile.js";
 
 const Landing = React.memo(() => {
@@ -59,6 +60,9 @@ const Landing = React.memo(() => {
 
   return (
     <>
+      {/* Campaign Banner — admin promotional offers */}
+      <CampaignBanner className="mb-4" />
+
       {/* Welcome Offer Banner for new users */}
       <WelcomeOfferBanner className="mb-4" />
 
