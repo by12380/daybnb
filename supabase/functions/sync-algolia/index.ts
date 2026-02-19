@@ -30,6 +30,18 @@ interface RoomRecord {
   description?: string;
   latitude?: number;
   longitude?: number;
+  property_type?: string;
+  place_type?: string;
+  bedrooms?: number;
+  beds?: number;
+  bathrooms?: number;
+  instant_book?: boolean;
+  self_checkin?: boolean;
+  allows_pets?: boolean;
+  is_guest_favorite?: boolean;
+  is_luxe?: boolean;
+  amenities?: string[];
+  safety_features?: string[];
   created_at?: string;
   updated_at?: string;
 }
@@ -46,6 +58,18 @@ interface AlgoliaRecord {
   price_per_hour: number;
   description?: string;
   booked_dates?: string[];
+  property_type?: string;
+  place_type?: string;
+  bedrooms?: number;
+  beds?: number;
+  bathrooms?: number;
+  instant_book?: boolean;
+  self_checkin?: boolean;
+  allows_pets?: boolean;
+  is_guest_favorite?: boolean;
+  is_luxe?: boolean;
+  amenities?: string[];
+  safety_features?: string[];
   _geoloc?: {
     lat: number;
     lng: number;
@@ -80,11 +104,22 @@ function transformToAlgoliaRecord(
     price_per_hour: room.price_per_hour || 0,
     description: room.description,
     booked_dates: bookedDates,
+    property_type: room.property_type || "house",
+    place_type: room.place_type || "entire_home",
+    bedrooms: room.bedrooms ?? 1,
+    beds: room.beds ?? 1,
+    bathrooms: room.bathrooms ?? 1,
+    instant_book: room.instant_book ?? false,
+    self_checkin: room.self_checkin ?? false,
+    allows_pets: room.allows_pets ?? false,
+    is_guest_favorite: room.is_guest_favorite ?? false,
+    is_luxe: room.is_luxe ?? false,
+    amenities: room.amenities || [],
+    safety_features: room.safety_features || [],
     created_at: room.created_at,
     updated_at: room.updated_at,
   };
 
-  // Add geolocation if coordinates are available
   if (
     room.latitude !== undefined &&
     room.latitude !== null &&
@@ -299,17 +334,15 @@ serve(async (req) => {
         break;
 
       case "CONFIGURE_INDEX":
-        // Configure Algolia index settings for GeoSearch
         result = await setSettings({
-          // Searchable attributes
           searchableAttributes: [
             "title",
             "location",
             "description",
             "tags",
             "type",
+            "amenities",
           ],
-          // Attributes for filtering
           attributesForFaceting: [
             "filterOnly(booked_dates)",
             "filterOnly(price_per_day)",
@@ -318,14 +351,22 @@ serve(async (req) => {
             "searchable(type)",
             "searchable(tags)",
             "searchable(location)",
+            "searchable(property_type)",
+            "searchable(place_type)",
+            "filterOnly(bedrooms)",
+            "filterOnly(beds)",
+            "filterOnly(bathrooms)",
+            "filterOnly(instant_book)",
+            "filterOnly(self_checkin)",
+            "filterOnly(allows_pets)",
+            "filterOnly(is_guest_favorite)",
+            "filterOnly(is_luxe)",
+            "searchable(amenities)",
+            "searchable(safety_features)",
           ],
-          // Custom ranking
           customRanking: ["desc(price_per_day)", "desc(price_per_hour)"],
-          // Pagination
           hitsPerPage: 20,
-          // Highlighting
           attributesToHighlight: ["title", "location", "description"],
-          // Snippeting
           attributesToSnippet: ["description:50"],
         });
         console.log("Algolia index configured for GeoSearch:", result);

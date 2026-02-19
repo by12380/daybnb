@@ -88,8 +88,34 @@ function AvailabilityBadge({ status, message }) {
   );
 }
 
+function StandoutBadges({ hit }) {
+  const badges = [];
+  if (hit.is_guest_favorite) badges.push({ label: "Guest favorite", cls: "from-amber-500 to-orange-500" });
+  if (hit.is_luxe) badges.push({ label: "Luxe", cls: "from-purple-500 to-indigo-500" });
+  if (badges.length === 0) return null;
+  return (
+    <div className="absolute left-3 top-3 flex flex-col gap-1">
+      {badges.map((b) => (
+        <span key={b.label} className={`rounded-full bg-gradient-to-r ${b.cls} px-2.5 py-1 text-[11px] font-bold text-white shadow-md`}>
+          {b.label}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function PropertyMeta({ hit }) {
+  const parts = [];
+  if (hit.bedrooms) parts.push(`${hit.bedrooms} bd`);
+  if (hit.beds) parts.push(`${hit.beds} beds`);
+  if (hit.bathrooms) parts.push(`${hit.bathrooms} ba`);
+  if (parts.length === 0) return null;
+  return <span className="text-[10px] text-muted dark:text-dark-muted">{parts.join(" \u00b7 ")}</span>;
+}
+
 function SearchResultCard({ hit, onBook, liked, onToggleLike, availability }) {
   const tags = hit.tags || [];
+  const amenities = hit.amenities || [];
   const isFullyBooked = availability?.status === "fully_booked";
 
   return (
@@ -103,8 +129,10 @@ function SearchResultCard({ hit, onBook, liked, onToggleLike, availability }) {
             loading="lazy"
           />
         )}
+        {/* Standout badges */}
+        <StandoutBadges hit={hit} />
         {/* Distance badge overlay */}
-        {hit._rankingInfo?.geoDistance !== undefined && (
+        {hit._rankingInfo?.geoDistance !== undefined && !hit.is_guest_favorite && !hit.is_luxe && (
           <div className="absolute left-3 top-3">
             <DistanceBadge distance={hit._rankingInfo.geoDistance} />
           </div>
@@ -135,23 +163,13 @@ function SearchResultCard({ hit, onBook, liked, onToggleLike, availability }) {
         <div className="flex items-center justify-between text-xs text-muted dark:text-dark-muted">
           <span className="flex items-center gap-1">
             <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
-              />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
             </svg>
             {hit.location}
           </span>
           <span className="flex items-center gap-1">
             <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"
-              />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
             {hit.guests} guests
           </span>
@@ -163,6 +181,22 @@ function SearchResultCard({ hit, onBook, liked, onToggleLike, availability }) {
             <span className="shrink-0 rounded-full bg-surface/80 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted dark:bg-dark-surface/80 dark:text-dark-muted">
               {hit.type}
             </span>
+          )}
+        </div>
+
+        {/* Property meta: beds, bathrooms */}
+        <PropertyMeta hit={hit} />
+
+        {/* Booking option pills */}
+        <div className="flex flex-wrap gap-1">
+          {hit.instant_book && (
+            <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">Instant Book</span>
+          )}
+          {hit.allows_pets && (
+            <span className="rounded-full bg-green-50 px-2 py-0.5 text-[10px] font-medium text-green-700 dark:bg-green-900/30 dark:text-green-300">Pets OK</span>
+          )}
+          {hit.self_checkin && (
+            <span className="rounded-full bg-purple-50 px-2 py-0.5 text-[10px] font-medium text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">Self check-in</span>
           )}
         </div>
 
@@ -178,26 +212,36 @@ function SearchResultCard({ hit, onBook, liked, onToggleLike, availability }) {
           </span>
         </p>
 
-        {tags.length > 0 && (
+        {/* Amenity highlights (top 4) */}
+        {amenities.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
-            {tags.slice(0, 4).map((tag) => (
-              <span
-                key={tag}
-                className="rounded-full border border-border bg-surface/60 px-2 py-0.5 text-[10px] text-muted dark:border-dark-border dark:bg-dark-surface/60 dark:text-dark-muted"
-              >
-                {tag}
+            {amenities.slice(0, 4).map((a) => (
+              <span key={a} className="rounded-full border border-border bg-surface/60 px-2 py-0.5 text-[10px] text-muted dark:border-dark-border dark:bg-dark-surface/60 dark:text-dark-muted">
+                {a.replace(/_/g, " ")}
               </span>
             ))}
-            {tags.length > 4 && (
-              <span className="text-[10px] text-muted dark:text-dark-muted">
-                +{tags.length - 4} more
-              </span>
+            {amenities.length > 4 && (
+              <span className="text-[10px] text-muted dark:text-dark-muted">+{amenities.length - 4} more</span>
             )}
           </div>
         )}
 
-        <Button 
-          onClick={() => onBook(hit)} 
+        {/* Tags (below amenities if present, otherwise shown as primary) */}
+        {amenities.length === 0 && tags.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {tags.slice(0, 4).map((tag) => (
+              <span key={tag} className="rounded-full border border-border bg-surface/60 px-2 py-0.5 text-[10px] text-muted dark:border-dark-border dark:bg-dark-surface/60 dark:text-dark-muted">
+                {tag}
+              </span>
+            ))}
+            {tags.length > 4 && (
+              <span className="text-[10px] text-muted dark:text-dark-muted">+{tags.length - 4} more</span>
+            )}
+          </div>
+        )}
+
+        <Button
+          onClick={() => onBook(hit)}
           className="mt-2 w-full"
           disabled={isFullyBooked}
         >

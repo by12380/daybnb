@@ -19,6 +19,17 @@ exports.getAll = asyncHandler(async (req, res) => {
     date,
     sort,
     owner_id,
+    property_type,
+    place_type,
+    min_beds,
+    min_bathrooms,
+    instant_book,
+    self_checkin,
+    allows_pets,
+    is_guest_favorite,
+    is_luxe,
+    amenities,
+    safety_features,
     limit = 50,
     offset = 0,
   } = req.query;
@@ -31,9 +42,37 @@ exports.getAll = asyncHandler(async (req, res) => {
     query = query.eq("type", type);
   }
 
-  // Filter by owner if specified
   if (owner_id) {
     query = query.eq("owner_id", owner_id);
+  }
+
+  if (property_type) {
+    const ptList = property_type.split(",").map((s) => s.trim()).filter(Boolean);
+    if (ptList.length === 1) query = query.eq("property_type", ptList[0]);
+    else if (ptList.length > 1) query = query.in("property_type", ptList);
+  }
+  if (place_type && place_type !== "any") query = query.eq("place_type", place_type);
+
+  const parsedMinBeds = Number(min_beds);
+  if (Number.isFinite(parsedMinBeds) && parsedMinBeds > 0) query = query.gte("beds", parsedMinBeds);
+
+  const parsedMinBathrooms = Number(min_bathrooms);
+  if (Number.isFinite(parsedMinBathrooms) && parsedMinBathrooms > 0) query = query.gte("bathrooms", parsedMinBathrooms);
+
+  if (instant_book === "true") query = query.eq("instant_book", true);
+  if (self_checkin === "true") query = query.eq("self_checkin", true);
+  if (allows_pets === "true") query = query.eq("allows_pets", true);
+  if (is_guest_favorite === "true") query = query.eq("is_guest_favorite", true);
+  if (is_luxe === "true") query = query.eq("is_luxe", true);
+
+  if (amenities) {
+    const amenityList = Array.isArray(amenities) ? amenities : amenities.split(",");
+    query = query.contains("amenities", amenityList);
+  }
+
+  if (safety_features) {
+    const safetyList = Array.isArray(safety_features) ? safety_features : safety_features.split(",");
+    query = query.contains("safety_features", safetyList);
   }
 
   if (search) {
@@ -117,7 +156,12 @@ exports.getById = asyncHandler(async (req, res) => {
 exports.create = asyncHandler(async (req, res) => {
   if (!supabaseAdmin) throw ApiError.internal("Supabase admin client is not configured");
 
-  const { title, location, type, guests, price_per_day, image, tags, owner_id } = req.body;
+  const {
+    title, location, type, guests, price_per_day, image, tags, owner_id,
+    property_type, place_type, bedrooms, beds, bathrooms,
+    instant_book, self_checkin, allows_pets,
+    is_guest_favorite, is_luxe, amenities, safety_features,
+  } = req.body;
 
   if (!title || !location) {
     throw ApiError.badRequest("Title and location are required");
@@ -133,6 +177,18 @@ exports.create = asyncHandler(async (req, res) => {
     image: image || null,
     tags: Array.isArray(tags) ? tags : [],
     owner_id: owner_id || null,
+    property_type: property_type || "house",
+    place_type: place_type || "entire_home",
+    bedrooms: Number(bedrooms) || 1,
+    beds: Number(beds) || 1,
+    bathrooms: Number(bathrooms) || 1,
+    instant_book: Boolean(instant_book),
+    self_checkin: Boolean(self_checkin),
+    allows_pets: Boolean(allows_pets),
+    is_guest_favorite: Boolean(is_guest_favorite),
+    is_luxe: Boolean(is_luxe),
+    amenities: Array.isArray(amenities) ? amenities : [],
+    safety_features: Array.isArray(safety_features) ? safety_features : [],
   };
 
   const { data, error } = await supabaseAdmin
@@ -153,7 +209,12 @@ exports.create = asyncHandler(async (req, res) => {
 exports.update = asyncHandler(async (req, res) => {
   if (!supabaseAdmin) throw ApiError.internal("Supabase admin client is not configured");
 
-  const { title, location, type, guests, price_per_day, image, tags, owner_id } = req.body;
+  const {
+    title, location, type, guests, price_per_day, image, tags, owner_id,
+    property_type, place_type, bedrooms, beds, bathrooms,
+    instant_book, self_checkin, allows_pets,
+    is_guest_favorite, is_luxe, amenities, safety_features,
+  } = req.body;
 
   const updates = {};
   if (title !== undefined) updates.title = title.trim();
@@ -164,6 +225,18 @@ exports.update = asyncHandler(async (req, res) => {
   if (image !== undefined) updates.image = image || null;
   if (tags !== undefined) updates.tags = Array.isArray(tags) ? tags : [];
   if (owner_id !== undefined) updates.owner_id = owner_id || null;
+  if (property_type !== undefined) updates.property_type = property_type;
+  if (place_type !== undefined) updates.place_type = place_type;
+  if (bedrooms !== undefined) updates.bedrooms = Number(bedrooms);
+  if (beds !== undefined) updates.beds = Number(beds);
+  if (bathrooms !== undefined) updates.bathrooms = Number(bathrooms);
+  if (instant_book !== undefined) updates.instant_book = Boolean(instant_book);
+  if (self_checkin !== undefined) updates.self_checkin = Boolean(self_checkin);
+  if (allows_pets !== undefined) updates.allows_pets = Boolean(allows_pets);
+  if (is_guest_favorite !== undefined) updates.is_guest_favorite = Boolean(is_guest_favorite);
+  if (is_luxe !== undefined) updates.is_luxe = Boolean(is_luxe);
+  if (amenities !== undefined) updates.amenities = Array.isArray(amenities) ? amenities : [];
+  if (safety_features !== undefined) updates.safety_features = Array.isArray(safety_features) ? safety_features : [];
 
   const { data, error } = await supabaseAdmin
     .from("rooms")

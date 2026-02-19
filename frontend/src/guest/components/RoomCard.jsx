@@ -36,6 +36,7 @@ const RoomCard = React.memo(function RoomCard({
   const navigate = useNavigate();
 
   const tags = room?.tags || [];
+  const amenities = room?.amenities || [];
 
   const handleToggle = useCallback(() => {
     onToggleLike?.(room);
@@ -53,18 +54,31 @@ const RoomCard = React.memo(function RoomCard({
           />
         )}
 
-        {offer && (
-          <div className="absolute left-3 top-3 flex flex-col gap-1">
-            <span className="rounded-full bg-gradient-to-r from-rose-500 to-orange-500 px-2.5 py-1 text-[11px] font-bold text-white shadow-md">
-              {offer.discount_type === "percentage" ? `${offer.discount_value}% OFF` : `$${offer.discount_value} OFF`}
+        {/* Standout + offer badges */}
+        <div className="absolute left-3 top-3 flex flex-col gap-1">
+          {room.is_guest_favorite && (
+            <span className="rounded-full bg-gradient-to-r from-amber-500 to-orange-500 px-2.5 py-1 text-[11px] font-bold text-white shadow-md">
+              Guest favorite
             </span>
-            {offer.tag_label && (
-              <span className="rounded-full border border-amber-300 bg-amber-50/90 px-2 py-0.5 text-[10px] font-semibold text-amber-700 shadow-sm backdrop-blur dark:border-amber-600 dark:bg-amber-900/80 dark:text-amber-300">
-                {offer.tag_label}
+          )}
+          {room.is_luxe && (
+            <span className="rounded-full bg-gradient-to-r from-purple-500 to-indigo-500 px-2.5 py-1 text-[11px] font-bold text-white shadow-md">
+              Luxe
+            </span>
+          )}
+          {offer && (
+            <>
+              <span className="rounded-full bg-gradient-to-r from-rose-500 to-orange-500 px-2.5 py-1 text-[11px] font-bold text-white shadow-md">
+                {offer.discount_type === "percentage" ? `${offer.discount_value}% OFF` : `$${offer.discount_value} OFF`}
               </span>
-            )}
-          </div>
-        )}
+              {offer.tag_label && (
+                <span className="rounded-full border border-amber-300 bg-amber-50/90 px-2 py-0.5 text-[10px] font-semibold text-amber-700 shadow-sm backdrop-blur dark:border-amber-600 dark:bg-amber-900/80 dark:text-amber-300">
+                  {offer.tag_label}
+                </span>
+              )}
+            </>
+          )}
+        </div>
 
         {showLike && (
           <button
@@ -92,6 +106,19 @@ const RoomCard = React.memo(function RoomCard({
           <StarsDisplay value={ratingAvg} count={ratingCount} className="shrink-0" />
         </div>
 
+        {/* Property meta */}
+        {(room.bedrooms || room.beds || room.bathrooms) && (
+          <p className="text-[10px] text-muted dark:text-dark-muted">
+            {[room.bedrooms && `${room.bedrooms} bd`, room.beds && `${room.beds} beds`, room.bathrooms && `${room.bathrooms} ba`].filter(Boolean).join(" \u00b7 ")}
+          </p>
+        )}
+
+        {/* Booking option pills */}
+        <div className="flex flex-wrap gap-1">
+          {room.instant_book && <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">Instant Book</span>}
+          {room.allows_pets && <span className="rounded-full bg-green-50 px-2 py-0.5 text-[10px] font-medium text-green-700 dark:bg-green-900/30 dark:text-green-300">Pets OK</span>}
+        </div>
+
         {offer ? (() => {
           const original = room.price_per_day || room.price_per_hour || 0;
           const discounted = offer.discount_type === "percentage"
@@ -117,18 +144,21 @@ const RoomCard = React.memo(function RoomCard({
           </p>
         )}
 
-        {tags.length > 0 && (
+        {/* Amenities (shown first if available, otherwise tags) */}
+        {amenities.length > 0 ? (
+          <div className="flex flex-wrap gap-1.5">
+            {amenities.slice(0, 4).map((a) => (
+              <span key={a} className="rounded-full border border-border bg-surface/60 px-2 py-0.5 text-[10px] text-muted dark:border-dark-border dark:bg-dark-surface/60">{a.replace(/_/g, " ")}</span>
+            ))}
+            {amenities.length > 4 && <span className="text-[10px] text-muted">+{amenities.length - 4}</span>}
+          </div>
+        ) : tags.length > 0 ? (
           <div className="flex flex-wrap gap-2">
             {tags.map((tag) => (
-              <span
-                key={tag}
-                className="rounded-full border border-border bg-surface/60 px-2 py-0.5 text-[11px] text-muted"
-              >
-                {tag}
-              </span>
+              <span key={tag} className="rounded-full border border-border bg-surface/60 px-2 py-0.5 text-[11px] text-muted">{tag}</span>
             ))}
           </div>
-        )}
+        ) : null}
 
         <Button onClick={() => navigate(`/book/${room.id}`)} className="mt-2 w-full">
           Book Now

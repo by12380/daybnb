@@ -78,9 +78,6 @@ const Landing = React.memo(() => {
           searchText={searchFilters.searchText}
           location={searchFilters.location}
           guests={searchFilters.guests}
-          date={searchFilters.date}
-          minPrice={searchFilters.minPrice}
-          maxPrice={searchFilters.maxPrice}
         />
       </section>
       

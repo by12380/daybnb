@@ -63,7 +63,12 @@ exports.createRoom = asyncHandler(async (req, res) => {
   const ownerId = resolveOwnerId(req);
   if (!ownerId) throw ApiError.forbidden("Owner context required");
 
-  const { title, location, type, guests, price_per_day, image, tags } = req.body;
+  const {
+    title, location, type, guests, price_per_day, image, tags,
+    property_type, place_type, bedrooms, beds, bathrooms,
+    instant_book, self_checkin, allows_pets,
+    is_guest_favorite, is_luxe, amenities, safety_features,
+  } = req.body;
 
   if (!title || !location) {
     throw ApiError.badRequest("Title and location are required");
@@ -79,6 +84,18 @@ exports.createRoom = asyncHandler(async (req, res) => {
     image: image || null,
     tags: Array.isArray(tags) ? tags : [],
     owner_id: ownerId,
+    property_type: property_type || "house",
+    place_type: place_type || "entire_home",
+    bedrooms: Number(bedrooms) || 1,
+    beds: Number(beds) || 1,
+    bathrooms: Number(bathrooms) || 1,
+    instant_book: Boolean(instant_book),
+    self_checkin: Boolean(self_checkin),
+    allows_pets: Boolean(allows_pets),
+    is_guest_favorite: Boolean(is_guest_favorite),
+    is_luxe: Boolean(is_luxe),
+    amenities: Array.isArray(amenities) ? amenities : [],
+    safety_features: Array.isArray(safety_features) ? safety_features : [],
   };
 
   const { data, error } = await supabaseAdmin
@@ -102,7 +119,12 @@ exports.updateRoom = asyncHandler(async (req, res) => {
   const ownerId = resolveOwnerId(req);
   if (!ownerId) throw ApiError.forbidden("Owner context required");
 
-  const { title, location, type, guests, price_per_day, image, tags } = req.body;
+  const {
+    title, location, type, guests, price_per_day, image, tags,
+    property_type, place_type, bedrooms, beds, bathrooms,
+    instant_book, self_checkin, allows_pets,
+    is_guest_favorite, is_luxe, amenities, safety_features,
+  } = req.body;
 
   const updates = {};
   if (title !== undefined) updates.title = title.trim();
@@ -112,6 +134,18 @@ exports.updateRoom = asyncHandler(async (req, res) => {
   if (price_per_day !== undefined) updates.price_per_day = Number(price_per_day);
   if (image !== undefined) updates.image = image || null;
   if (tags !== undefined) updates.tags = Array.isArray(tags) ? tags : [];
+  if (property_type !== undefined) updates.property_type = property_type;
+  if (place_type !== undefined) updates.place_type = place_type;
+  if (bedrooms !== undefined) updates.bedrooms = Number(bedrooms);
+  if (beds !== undefined) updates.beds = Number(beds);
+  if (bathrooms !== undefined) updates.bathrooms = Number(bathrooms);
+  if (instant_book !== undefined) updates.instant_book = Boolean(instant_book);
+  if (self_checkin !== undefined) updates.self_checkin = Boolean(self_checkin);
+  if (allows_pets !== undefined) updates.allows_pets = Boolean(allows_pets);
+  if (is_guest_favorite !== undefined) updates.is_guest_favorite = Boolean(is_guest_favorite);
+  if (is_luxe !== undefined) updates.is_luxe = Boolean(is_luxe);
+  if (amenities !== undefined) updates.amenities = Array.isArray(amenities) ? amenities : [];
+  if (safety_features !== undefined) updates.safety_features = Array.isArray(safety_features) ? safety_features : [];
 
   const { data, error } = await supabaseAdmin
     .from("rooms")
