@@ -22,6 +22,11 @@ const Landing = React.memo(() => {
     date: "",
     minPrice: "",
     maxPrice: "",
+    propertyType: "",
+    placeType: "any",
+    bookingOptions: [],
+    standoutStays: [],
+    amenities: [],
   });
 
   // Redirect admin/owner users to their respective panels
@@ -41,6 +46,11 @@ const Landing = React.memo(() => {
       date: params.date || "",
       minPrice: params.minPrice || "",
       maxPrice: params.maxPrice || "",
+      propertyType: params.propertyType || "",
+      placeType: params.placeType || "any",
+      bookingOptions: Array.isArray(params.bookingOptions) ? params.bookingOptions : [],
+      standoutStays: Array.isArray(params.standoutStays) ? params.standoutStays : [],
+      amenities: Array.isArray(params.amenities) ? params.amenities : [],
     });
   }, []);
 
@@ -81,6 +91,11 @@ const Landing = React.memo(() => {
           date={searchFilters.date}
           minPrice={searchFilters.minPrice}
           maxPrice={searchFilters.maxPrice}
+          propertyType={searchFilters.propertyType}
+          placeType={searchFilters.placeType}
+          bookingOptions={searchFilters.bookingOptions}
+          standoutStays={searchFilters.standoutStays}
+          amenities={searchFilters.amenities}
         />
       </section>
       

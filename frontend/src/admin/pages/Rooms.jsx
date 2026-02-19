@@ -8,6 +8,14 @@ import FormInput, { INPUT_STYLES } from "../../guest/components/ui/FormInput.jsx
 import { fetchRooms, createRoom, updateRoom, deleteRoom } from "../../redux/slices/roomSlice.js";
 import { fetchBookings } from "../../redux/slices/bookingSlice.js";
 import api from "../../redux/api.js";
+import {
+  AMENITIES,
+  PROPERTY_TYPES,
+  PLACE_TYPES,
+  BOOKING_OPTIONS,
+  STANDOUT_STAYS,
+  toLabel,
+} from "../../guest/utils/roomFilters.js";
 
 const ROOM_TYPES = [
   { value: "room", label: "Room" },
@@ -15,6 +23,13 @@ const ROOM_TYPES = [
   { value: "studio", label: "Studio" },
   { value: "villa", label: "Villa" },
   { value: "resort", label: "Resort" },
+];
+
+const AMENITY_GROUPS = [
+  { key: "popular", label: "Popular" },
+  { key: "essentials", label: "Essentials" },
+  { key: "features", label: "Features" },
+  { key: "safety", label: "Safety" },
 ];
 
 const ViewRoomModal = React.memo(({ open, room, bookingsCount, onClose }) => {
@@ -51,13 +66,69 @@ const RoomFormModal = React.memo(({ open, room, onClose, onSave, isNew }) => {
   const [pricePerDay, setPricePerDay] = useState(100);
   const [image, setImage] = useState("");
   const [tags, setTags] = useState("");
+  const [propertyType, setPropertyType] = useState(PROPERTY_TYPES[0]);
+  const [placeType, setPlaceType] = useState("room");
+  const [bedrooms, setBedrooms] = useState(1);
+  const [beds, setBeds] = useState(1);
+  const [bathrooms, setBathrooms] = useState(1);
+  const [instantBook, setInstantBook] = useState(false);
+  const [selfCheckin, setSelfCheckin] = useState(false);
+  const [allowsPets, setAllowsPets] = useState(false);
+  const [isGuestFavorite, setIsGuestFavorite] = useState(false);
+  const [isLuxe, setIsLuxe] = useState(false);
+  const [amenities, setAmenities] = useState([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
+  const toggleAmenity = useCallback((amenity) => {
+    setAmenities((prev) =>
+      prev.includes(amenity)
+        ? prev.filter((item) => item !== amenity)
+        : [...prev, amenity]
+    );
+  }, []);
+
   useEffect(() => {
     if (open) {
-      if (room && !isNew) { setTitle(room.title || ""); setLocation(room.location || ""); setType(room.type || "room"); setGuests(room.guests || 2); setPricePerDay(room.price_per_day || 100); setImage(room.image || ""); setTags(room.tags?.join(", ") || ""); }
-      else { setTitle(""); setLocation(""); setType("room"); setGuests(2); setPricePerDay(100); setImage(""); setTags(""); }
+      if (room && !isNew) {
+        setTitle(room.title || "");
+        setLocation(room.location || "");
+        setType(room.type || "room");
+        setGuests(room.guests || 2);
+        setPricePerDay(room.price_per_day || 100);
+        setImage(room.image || "");
+        setTags(room.tags?.join(", ") || "");
+        setPropertyType(room.property_type || PROPERTY_TYPES[0]);
+        setPlaceType(room.place_type || "room");
+        setBedrooms(room.bedrooms ?? 1);
+        setBeds(room.beds ?? 1);
+        setBathrooms(room.bathrooms ?? 1);
+        setInstantBook(Boolean(room.instant_book));
+        setSelfCheckin(Boolean(room.self_checkin));
+        setAllowsPets(Boolean(room.allows_pets));
+        setIsGuestFavorite(Boolean(room.is_guest_favorite));
+        setIsLuxe(Boolean(room.is_luxe));
+        setAmenities(Array.isArray(room.amenities) ? room.amenities : []);
+      } else {
+        setTitle("");
+        setLocation("");
+        setType("room");
+        setGuests(2);
+        setPricePerDay(100);
+        setImage("");
+        setTags("");
+        setPropertyType(PROPERTY_TYPES[0]);
+        setPlaceType("room");
+        setBedrooms(1);
+        setBeds(1);
+        setBathrooms(1);
+        setInstantBook(false);
+        setSelfCheckin(false);
+        setAllowsPets(false);
+        setIsGuestFavorite(false);
+        setIsLuxe(false);
+        setAmenities([]);
+      }
       setError("");
     }
   }, [room, open, isNew]);
@@ -66,15 +137,39 @@ const RoomFormModal = React.memo(({ open, room, onClose, onSave, isNew }) => {
     setError("");
     if (!title.trim()) { setError("Please enter a room title."); return; }
     if (!location.trim()) { setError("Please enter a location."); return; }
+    if (!propertyType) { setError("Please select a property type."); return; }
+    if (!placeType || placeType === "any") { setError("Please select a valid place type."); return; }
+    if (!amenities.length) { setError("Select at least one amenity."); return; }
     setSaving(true);
-    const roomData = { title: title.trim(), location: location.trim(), type, guests: Number(guests) || 2, price_per_day: Number(pricePerDay) || 0, image: image.trim() || null, tags: tags.split(",").map((t) => t.trim()).filter(Boolean) };
+    const safetyFeatures = amenities.filter((amenity) => AMENITIES.safety.includes(amenity));
+    const roomData = {
+      title: title.trim(),
+      location: location.trim(),
+      type,
+      guests: Number(guests) || 2,
+      price_per_day: Number(pricePerDay) || 0,
+      image: image.trim() || null,
+      tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
+      property_type: propertyType,
+      place_type: placeType,
+      bedrooms: Number(bedrooms) || 0,
+      beds: Number(beds) || 0,
+      bathrooms: Number(bathrooms) || 0,
+      instant_book: instantBook,
+      self_checkin: selfCheckin,
+      allows_pets: allowsPets,
+      is_guest_favorite: isGuestFavorite,
+      is_luxe: isLuxe,
+      amenities,
+      safety_features: safetyFeatures,
+    };
     try {
       if (isNew) { await dispatch(createRoom(roomData)).unwrap(); }
       else { await dispatch(updateRoom({ id: room.id, ...roomData })).unwrap(); }
       onSave();
     } catch (err) { setError(err || `Failed to ${isNew ? "create" : "update"} room.`); }
     finally { setSaving(false); }
-  }, [dispatch, title, location, type, guests, pricePerDay, image, tags, isNew, room?.id, onSave]);
+  }, [dispatch, title, location, type, guests, pricePerDay, image, tags, propertyType, placeType, bedrooms, beds, bathrooms, instantBook, selfCheckin, allowsPets, isGuestFavorite, isLuxe, amenities, isNew, room?.id, onSave]);
 
   return (
     <Modal title={isNew ? "Add New Room" : "Edit Room"} open={open} onCancel={onClose} footer={null} destroyOnClose width={600}>
@@ -85,10 +180,82 @@ const RoomFormModal = React.memo(({ open, room, onClose, onSave, isNew }) => {
           <label className="flex flex-col gap-2"><span className="text-sm font-medium text-muted">Room Type</span><select value={type} onChange={(e) => setType(e.target.value)} className={INPUT_STYLES}>{ROOM_TYPES.map((t) => (<option key={t.value} value={t.value}>{t.label}</option>))}</select></label>
           <FormInput label="Max Guests" type="number" min={1} max={20} value={guests} onChange={(e) => setGuests(e.target.value)} />
         </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="flex flex-col gap-2">
+            <span className="text-sm font-medium text-muted">Property Type *</span>
+            <select value={propertyType} onChange={(e) => setPropertyType(e.target.value)} className={INPUT_STYLES}>
+              {PROPERTY_TYPES.map((item) => (<option key={item} value={item}>{toLabel(item)}</option>))}
+            </select>
+          </label>
+          <label className="flex flex-col gap-2">
+            <span className="text-sm font-medium text-muted">Place Type *</span>
+            <select value={placeType} onChange={(e) => setPlaceType(e.target.value)} className={INPUT_STYLES}>
+              {PLACE_TYPES.filter((item) => item !== "any").map((item) => (<option key={item} value={item}>{toLabel(item)}</option>))}
+            </select>
+          </label>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <FormInput label="Bedrooms" type="number" min={0} value={bedrooms} onChange={(e) => setBedrooms(e.target.value)} />
+          <FormInput label="Beds" type="number" min={0} value={beds} onChange={(e) => setBeds(e.target.value)} />
+          <FormInput label="Bathrooms" type="number" min={0} step={0.5} value={bathrooms} onChange={(e) => setBathrooms(e.target.value)} />
+        </div>
         <FormInput label="Price per Day ($)" type="number" min={0} step={0.01} value={pricePerDay} onChange={(e) => setPricePerDay(e.target.value)} />
         <FormInput label="Image URL" value={image} onChange={(e) => setImage(e.target.value)} placeholder="https://example.com/image.jpg" />
         {image && (<div className="overflow-hidden rounded-xl border border-border"><img src={image} alt="Preview" className="h-32 w-full object-cover" onError={(e) => { e.target.style.display = "none"; }} /></div>)}
         <FormInput label="Tags (comma-separated)" value={tags} onChange={(e) => setTags(e.target.value)} placeholder="e.g., Ocean view, Wi-Fi, Workspace" />
+        <div className="grid gap-2 sm:grid-cols-2">
+          {BOOKING_OPTIONS.map((field) => (
+            <label key={field} className="flex items-center gap-2 text-sm text-ink">
+              <input
+                type="checkbox"
+                checked={field === "instant_book" ? instantBook : field === "self_checkin" ? selfCheckin : allowsPets}
+                onChange={(e) => {
+                  if (field === "instant_book") setInstantBook(e.target.checked);
+                  if (field === "self_checkin") setSelfCheckin(e.target.checked);
+                  if (field === "allows_pets") setAllowsPets(e.target.checked);
+                }}
+              />
+              {toLabel(field)}
+            </label>
+          ))}
+          {STANDOUT_STAYS.map((field) => (
+            <label key={field} className="flex items-center gap-2 text-sm text-ink">
+              <input
+                type="checkbox"
+                checked={field === "is_guest_favorite" ? isGuestFavorite : isLuxe}
+                onChange={(e) => {
+                  if (field === "is_guest_favorite") setIsGuestFavorite(e.target.checked);
+                  if (field === "is_luxe") setIsLuxe(e.target.checked);
+                }}
+              />
+              {toLabel(field)}
+            </label>
+          ))}
+        </div>
+        <div className="space-y-3 rounded-xl border border-border p-3">
+          <p className="text-sm font-medium text-ink">Amenities *</p>
+          {AMENITY_GROUPS.map((group) => (
+            <div key={group.key} className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted">{group.label}</p>
+              <div className="flex flex-wrap gap-2">
+                {AMENITIES[group.key].map((amenity) => (
+                  <button
+                    key={amenity}
+                    type="button"
+                    onClick={() => toggleAmenity(amenity)}
+                    className={`rounded-full border px-3 py-1 text-xs ${
+                      amenities.includes(amenity)
+                        ? "border-brand-500 bg-brand-50 text-brand-700"
+                        : "border-border bg-surface/60 text-muted"
+                    }`}
+                  >
+                    {toLabel(amenity)}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
         {error && <p className="text-sm text-red-600">{error}</p>}
         <div className="flex justify-end gap-3 pt-2"><Button variant="outline" onClick={onClose}>Cancel</Button><Button onClick={handleSave} disabled={saving}>{saving ? "Saving..." : isNew ? "Create Room" : "Save Changes"}</Button></div>
       </div>

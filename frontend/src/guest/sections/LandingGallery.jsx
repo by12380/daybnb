@@ -19,7 +19,19 @@ const SORT_OPTIONS = [
 ];
 
 const LandingGallery = React.memo(
-  ({ searchText = "", location = "", guests = 0, date = "", minPrice = "", maxPrice = "" }) => {
+  ({
+    searchText = "",
+    location = "",
+    guests = 0,
+    date = "",
+    minPrice = "",
+    maxPrice = "",
+    propertyType = "",
+    placeType = "any",
+    bookingOptions = [],
+    standoutStays = [],
+    amenities = [],
+  }) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -42,7 +54,7 @@ const LandingGallery = React.memo(
   // Reset to first page whenever any filter or sort changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchText, location, guests, date, minPrice, maxPrice, sortOrder]);
+  }, [searchText, location, guests, date, minPrice, maxPrice, propertyType, placeType, bookingOptions, standoutStays, amenities, sortOrder]);
 
   // Fetch active offers once
   useEffect(() => {
@@ -91,10 +103,15 @@ const LandingGallery = React.memo(
     if (date) params.date = date;
     if (minPrice !== "" && Number(minPrice) >= 0) params.min_price = Number(minPrice);
     if (maxPrice !== "" && Number(maxPrice) >= 0) params.max_price = Number(maxPrice);
+    if (propertyType) params.property_type = propertyType;
+    if (placeType && placeType !== "any") params.place_type = placeType;
+    if (bookingOptions.length > 0) params.booking_options = bookingOptions;
+    if (standoutStays.length > 0) params.standout = standoutStays;
+    if (amenities.length > 0) params.amenities = amenities;
     if (sortOrder) params.sort = sortOrder;
 
     dispatch(fetchRooms(params));
-  }, [dispatch, currentPage, searchText, location, guests, date, minPrice, maxPrice, sortOrder]);
+  }, [dispatch, currentPage, searchText, location, guests, date, minPrice, maxPrice, propertyType, placeType, bookingOptions, standoutStays, amenities, sortOrder]);
 
   const handlePageChange = useCallback((page) => {
     setCurrentPage(page);

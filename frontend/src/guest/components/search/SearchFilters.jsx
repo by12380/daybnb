@@ -3,7 +3,14 @@ import { useConfigure, useSearchBox } from "react-instantsearch";
 import { DatePicker } from "antd";
 import dayjs from "dayjs";
 import { INPUT_STYLES } from "../ui/FormInput.jsx";
-
+import {
+  AMENITIES,
+  PROPERTY_TYPES,
+  PLACE_TYPES,
+  BOOKING_OPTIONS,
+  STANDOUT_STAYS,
+  toLabel,
+} from "../../utils/roomFilters.js";
 
 function FilterIcon({ className = "" }) {
   return (
@@ -125,6 +132,22 @@ function GuestsFilter({ minGuests, onGuestsChange }) {
   );
 }
 
+function PillToggle({ active, onClick, children }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+        active
+          ? "border-brand-500 bg-brand-50 text-brand-700 dark:border-brand-400 dark:bg-brand-900/30 dark:text-brand-300"
+          : "border-border bg-surface/60 text-muted hover:border-brand-200 hover:text-ink dark:border-dark-border dark:bg-dark-surface/60 dark:text-dark-muted dark:hover:border-brand-700"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
 const SearchFilters = React.memo(function SearchFilters({
   onDateChange,
   onFiltersChange,
@@ -137,8 +160,19 @@ const SearchFilters = React.memo(function SearchFilters({
   const [maxPrice, setMaxPrice] = useState("");
   const [minGuests, setMinGuests] = useState(1);
   const [selectedTypes, setSelectedTypes] = useState([]);
+  const [selectedBookingOptions, setSelectedBookingOptions] = useState([]);
+  const [selectedStandout, setSelectedStandout] = useState([]);
+  const [selectedPropertyTypes, setSelectedPropertyTypes] = useState([]);
+  const [selectedPlaceType, setSelectedPlaceType] = useState("any");
+  const [selectedAmenities, setSelectedAmenities] = useState([]);
 
   const availableTypes = ["suite", "resort", "villa", "room", "studio"];
+
+  const toggleListValue = useCallback((setter, value) => {
+    setter((prev) =>
+      prev.includes(value) ? prev.filter((item) => item !== value) : [...prev, value]
+    );
+  }, []);
 
   // Build Algolia filters string
   const filters = useMemo(() => {
@@ -157,13 +191,31 @@ const SearchFilters = React.memo(function SearchFilters({
       const typeFilters = selectedTypes.map(t => `type:${t}`).join(" OR ");
       parts.push(`(${typeFilters})`);
     }
+    if (selectedPropertyTypes.length > 0) {
+      const propertyFilters = selectedPropertyTypes
+        .map((value) => `property_type:${value}`)
+        .join(" OR ");
+      parts.push(`(${propertyFilters})`);
+    }
+    if (selectedPlaceType !== "any") {
+      parts.push(`place_type:${selectedPlaceType}`);
+    }
+    selectedBookingOptions.forEach((field) => {
+      parts.push(`${field}:true`);
+    });
+    selectedStandout.forEach((field) => {
+      parts.push(`${field}:true`);
+    });
+    selectedAmenities.forEach((amenity) => {
+      parts.push(`amenities:${amenity}`);
+    });
 
     if (selectedDate) {
       parts.push(`NOT booked_dates:${selectedDate}`);
     }
     
     return parts.join(" AND ");
-  }, [minPrice, maxPrice, minGuests, selectedTypes, selectedDate]);
+  }, [minPrice, maxPrice, minGuests, selectedTypes, selectedPropertyTypes, selectedPlaceType, selectedBookingOptions, selectedStandout, selectedAmenities, selectedDate]);
 
   // Apply filters to Algolia via Configure
   useConfigure({ filters: filters || undefined });
@@ -232,6 +284,88 @@ const SearchFilters = React.memo(function SearchFilters({
             availableTypes={availableTypes}
           />
 
+          <div className="space-y-3">
+            <label className="text-sm font-medium text-ink dark:text-dark-ink">Booking options</label>
+            <div className="flex flex-wrap gap-2">
+              {BOOKING_OPTIONS.map((value) => (
+                <PillToggle
+                  key={value}
+                  active={selectedBookingOptions.includes(value)}
+                  onClick={() => toggleListValue(setSelectedBookingOptions, value)}
+                >
+                  {toLabel(value)}
+                </PillToggle>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <label className="text-sm font-medium text-ink dark:text-dark-ink">Standout stays</label>
+            <div className="flex flex-wrap gap-2">
+              {STANDOUT_STAYS.map((value) => (
+                <PillToggle
+                  key={value}
+                  active={selectedStandout.includes(value)}
+                  onClick={() => toggleListValue(setSelectedStandout, value)}
+                >
+                  {toLabel(value)}
+                </PillToggle>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <label className="text-sm font-medium text-ink dark:text-dark-ink">Property type</label>
+            <div className="flex flex-wrap gap-2">
+              {PROPERTY_TYPES.map((value) => (
+                <PillToggle
+                  key={value}
+                  active={selectedPropertyTypes.includes(value)}
+                  onClick={() => toggleListValue(setSelectedPropertyTypes, value)}
+                >
+                  {toLabel(value)}
+                </PillToggle>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <label className="text-sm font-medium text-ink dark:text-dark-ink">Type of place</label>
+            <div className="grid grid-cols-3 gap-2">
+              {PLACE_TYPES.map((value) => (
+                <PillToggle
+                  key={value}
+                  active={selectedPlaceType === value}
+                  onClick={() => setSelectedPlaceType(value)}
+                >
+                  {toLabel(value)}
+                </PillToggle>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <label className="text-sm font-medium text-ink dark:text-dark-ink">Amenities</label>
+            {Object.entries(AMENITIES).map(([groupKey, values]) => (
+              <div key={groupKey} className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted dark:text-dark-muted">
+                  {toLabel(groupKey)}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {values.map((amenity) => (
+                    <PillToggle
+                      key={amenity}
+                      active={selectedAmenities.includes(amenity)}
+                      onClick={() => toggleListValue(setSelectedAmenities, amenity)}
+                    >
+                      {toLabel(amenity)}
+                    </PillToggle>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+
           {/* Guests */}
           {/* <GuestsFilter
             minGuests={minGuests}
@@ -249,6 +383,11 @@ const SearchFilters = React.memo(function SearchFilters({
               setMaxPrice("");
               setMinGuests(1);
               setSelectedTypes([]);
+              setSelectedBookingOptions([]);
+              setSelectedStandout([]);
+              setSelectedPropertyTypes([]);
+              setSelectedPlaceType("any");
+              setSelectedAmenities([]);
               onDateChange?.(null);
             }}
             className="w-full rounded-xl border border-border bg-surface/60 px-4 py-2 text-sm font-medium text-muted transition hover:border-red-300 hover:bg-red-50 hover:text-red-600 dark:border-dark-border dark:bg-dark-surface/60 dark:text-dark-muted dark:hover:border-red-700 dark:hover:bg-red-900/20 dark:hover:text-red-400"

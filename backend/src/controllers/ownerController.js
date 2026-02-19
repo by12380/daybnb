@@ -2,6 +2,14 @@ const { supabaseAdmin } = require("../config/supabase");
 const asyncHandler = require("../utils/asyncHandler");
 const ApiError = require("../utils/ApiError");
 const { ROLES } = require("../middleware/rbac");
+const {
+  PROPERTY_TYPES,
+  PLACE_TYPES,
+  BOOKING_OPTIONS,
+  STANDOUT_STAYS,
+  toBoolean,
+  sanitizeAmenities,
+} = require("../utils/roomFilters");
 
 /* ──────────────────────────────────────────────────────────
  * Helper: resolve which owner ID to scope queries to.
@@ -16,6 +24,149 @@ function resolveOwnerId(req) {
     return req.user.id;
   }
   return null;
+}
+
+function normalizeRoomPayload(input, { partial = false } = {}) {
+  const updates = {};
+  const errors = [];
+
+  if (!partial || input.title !== undefined) {
+    if (!input.title || !String(input.title).trim()) {
+      errors.push("Title is required");
+    } else {
+      updates.title = String(input.title).trim();
+    }
+  }
+
+  if (!partial || input.location !== undefined) {
+    if (!input.location || !String(input.location).trim()) {
+      errors.push("Location is required");
+    } else {
+      updates.location = String(input.location).trim();
+    }
+  }
+
+  if (input.type !== undefined) {
+    updates.type = String(input.type || "room").trim().toLowerCase();
+  } else if (!partial) {
+    updates.type = "room";
+  }
+
+  if (!partial || input.guests !== undefined) {
+    const parsedGuests = Number(input.guests);
+    if (!Number.isFinite(parsedGuests) || parsedGuests <= 0) {
+      errors.push("Guests must be greater than 0");
+    } else {
+      updates.guests = parsedGuests;
+    }
+  }
+
+  if (!partial || input.price_per_day !== undefined) {
+    const parsedPrice = Number(input.price_per_day);
+    if (!Number.isFinite(parsedPrice) || parsedPrice < 0) {
+      errors.push("Price per day must be 0 or higher");
+    } else {
+      updates.price_per_day = parsedPrice;
+    }
+  }
+
+  if (input.image !== undefined) {
+    updates.image = input.image ? String(input.image).trim() : null;
+  } else if (!partial) {
+    updates.image = null;
+  }
+
+  if (input.tags !== undefined) {
+    updates.tags = Array.isArray(input.tags)
+      ? input.tags.map((tag) => String(tag).trim()).filter(Boolean)
+      : [];
+  } else if (!partial) {
+    updates.tags = [];
+  }
+
+  if (!partial || input.property_type !== undefined) {
+    const propertyType = String(input.property_type || "")
+      .trim()
+      .toLowerCase();
+    if (!PROPERTY_TYPES.includes(propertyType)) {
+      errors.push(`property_type must be one of: ${PROPERTY_TYPES.join(", ")}`);
+    } else {
+      updates.property_type = propertyType;
+    }
+  }
+
+  if (!partial || input.place_type !== undefined) {
+    const placeType = String(input.place_type || "")
+      .trim()
+      .toLowerCase();
+    if (!PLACE_TYPES.includes(placeType)) {
+      errors.push(`place_type must be one of: ${PLACE_TYPES.join(", ")}`);
+    } else {
+      updates.place_type = placeType;
+    }
+  }
+
+  if (input.bedrooms !== undefined) {
+    const parsed = Number(input.bedrooms);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      errors.push("bedrooms must be 0 or higher");
+    } else {
+      updates.bedrooms = parsed;
+    }
+  }
+
+  if (input.beds !== undefined) {
+    const parsed = Number(input.beds);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      errors.push("beds must be 0 or higher");
+    } else {
+      updates.beds = parsed;
+    }
+  }
+
+  if (input.bathrooms !== undefined) {
+    const parsed = Number(input.bathrooms);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      errors.push("bathrooms must be 0 or higher");
+    } else {
+      updates.bathrooms = parsed;
+    }
+  }
+
+  BOOKING_OPTIONS.forEach((field) => {
+    if (!partial || input[field] !== undefined) {
+      updates[field] = toBoolean(input[field]);
+    }
+  });
+
+  STANDOUT_STAYS.forEach((field) => {
+    if (!partial || input[field] !== undefined) {
+      updates[field] = toBoolean(input[field]);
+    }
+  });
+
+  if (
+    !partial ||
+    input.amenities !== undefined ||
+    input.safety_features !== undefined
+  ) {
+    const { amenities, safetyFeatures } = sanitizeAmenities(
+      input.amenities,
+      input.safety_features
+    );
+    updates.amenities = amenities;
+    updates.safety_features = safetyFeatures;
+
+    if (!partial && amenities.length === 0) {
+      errors.push("At least one amenity is required");
+    }
+  }
+
+  if (errors.length) {
+    throw ApiError.badRequest(errors.join(". "));
+  }
+
+  return updates;
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -63,23 +214,9 @@ exports.createRoom = asyncHandler(async (req, res) => {
   const ownerId = resolveOwnerId(req);
   if (!ownerId) throw ApiError.forbidden("Owner context required");
 
-  const { title, location, type, guests, price_per_day, image, tags } = req.body;
-
-  if (!title || !location) {
-    throw ApiError.badRequest("Title and location are required");
-  }
-
-  const roomData = {
-    id: require("crypto").randomUUID(),
-    title: title.trim(),
-    location: location.trim(),
-    type: type || "room",
-    guests: Number(guests) || 2,
-    price_per_day: Number(price_per_day) || 0,
-    image: image || null,
-    tags: Array.isArray(tags) ? tags : [],
-    owner_id: ownerId,
-  };
+  const roomData = normalizeRoomPayload(req.body, { partial: false });
+  roomData.id = require("crypto").randomUUID();
+  roomData.owner_id = ownerId;
 
   const { data, error } = await supabaseAdmin
     .from("rooms")
@@ -102,16 +239,7 @@ exports.updateRoom = asyncHandler(async (req, res) => {
   const ownerId = resolveOwnerId(req);
   if (!ownerId) throw ApiError.forbidden("Owner context required");
 
-  const { title, location, type, guests, price_per_day, image, tags } = req.body;
-
-  const updates = {};
-  if (title !== undefined) updates.title = title.trim();
-  if (location !== undefined) updates.location = location.trim();
-  if (type !== undefined) updates.type = type;
-  if (guests !== undefined) updates.guests = Number(guests);
-  if (price_per_day !== undefined) updates.price_per_day = Number(price_per_day);
-  if (image !== undefined) updates.image = image || null;
-  if (tags !== undefined) updates.tags = Array.isArray(tags) ? tags : [];
+  const updates = normalizeRoomPayload(req.body, { partial: true });
 
   const { data, error } = await supabaseAdmin
     .from("rooms")

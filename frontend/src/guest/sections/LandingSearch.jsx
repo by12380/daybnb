@@ -6,6 +6,14 @@ import dayjs from "dayjs";
 import Card from "../components/ui/Card.jsx";
 import FormInput, { INPUT_STYLES } from "../components/ui/FormInput.jsx";
 import { fetchRooms } from "../../redux/slices/roomSlice.js";
+import {
+  AMENITIES,
+  PROPERTY_TYPES,
+  PLACE_TYPES,
+  BOOKING_OPTIONS,
+  STANDOUT_STAYS,
+  toLabel,
+} from "../utils/roomFilters.js";
 
 const LandingSearch = React.memo(({ onSearch }) => {
   const { t } = useTranslation();
@@ -19,6 +27,11 @@ const LandingSearch = React.memo(({ onSearch }) => {
     guests: 1,
     minPrice: "",
     maxPrice: "",
+    propertyType: "",
+    placeType: "any",
+    bookingOptions: [],
+    standoutStays: [],
+    amenities: [],
   });
 
   // Fetch rooms to extract unique cities
@@ -37,7 +50,7 @@ const LandingSearch = React.memo(({ onSearch }) => {
     ].sort((a, b) => a.localeCompare(b));
   }, [rooms]);
 
-  // Call onSearch whenever any filter changes
+  // Keep legacy behavior: apply filters as user changes fields.
   useEffect(() => {
     onSearch?.(formState);
   }, [formState, onSearch]);
@@ -49,6 +62,17 @@ const LandingSearch = React.memo(({ onSearch }) => {
 
   const onDateChange = useCallback((_, dateString) => {
     setFormState((prev) => ({ ...prev, date: dateString || "" }));
+  }, []);
+
+  const toggleListFilter = useCallback((key, value) => {
+    setFormState((prev) => {
+      const list = Array.isArray(prev[key]) ? prev[key] : [];
+      const exists = list.includes(value);
+      return {
+        ...prev,
+        [key]: exists ? list.filter((item) => item !== value) : [...list, value],
+      };
+    });
   }, []);
 
   return (
@@ -129,6 +153,125 @@ const LandingSearch = React.memo(({ onSearch }) => {
           placeholder={t("search.noMax")}
           className="md:col-span-1"
         />
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <label className="flex flex-col gap-2">
+          <span className="text-sm font-medium text-muted dark:text-dark-muted">Property type</span>
+          <select
+            name="propertyType"
+            value={formState.propertyType}
+            onChange={onChange}
+            className={INPUT_STYLES}
+          >
+            <option value="">All types</option>
+            {PROPERTY_TYPES.map((value) => (
+              <option key={value} value={value}>
+                {toLabel(value)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex flex-col gap-2">
+          <span className="text-sm font-medium text-muted dark:text-dark-muted">Type of place</span>
+          <select
+            name="placeType"
+            value={formState.placeType}
+            onChange={onChange}
+            className={INPUT_STYLES}
+          >
+            {PLACE_TYPES.map((value) => (
+              <option key={value} value={value}>
+                {toLabel(value)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <FormInput
+          label={t("search.guestsLabel", { defaultValue: "Guests" })}
+          name="guests"
+          min="1"
+          value={formState.guests}
+          onChange={onChange}
+          type="number"
+          className="md:col-span-1"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <p className="text-sm font-medium text-muted dark:text-dark-muted">Booking options</p>
+        <div className="flex flex-wrap gap-2">
+          {BOOKING_OPTIONS.map((value) => {
+            const selected = formState.bookingOptions.includes(value);
+            return (
+              <button
+                key={value}
+                type="button"
+                onClick={() => toggleListFilter("bookingOptions", value)}
+                className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+                  selected
+                    ? "border-brand-500 bg-brand-50 text-brand-700 dark:border-brand-400 dark:bg-brand-900/30 dark:text-brand-300"
+                    : "border-border bg-surface/60 text-muted hover:border-brand-200 hover:text-ink dark:border-dark-border dark:bg-dark-surface/60 dark:text-dark-muted dark:hover:border-brand-700"
+                }`}
+              >
+                {toLabel(value)}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <p className="text-sm font-medium text-muted dark:text-dark-muted">Standout stays</p>
+        <div className="flex flex-wrap gap-2">
+          {STANDOUT_STAYS.map((value) => {
+            const selected = formState.standoutStays.includes(value);
+            return (
+              <button
+                key={value}
+                type="button"
+                onClick={() => toggleListFilter("standoutStays", value)}
+                className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+                  selected
+                    ? "border-brand-500 bg-brand-50 text-brand-700 dark:border-brand-400 dark:bg-brand-900/30 dark:text-brand-300"
+                    : "border-border bg-surface/60 text-muted hover:border-brand-200 hover:text-ink dark:border-dark-border dark:bg-dark-surface/60 dark:text-dark-muted dark:hover:border-brand-700"
+                }`}
+              >
+                {toLabel(value)}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <p className="text-sm font-medium text-muted dark:text-dark-muted">Amenities</p>
+        {Object.entries(AMENITIES).map(([group, values]) => (
+          <div key={group} className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted dark:text-dark-muted">
+              {toLabel(group)}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {values.map((value) => {
+                const selected = formState.amenities.includes(value);
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => toggleListFilter("amenities", value)}
+                    className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+                      selected
+                        ? "border-brand-500 bg-brand-50 text-brand-700 dark:border-brand-400 dark:bg-brand-900/30 dark:text-brand-300"
+                        : "border-border bg-surface/60 text-muted hover:border-brand-200 hover:text-ink dark:border-dark-border dark:bg-dark-surface/60 dark:text-dark-muted dark:hover:border-brand-700"
+                    }`}
+                  >
+                    {toLabel(value)}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </div>
     </Card>
   );

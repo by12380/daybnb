@@ -25,6 +25,18 @@ interface RoomRecord {
   type?: string;
   image?: string;
   tags?: string[];
+  property_type?: string;
+  place_type?: string;
+  bedrooms?: number;
+  beds?: number;
+  bathrooms?: number;
+  instant_book?: boolean;
+  self_checkin?: boolean;
+  allows_pets?: boolean;
+  is_guest_favorite?: boolean;
+  is_luxe?: boolean;
+  amenities?: string[];
+  safety_features?: string[];
   price_per_day?: number;
   price_per_hour?: number;
   description?: string;
@@ -42,6 +54,18 @@ interface AlgoliaRecord {
   type?: string;
   image?: string;
   tags?: string[];
+  property_type?: string;
+  place_type?: string;
+  bedrooms?: number;
+  beds?: number;
+  bathrooms?: number;
+  instant_book?: boolean;
+  self_checkin?: boolean;
+  allows_pets?: boolean;
+  is_guest_favorite?: boolean;
+  is_luxe?: boolean;
+  amenities?: string[];
+  safety_features?: string[];
   price_per_day: number;
   price_per_hour: number;
   description?: string;
@@ -76,6 +100,18 @@ function transformToAlgoliaRecord(
     type: room.type,
     image: room.image,
     tags: room.tags || [],
+    property_type: room.property_type,
+    place_type: room.place_type,
+    bedrooms: room.bedrooms,
+    beds: room.beds,
+    bathrooms: room.bathrooms,
+    instant_book: Boolean(room.instant_book),
+    self_checkin: Boolean(room.self_checkin),
+    allows_pets: Boolean(room.allows_pets),
+    is_guest_favorite: Boolean(room.is_guest_favorite),
+    is_luxe: Boolean(room.is_luxe),
+    amenities: room.amenities || [],
+    safety_features: room.safety_features || [],
     price_per_day: room.price_per_day ?? room.price_per_hour ?? 0,
     price_per_hour: room.price_per_hour || 0,
     description: room.description,
@@ -308,6 +344,8 @@ serve(async (req) => {
             "description",
             "tags",
             "type",
+            "property_type",
+            "amenities",
           ],
           // Attributes for filtering
           attributesForFaceting: [
@@ -315,6 +353,15 @@ serve(async (req) => {
             "filterOnly(price_per_day)",
             "filterOnly(price_per_hour)",
             "filterOnly(guests)",
+            "filterOnly(instant_book)",
+            "filterOnly(self_checkin)",
+            "filterOnly(allows_pets)",
+            "filterOnly(is_guest_favorite)",
+            "filterOnly(is_luxe)",
+            "searchable(property_type)",
+            "searchable(place_type)",
+            "searchable(amenities)",
+            "searchable(safety_features)",
             "searchable(type)",
             "searchable(tags)",
             "searchable(location)",
