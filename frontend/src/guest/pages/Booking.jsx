@@ -5,10 +5,12 @@ import { DatePicker } from "antd";
 import dayjs from "dayjs";
 import Card from "../components/ui/Card.jsx";
 import Button from "../components/ui/Button.jsx";
+import RoomCard from "../components/RoomCard.jsx";
 import FormInput, { INPUT_STYLES } from "../components/ui/FormInput.jsx";
 import { StarsDisplay, StarsInput } from "../components/ui/Stars.jsx";
 import { formatPrice } from "../utils/format.js";
 import { useAuth } from "../../auth/useAuth.js";
+import { searchClient, indexName, isAlgoliaConfigured } from "../../lib/algoliaClient.js";
 import { fetchRoomById, clearSelectedRoom } from "../../redux/slices/roomSlice.js";
 import {
   createBooking,
@@ -44,6 +46,81 @@ function normalizeTags(value, type) {
   return type ? [String(type)] : [];
 }
 
+function escapeAlgoliaValue(value) {
+  return String(value).replaceAll("\\", "\\\\").replaceAll('"', '\\"');
+}
+
+function mapAlgoliaHitToRoom(hit) {
+  return {
+    ...hit,
+    id: hit.objectID,
+  };
+}
+
+const MIN_RECOMMENDATIONS = 2;
+const MAX_RECOMMENDATIONS = 6;
+
+function computeReasons(hit, sourceRoom) {
+  const reasons = [];
+
+  if (hit.property_type && sourceRoom.property_type && hit.property_type === sourceRoom.property_type) {
+    reasons.push("Same property type");
+  }
+
+  if (hit.location && sourceRoom.location) {
+    const hitLoc = hit.location.toLowerCase().trim();
+    const srcLoc = sourceRoom.location.toLowerCase().trim();
+    if (hitLoc === srcLoc || hitLoc.includes(srcLoc) || srcLoc.includes(hitLoc)) {
+      reasons.push("Same location");
+    }
+  }
+
+  const srcLat = Number(sourceRoom.latitude);
+  const srcLng = Number(sourceRoom.longitude);
+  const hitLat = Number(hit._geoloc?.lat ?? hit.latitude);
+  const hitLng = Number(hit._geoloc?.lng ?? hit.longitude);
+  if (Number.isFinite(srcLat) && Number.isFinite(hitLat) && Number.isFinite(srcLng) && Number.isFinite(hitLng)) {
+    const R = 6371;
+    const dLat = ((hitLat - srcLat) * Math.PI) / 180;
+    const dLng = ((hitLng - srcLng) * Math.PI) / 180;
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos((srcLat * Math.PI) / 180) * Math.cos((hitLat * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+    const km = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    if (km <= 50) reasons.push("Nearby");
+  }
+
+  const srcPrice = Number(sourceRoom.price_per_day);
+  const hitPrice = Number(hit.price_per_day);
+  if (srcPrice > 0 && hitPrice > 0) {
+    const ratio = hitPrice / srcPrice;
+    if (ratio >= 0.6 && ratio <= 1.4) reasons.push("Similar price");
+  }
+
+  if (reasons.length === 0) reasons.push("Recommended");
+
+  return reasons;
+}
+
+const REASON_STYLES = {
+  "Same property type": "bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300",
+  "Same location": "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
+  "Nearby": "bg-teal-50 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300",
+  "Similar price": "bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
+  "Recommended": "bg-gray-50 text-gray-600 dark:bg-gray-800/40 dark:text-gray-400",
+};
+
+function RecommendationBadges({ reasons }) {
+  if (!reasons || reasons.length === 0) return null;
+  return (
+    <div className="flex flex-wrap gap-1 px-4 pb-1">
+      {reasons.map((r) => (
+        <span key={r} className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${REASON_STYLES[r] || REASON_STYLES.Recommended}`}>
+          {r}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 const Booking = React.memo(() => {
   const dispatch = useDispatch();
   const { roomId } = useParams();
@@ -66,6 +143,9 @@ const Booking = React.memo(() => {
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("online");
+  const [recommendedRooms, setRecommendedRooms] = useState([]);
+  const [recommendationsLoading, setRecommendationsLoading] = useState(false);
+  const [recommendationsError, setRecommendationsError] = useState("");
 
   const retryBookingId = searchParams.get("retry");
 
@@ -135,8 +215,11 @@ const Booking = React.memo(() => {
   }, [sessionUrl]);
 
   const tags = useMemo(() => normalizeTags(room?.tags, room?.type), [room?.tags, room?.type]);
+  const roomLat = Number(room?.latitude);
+  const roomLng = Number(room?.longitude);
+  const hasGeo = Number.isFinite(roomLat) && Number.isFinite(roomLng);
 
-  const pricePerDay = room?.price_per_day ?? room?.price_per_hour ?? 0;
+  const pricePerDay = room?.price_per_day ?? 0;
   const originalTotalPrice = pricePerDay;
 
   // Calculate room-offer discount (admin/owner offers)
@@ -223,6 +306,128 @@ const Booking = React.memo(() => {
     },
     [dispatch, reviewNote, reviewRating, roomId, user?.id]
   );
+
+  useEffect(() => {
+    if (!room?.id || !isAlgoliaConfigured || !searchClient) {
+      setRecommendedRooms([]);
+      setRecommendationsError("");
+      return;
+    }
+
+    let cancelled = false;
+
+    const fetchRecommendations = async () => {
+      setRecommendationsLoading(true);
+      setRecommendationsError("");
+
+      try {
+        const baseFilter = `NOT objectID:${room.id}`;
+        const dateFilter = date ? ` AND NOT booked_dates:${date}` : "";
+        const exclude = baseFilter + dateFilter;
+
+        const queries = [];
+
+        // Query 1: Same property type
+        if (room.property_type) {
+          queries.push({
+            indexName,
+            query: "",
+            params: {
+              hitsPerPage: MAX_RECOMMENDATIONS,
+              filters: `${exclude} AND property_type:"${escapeAlgoliaValue(room.property_type)}"`,
+              aroundLatLng: hasGeo ? `${roomLat}, ${roomLng}` : undefined,
+              aroundRadius: hasGeo ? 100000 : undefined,
+            },
+          });
+        }
+
+        // Query 2: Same location (text search on location field)
+        if (room.location) {
+          queries.push({
+            indexName,
+            query: room.location,
+            params: {
+              hitsPerPage: MAX_RECOMMENDATIONS,
+              filters: exclude,
+              restrictSearchableAttributes: ["location"],
+            },
+          });
+        }
+
+        // Query 3: Nearby (geo only, broad)
+        if (hasGeo) {
+          queries.push({
+            indexName,
+            query: "",
+            params: {
+              hitsPerPage: MAX_RECOMMENDATIONS,
+              filters: exclude,
+              aroundLatLng: `${roomLat}, ${roomLng}`,
+              aroundRadius: 80000,
+            },
+          });
+        }
+
+        // Query 4: Broad fallback (no type/geo filter, just exclude current room)
+        queries.push({
+          indexName,
+          query: room.title || "",
+          params: {
+            hitsPerPage: MAX_RECOMMENDATIONS,
+            filters: exclude,
+          },
+        });
+
+        const response = await searchClient.search(queries);
+        const allResults = (response?.results || []).flatMap((r) => r.hits || []);
+
+        // Deduplicate by objectID, keep first occurrence (higher-priority query wins)
+        const seen = new Set();
+        const uniqueHits = [];
+        for (const hit of allResults) {
+          if (!hit.objectID || hit.objectID === room.id || seen.has(hit.objectID)) continue;
+          seen.add(hit.objectID);
+          uniqueHits.push(hit);
+          if (uniqueHits.length >= MAX_RECOMMENDATIONS) break;
+        }
+
+        const withReasons = uniqueHits.map((hit) => ({
+          room: mapAlgoliaHitToRoom(hit),
+          reasons: computeReasons(hit, room),
+        }));
+
+        if (!cancelled) {
+          setRecommendedRooms(withReasons);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setRecommendedRooms([]);
+          setRecommendationsError(err?.message || "Failed to load recommendations.");
+        }
+      } finally {
+        if (!cancelled) {
+          setRecommendationsLoading(false);
+        }
+      }
+    };
+
+    fetchRecommendations();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    date,
+    hasGeo,
+    room?.id,
+    room?.location,
+    room?.place_type,
+    room?.price_per_day,
+    room?.property_type,
+    room?.title,
+    roomLat,
+    roomLng,
+  ]);
 
   const validate = useCallback(() => {
     if (!roomId) return "Missing room id.";
@@ -599,6 +804,48 @@ const Booking = React.memo(() => {
           </div>
         </div>
       </Card>
+
+      {/* Recommended Rooms */}
+      {isAlgoliaConfigured && (
+        <Card className="md:col-span-5">
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <p className="text-sm font-semibold text-ink dark:text-dark-ink">Similar stays you may like</p>
+              <p className="mt-1 text-sm text-muted dark:text-dark-muted">
+                Recommended homes based on this listing{date ? ` and availability for ${date}` : ""}.
+              </p>
+            </div>
+          </div>
+
+          {recommendationsLoading ? (
+            <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {[1, 2, 3].map((i) => (
+                <Card key={i} className="animate-pulse overflow-hidden p-0">
+                  <div className="h-48 bg-surface dark:bg-dark-surface" />
+                  <div className="space-y-3 p-4">
+                    <div className="h-4 w-3/4 rounded bg-surface dark:bg-dark-surface" />
+                    <div className="h-3 w-1/2 rounded bg-surface dark:bg-dark-surface" />
+                    <div className="h-6 w-1/3 rounded bg-surface dark:bg-dark-surface" />
+                  </div>
+                </Card>
+              ))}
+            </div>
+          ) : recommendationsError ? (
+            <p className="mt-4 text-sm text-red-600 dark:text-red-400">{recommendationsError}</p>
+          ) : recommendedRooms.length === 0 ? (
+            <p className="mt-4 text-sm text-muted dark:text-dark-muted">No similar stays found right now.</p>
+          ) : (
+            <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {recommendedRooms.map(({ room: recRoom, reasons }) => (
+                <div key={recRoom.id} className="flex flex-col">
+                  <RoomCard room={recRoom} showLike={false} />
+                  <RecommendationBadges reasons={reasons} />
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
     </div>
   );
 });
