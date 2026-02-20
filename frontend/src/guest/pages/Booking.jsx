@@ -63,6 +63,10 @@ const MAX_RECOMMENDATIONS = 6;
 function computeReasons(hit, sourceRoom) {
   const reasons = [];
 
+  if (hit.is_guest_favorite || hit.is_luxe) {
+    reasons.push("Standout stay");
+  }
+
   if (hit.property_type && sourceRoom.property_type && hit.property_type === sourceRoom.property_type) {
     reasons.push("Same property type");
   }
@@ -101,6 +105,7 @@ function computeReasons(hit, sourceRoom) {
 }
 
 const REASON_STYLES = {
+  "Standout stay": "bg-rose-50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300",
   "Same property type": "bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300",
   "Same location": "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
   "Nearby": "bg-teal-50 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300",
@@ -321,74 +326,125 @@ const Booking = React.memo(() => {
       setRecommendationsError("");
 
       try {
-        const baseFilter = `NOT objectID:${room.id}`;
-        const dateFilter = date ? ` AND NOT booked_dates:${date}` : "";
-        const exclude = baseFilter + dateFilter;
+        const escapedRoomId = escapeAlgoliaValue(room.id);
+        const escapedDate = date ? escapeAlgoliaValue(date) : "";
+        const baseFilter = `NOT objectID:"${escapedRoomId}"`;
+        const buildExcludeFilter = (includeDateFilter) =>
+          `${baseFilter}${includeDateFilter && date ? ` AND NOT booked_dates:"${escapedDate}"` : ""}`;
 
-        const queries = [];
+        const toPrimaryQueries = (excludeFilter) => {
+          const queries = [];
 
-        // Query 1: Same property type
-        if (room.property_type) {
+          if (room.property_type) {
+            queries.push({
+              indexName,
+              query: "",
+              params: {
+                hitsPerPage: MAX_RECOMMENDATIONS,
+                filters: `${excludeFilter} AND property_type:"${escapeAlgoliaValue(room.property_type)}"`,
+                aroundLatLng: hasGeo ? `${roomLat}, ${roomLng}` : undefined,
+                aroundRadius: hasGeo ? 100000 : undefined,
+              },
+            });
+          }
+
+          if (room.location) {
+            queries.push({
+              indexName,
+              query: room.location,
+              params: {
+                hitsPerPage: MAX_RECOMMENDATIONS,
+                filters: excludeFilter,
+                restrictSearchableAttributes: ["location"],
+              },
+            });
+          }
+
+          if (hasGeo) {
+            queries.push({
+              indexName,
+              query: "",
+              params: {
+                hitsPerPage: MAX_RECOMMENDATIONS,
+                filters: excludeFilter,
+                aroundLatLng: `${roomLat}, ${roomLng}`,
+                aroundRadius: 80000,
+              },
+            });
+          }
+
           queries.push({
+            indexName,
+            query: room.title || "",
+            params: {
+              hitsPerPage: MAX_RECOMMENDATIONS,
+              filters: excludeFilter,
+            },
+          });
+
+          return queries;
+        };
+
+        const toStandoutQueries = (excludeFilter) => [
+          {
             indexName,
             query: "",
             params: {
               hitsPerPage: MAX_RECOMMENDATIONS,
-              filters: `${exclude} AND property_type:"${escapeAlgoliaValue(room.property_type)}"`,
+              filters: `${excludeFilter} AND (is_guest_favorite:true OR is_luxe:true)`,
               aroundLatLng: hasGeo ? `${roomLat}, ${roomLng}` : undefined,
-              aroundRadius: hasGeo ? 100000 : undefined,
+              aroundRadius: hasGeo ? 120000 : undefined,
             },
-          });
-        }
+          },
+        ];
 
-        // Query 2: Same location (text search on location field)
-        if (room.location) {
-          queries.push({
-            indexName,
-            query: room.location,
-            params: {
-              hitsPerPage: MAX_RECOMMENDATIONS,
-              filters: exclude,
-              restrictSearchableAttributes: ["location"],
-            },
-          });
-        }
-
-        // Query 3: Nearby (geo only, broad)
-        if (hasGeo) {
-          queries.push({
+        const toAnyRoomFallbackQuery = (excludeFilter) => [
+          {
             indexName,
             query: "",
             params: {
-              hitsPerPage: MAX_RECOMMENDATIONS,
-              filters: exclude,
-              aroundLatLng: `${roomLat}, ${roomLng}`,
-              aroundRadius: 80000,
+              hitsPerPage: Math.max(MIN_RECOMMENDATIONS, MAX_RECOMMENDATIONS),
+              filters: excludeFilter,
             },
-          });
-        }
-
-        // Query 4: Broad fallback (no type/geo filter, just exclude current room)
-        queries.push({
-          indexName,
-          query: room.title || "",
-          params: {
-            hitsPerPage: MAX_RECOMMENDATIONS,
-            filters: exclude,
           },
-        });
+        ];
 
-        const response = await searchClient.search(queries);
-        const allResults = (response?.results || []).flatMap((r) => r.hits || []);
+        const collectUniqueHits = async (queries, store, seen) => {
+          if (!queries.length || store.length >= MAX_RECOMMENDATIONS) return;
+          const response = await searchClient.search(queries);
+          const hits = (response?.results || []).flatMap((r) => r.hits || []);
+          for (const hit of hits) {
+            if (!hit.objectID || hit.objectID === room.id || seen.has(hit.objectID)) continue;
+            seen.add(hit.objectID);
+            store.push(hit);
+            if (store.length >= MAX_RECOMMENDATIONS) break;
+          }
+        };
 
-        // Deduplicate by objectID, keep first occurrence (higher-priority query wins)
         const seen = new Set();
         const uniqueHits = [];
-        for (const hit of allResults) {
-          if (!hit.objectID || hit.objectID === room.id || seen.has(hit.objectID)) continue;
-          seen.add(hit.objectID);
-          uniqueHits.push(hit);
-          if (uniqueHits.length >= MAX_RECOMMENDATIONS) break;
+
+        // Pass 1: strict (respect selected date)
+        await collectUniqueHits(toPrimaryQueries(buildExcludeFilter(true)), uniqueHits, seen);
+
+        // Pass 2: still strict, but standout homes
+        if (uniqueHits.length < MIN_RECOMMENDATIONS) {
+          await collectUniqueHits(toStandoutQueries(buildExcludeFilter(true)), uniqueHits, seen);
+        }
+
+        // Pass 3: relax date filter for availability-starved cases
+        if (uniqueHits.length < MIN_RECOMMENDATIONS) {
+          await collectUniqueHits(toPrimaryQueries(buildExcludeFilter(false)), uniqueHits, seen);
+        }
+
+        // Pass 4: final fallback to standout stays without date filter
+        if (uniqueHits.length < MIN_RECOMMENDATIONS) {
+          await collectUniqueHits(toStandoutQueries(buildExcludeFilter(false)), uniqueHits, seen);
+        }
+
+        // Pass 5: absolute fallback - any rooms except current
+        if (uniqueHits.length < MIN_RECOMMENDATIONS) {
+          await collectUniqueHits(toAnyRoomFallbackQuery(baseFilter), uniqueHits, seen);
         }
 
         const withReasons = uniqueHits.map((hit) => ({
