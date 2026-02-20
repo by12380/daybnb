@@ -120,7 +120,7 @@ const RoomCard = React.memo(function RoomCard({
         </div>
 
         {offer ? (() => {
-          const original = room.price_per_day || room.price_per_hour || 0;
+          const original = room.price_per_day || 0;
           const discounted = offer.discount_type === "percentage"
             ? original * (1 - offer.discount_value / 100)
             : Math.max(0, original - offer.discount_value);
@@ -129,7 +129,7 @@ const RoomCard = React.memo(function RoomCard({
               <p className="text-lg font-semibold text-brand-700 dark:text-brand-400">
                 {formatPrice(Math.round(discounted * 100) / 100)}
                 <span className="text-xs font-normal text-muted dark:text-dark-muted">
-                  /{room.price_per_day ? "day" : "hour"}
+                  /day
                 </span>
               </p>
               <span className="text-sm text-muted line-through dark:text-dark-muted">{formatPrice(original)}</span>
@@ -137,9 +137,9 @@ const RoomCard = React.memo(function RoomCard({
           );
         })() : (
           <p className="text-lg font-semibold text-brand-700 dark:text-brand-400">
-            {formatPrice(room.price_per_day || room.price_per_hour || 0)}
+            {formatPrice(room.price_per_day || 0)}
             <span className="text-xs font-normal text-muted dark:text-dark-muted">
-              /{room.price_per_day ? "day" : "hour"}
+              /day
             </span>
           </p>
         )}

@@ -86,7 +86,7 @@ const EditBookingModal = React.memo(({ open, booking, room, onClose, onSave }) =
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  const pricePerDay = booking?.price_per_day ?? room?.price_per_day ?? room?.price_per_hour ?? 0;
+  const pricePerDay = booking?.price_per_day ?? room?.price_per_day ?? 0;
   const totalPrice = booking?.total_price ?? pricePerDay;
 
   useEffect(() => {

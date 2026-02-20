@@ -26,7 +26,6 @@ interface RoomRecord {
   image?: string;
   tags?: string[];
   price_per_day?: number;
-  price_per_hour?: number;
   description?: string;
   latitude?: number;
   longitude?: number;
@@ -55,7 +54,6 @@ interface AlgoliaRecord {
   image?: string;
   tags?: string[];
   price_per_day: number;
-  price_per_hour: number;
   description?: string;
   booked_dates?: string[];
   property_type?: string;
@@ -100,8 +98,7 @@ function transformToAlgoliaRecord(
     type: room.type,
     image: room.image,
     tags: room.tags || [],
-    price_per_day: room.price_per_day ?? room.price_per_hour ?? 0,
-    price_per_hour: room.price_per_hour || 0,
+    price_per_day: room.price_per_day ?? 0,
     description: room.description,
     booked_dates: bookedDates,
     property_type: room.property_type || "house",
@@ -346,7 +343,6 @@ serve(async (req) => {
           attributesForFaceting: [
             "filterOnly(booked_dates)",
             "filterOnly(price_per_day)",
-            "filterOnly(price_per_hour)",
             "filterOnly(guests)",
             "searchable(type)",
             "searchable(tags)",
@@ -364,7 +360,7 @@ serve(async (req) => {
             "searchable(amenities)",
             "searchable(safety_features)",
           ],
-          customRanking: ["desc(price_per_day)", "desc(price_per_hour)"],
+          customRanking: ["desc(price_per_day)"],
           hitsPerPage: 20,
           attributesToHighlight: ["title", "location", "description"],
           attributesToSnippet: ["description:50"],

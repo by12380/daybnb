@@ -206,9 +206,9 @@ function SearchResultCard({ hit, onBook, liked, onToggleLike, availability }) {
         )}
 
         <p className="text-lg font-semibold text-brand-700 dark:text-brand-400">
-          {formatPrice(hit.price_per_day || hit.price_per_hour || 0)}
+          {formatPrice(hit.price_per_day || 0)}
           <span className="text-xs font-normal text-muted dark:text-dark-muted">
-            /{hit.price_per_day ? "day" : "hour"}
+            /day
           </span>
         </p>
 
@@ -535,8 +535,8 @@ function SearchResults({ selectedDate }) {
 
     const copy = [...items];
     copy.sort((a, b) => {
-      const priceA = a.price_per_day ?? a.price_per_hour ?? 0;
-      const priceB = b.price_per_day ?? b.price_per_hour ?? 0;
+      const priceA = a.price_per_day ?? 0;
+      const priceB = b.price_per_day ?? 0;
       return sortOrder === "asc" ? priceA - priceB : priceB - priceA;
     });
     return copy;
