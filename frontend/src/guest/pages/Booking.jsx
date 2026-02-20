@@ -32,6 +32,8 @@ import {
 import { fetchOfferForRoom, clearRoomOffer } from "../../redux/slices/offerSlice.js";
 import AvailabilityCalendar from "../components/AvailabilityCalendar.jsx";
 import { useWelcomeOffer } from "../../hooks/useWelcomeOffer.js";
+import { useRecommendations } from "../../hooks/useRecommendations.js";
+import RoomCard from "../components/RoomCard.jsx";
 
 const FALLBACK_IMAGE =
   "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=60";
@@ -80,6 +82,8 @@ const Booking = React.memo(() => {
     discountPercent: welcomeDiscountPercent,
     refetch: refetchWelcomeOffer,
   } = useWelcomeOffer();
+
+  const { recommendations, loading: recsLoading } = useRecommendations(roomId, room);
 
   // Review form state
   const [reviewRating, setReviewRating] = useState(0);
@@ -136,7 +140,7 @@ const Booking = React.memo(() => {
 
   const tags = useMemo(() => normalizeTags(room?.tags, room?.type), [room?.tags, room?.type]);
 
-  const pricePerDay = room?.price_per_day ?? room?.price_per_hour ?? 0;
+  const pricePerDay = room?.price_per_day ?? 0;
   const originalTotalPrice = pricePerDay;
 
   // Calculate room-offer discount (admin/owner offers)
@@ -599,6 +603,66 @@ const Booking = React.memo(() => {
           </div>
         </div>
       </Card>
+
+      {/* Recommendations Section */}
+      {(recsLoading || recommendations.length > 0) && (
+        <div className="md:col-span-5">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-50 dark:bg-brand-900/30">
+              <svg className="h-5 w-5 text-brand-600 dark:text-brand-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-lg font-semibold text-ink dark:text-dark-ink">You might also like</p>
+              <p className="text-sm text-muted dark:text-dark-muted">Similar places near {room.location}</p>
+            </div>
+          </div>
+
+          {recsLoading ? (
+            <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {[1, 2, 3].map((i) => (
+                <Card key={i} className="animate-pulse overflow-hidden p-0">
+                  <div className="h-48 bg-surface dark:bg-dark-surface" />
+                  <div className="space-y-3 p-4">
+                    <div className="h-4 w-3/4 rounded bg-surface dark:bg-dark-surface" />
+                    <div className="h-3 w-1/2 rounded bg-surface dark:bg-dark-surface" />
+                    <div className="h-6 w-1/3 rounded bg-surface dark:bg-dark-surface" />
+                    <div className="h-10 rounded bg-surface dark:bg-dark-surface" />
+                  </div>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {recommendations.map((hit) => (
+                <RoomCard
+                  key={hit.objectID}
+                  room={{
+                    id: hit.objectID,
+                    title: hit.title,
+                    location: hit.location,
+                    image: hit.image,
+                    price_per_day: hit.price_per_day,
+                    guests: hit.guests,
+                    type: hit.type,
+                    tags: hit.tags,
+                    amenities: hit.amenities,
+                    bedrooms: hit.bedrooms,
+                    beds: hit.beds,
+                    bathrooms: hit.bathrooms,
+                    instant_book: hit.instant_book,
+                    allows_pets: hit.allows_pets,
+                    is_guest_favorite: hit.is_guest_favorite,
+                    is_luxe: hit.is_luxe,
+                  }}
+                  showLike={false}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 });
