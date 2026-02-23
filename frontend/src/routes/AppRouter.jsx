@@ -24,6 +24,7 @@ import AdminRooms from "../admin/pages/Rooms.jsx";
 import AdminMessages from "../admin/pages/Messages.jsx";
 import AdminOwners from "../admin/pages/Owners.jsx";
 import AdminOffers from "../admin/pages/Offers.jsx";
+import AdminAlgoliaSync from "../admin/pages/AlgoliaSync.jsx";
 
 // Owner imports
 import OwnerLayout from "../owner/components/layout/OwnerLayout.jsx";
@@ -74,6 +75,7 @@ export default function AppRouter() {
             <Route path="/admin/chat" element={<AdminChat />} />
             <Route path="/admin/owners" element={<AdminOwners />} />
             <Route path="/admin/offers" element={<AdminOffers />} />
+            <Route path="/admin/algolia" element={<AdminAlgoliaSync />} />
           </Route>
         </Route>
 

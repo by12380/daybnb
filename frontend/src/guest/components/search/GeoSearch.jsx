@@ -1,5 +1,5 @@
-import React, { useCallback, useState } from "react";
-import { InstantSearch, Configure, useSearchBox } from "react-instantsearch";
+import React, { useCallback, useEffect, useState } from "react";
+import { InstantSearch, Configure, useSearchBox, useInstantSearch } from "react-instantsearch";
 import {
   searchClient,
   indexName,
@@ -146,6 +146,33 @@ function TopSearchBar({ onLocationChange, userLocation, searchRadius, onRadiusCh
   );
 }
 
+// ─── Algolia error banner (surfaces filter/config errors) ───
+
+function AlgoliaErrorBanner() {
+  const { error } = useInstantSearch();
+
+  useEffect(() => {
+    if (error) console.error("[Algolia error]", error);
+  }, [error]);
+
+  if (!error) return null;
+
+  const msg = error.message || String(error);
+  const isFacetError = msg.includes("attributesForFaceting") || msg.includes("not valid");
+
+  return (
+    <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm dark:border-red-800 dark:bg-red-900/20">
+      <p className="font-semibold text-red-700 dark:text-red-300">Algolia Search Error</p>
+      <p className="mt-1 text-red-600 dark:text-red-400">{msg}</p>
+      {isFacetError && (
+        <p className="mt-2 text-xs text-red-500 dark:text-red-400">
+          Go to <strong>Admin &rarr; Algolia Sync</strong> and click <strong>"Configure + Sync"</strong> to set up all filterable attributes.
+        </p>
+      )}
+    </div>
+  );
+}
+
 // ─── Main GeoSearch ─────────────────────────────────────────
 
 function GeoSearch({ className = "" }) {
@@ -180,6 +207,8 @@ function GeoSearch({ className = "" }) {
           searchRadius={searchRadius}
           onRadiusChange={handleRadiusChange}
         />
+
+        <AlgoliaErrorBanner />
 
         {/* Filters sidebar + Results */}
         <div className="grid gap-6 lg:grid-cols-[280px_1fr]">

@@ -4,6 +4,8 @@ import { Provider } from "react-redux";
 import store from "./redux/store";
 import App from "./App.jsx";
 import "antd/dist/reset.css";
+import "slick-carousel/slick/slick.css";
+import "slick-carousel/slick/slick-theme.css";
 import "./styles/index.css";
 import "./i18n/index.js";
 

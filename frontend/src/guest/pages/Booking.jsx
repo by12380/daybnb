@@ -30,6 +30,7 @@ import {
   resetStripeSession,
 } from "../../redux/slices/stripeSlice.js";
 import { fetchOfferForRoom, clearRoomOffer } from "../../redux/slices/offerSlice.js";
+import Slider from "react-slick";
 import AvailabilityCalendar from "../components/AvailabilityCalendar.jsx";
 import { useWelcomeOffer } from "../../hooks/useWelcomeOffer.js";
 import { useRecommendations } from "../../hooks/useRecommendations.js";
@@ -606,7 +607,7 @@ const Booking = React.memo(() => {
 
       {/* Recommendations Section */}
       {(recsLoading || recommendations.length > 0) && (
-        <div className="md:col-span-5">
+        <div className="md:col-span-5 rec-slider">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-50 dark:bg-brand-900/30">
               <svg className="h-5 w-5 text-brand-600 dark:text-brand-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -620,7 +621,7 @@ const Booking = React.memo(() => {
           </div>
 
           {recsLoading ? (
-            <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <div className="mt-4 grid grid-cols-3 gap-4">
               {[1, 2, 3].map((i) => (
                 <Card key={i} className="animate-pulse overflow-hidden p-0">
                   <div className="h-48 bg-surface dark:bg-dark-surface" />
@@ -634,31 +635,45 @@ const Booking = React.memo(() => {
               ))}
             </div>
           ) : (
-            <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {recommendations.map((hit) => (
-                <RoomCard
-                  key={hit.objectID}
-                  room={{
-                    id: hit.objectID,
-                    title: hit.title,
-                    location: hit.location,
-                    image: hit.image,
-                    price_per_day: hit.price_per_day,
-                    guests: hit.guests,
-                    type: hit.type,
-                    tags: hit.tags,
-                    amenities: hit.amenities,
-                    bedrooms: hit.bedrooms,
-                    beds: hit.beds,
-                    bathrooms: hit.bathrooms,
-                    instant_book: hit.instant_book,
-                    allows_pets: hit.allows_pets,
-                    is_guest_favorite: hit.is_guest_favorite,
-                    is_luxe: hit.is_luxe,
-                  }}
-                  showLike={false}
-                />
-              ))}
+            <div className="mt-4">
+              <Slider
+                dots={false}
+                infinite={recommendations.length > 3}
+                speed={400}
+                slidesToShow={3}
+                slidesToScroll={1}
+                swipeToSlide
+                responsive={[
+                  { breakpoint: 1024, settings: { slidesToShow: 2 } },
+                  { breakpoint: 640, settings: { slidesToShow: 1, centerMode: true, centerPadding: "24px" } },
+                ]}
+              >
+                {recommendations.map((hit) => (
+                  <div key={hit.objectID} className="px-2">
+                    <RoomCard
+                      room={{
+                        id: hit.objectID,
+                        title: hit.title,
+                        location: hit.location,
+                        image: hit.image,
+                        price_per_day: hit.price_per_day,
+                        guests: hit.guests,
+                        type: hit.type,
+                        tags: hit.tags,
+                        amenities: hit.amenities,
+                        bedrooms: hit.bedrooms,
+                        beds: hit.beds,
+                        bathrooms: hit.bathrooms,
+                        instant_book: hit.instant_book,
+                        allows_pets: hit.allows_pets,
+                        is_guest_favorite: hit.is_guest_favorite,
+                        is_luxe: hit.is_luxe,
+                      }}
+                      showLike={false}
+                    />
+                  </div>
+                ))}
+              </Slider>
             </div>
           )}
         </div>

@@ -177,7 +177,7 @@ const SearchFilters = React.memo(function SearchFilters({
 
   const availableTypes = ["suite", "resort", "villa", "room", "studio"];
 
-  // Build Algolia filters string
+  // Build Algolia filters string — string facet values must be quoted
   const filters = useMemo(() => {
     const parts = [];
 
@@ -186,42 +186,35 @@ const SearchFilters = React.memo(function SearchFilters({
     if (minGuests > 1) parts.push(`guests >= ${minGuests}`);
 
     if (selectedTypes.length > 0) {
-      parts.push(`(${selectedTypes.map((t) => `type:${t}`).join(" OR ")})`);
+      parts.push(`(${selectedTypes.map((t) => `type:"${t}"`).join(" OR ")})`);
     }
 
-    // Property type
     if (selectedPropertyTypes.length > 0) {
-      parts.push(`(${selectedPropertyTypes.map((t) => `property_type:${t}`).join(" OR ")})`);
+      parts.push(`(${selectedPropertyTypes.map((t) => `property_type:"${t}"`).join(" OR ")})`);
     }
 
-    // Place type
     if (placeType && placeType !== "any") {
-      parts.push(`place_type:${placeType}`);
+      parts.push(`place_type:"${placeType}"`);
     }
 
-    // Beds / bathrooms
     if (minBeds > 0) parts.push(`beds >= ${minBeds}`);
     if (minBathrooms > 0) parts.push(`bathrooms >= ${minBathrooms}`);
 
-    // Booking options
     if (instantBook) parts.push(`instant_book:true`);
     if (selfCheckin) parts.push(`self_checkin:true`);
     if (allowsPets) parts.push(`allows_pets:true`);
 
-    // Standout stays
     if (guestFavorite) parts.push(`is_guest_favorite:true`);
     if (luxe) parts.push(`is_luxe:true`);
 
-    // Amenities
-    selectedAmenities.forEach((a) => parts.push(`amenities:${a}`));
+    selectedAmenities.forEach((a) => parts.push(`amenities:"${a}"`));
+    selectedSafety.forEach((s) => parts.push(`safety_features:"${s}"`));
 
-    // Safety
-    selectedSafety.forEach((s) => parts.push(`safety_features:${s}`));
+    if (selectedDate) parts.push(`NOT booked_dates:"${selectedDate}"`);
 
-    // Date availability
-    if (selectedDate) parts.push(`NOT booked_dates:${selectedDate}`);
-
-    return parts.join(" AND ");
+    const result = parts.join(" AND ");
+    if (result) console.log("[Algolia filters]", result);
+    return result;
   }, [
     minPrice, maxPrice, minGuests, selectedTypes, selectedPropertyTypes,
     placeType, minBeds, minBathrooms, instantBook, selfCheckin, allowsPets,
