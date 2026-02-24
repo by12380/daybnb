@@ -544,7 +544,7 @@ function SearchResults({ selectedDate }) {
 
   const handleBook = useCallback(
     (hit) => {
-      navigate(`/book/${hit.objectID}`);
+      navigate(`/rooms/${hit.objectID}`);
     },
     [navigate]
   );

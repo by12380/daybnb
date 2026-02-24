@@ -6,6 +6,7 @@ import Landing from "../guest/pages/Landing.jsx";
 import ContactUs from "../guest/pages/ContactUs.jsx";
 import Auth from "../pages/Auth.jsx";
 import Booking from "../guest/pages/Booking.jsx";
+import RoomDetails from "../guest/pages/RoomDetails.jsx";
 import Profile from "../guest/pages/Profile.jsx";
 import MyBookings from "../guest/pages/MyBookings.jsx";
 import LikedRooms from "../guest/pages/LikedRooms.jsx";
@@ -50,6 +51,7 @@ export default function AppRouter() {
         <Route element={<GuestLayout />}>
           <Route path="/" element={<Landing />} />
           <Route path="/contact" element={<ContactUs />} />
+          <Route path="/rooms/:roomId" element={<RoomDetails />} />
           <Route path="/auth" element={<Auth />} />
           <Route element={<RequireAuth />}>
             <Route path="/book/:roomId" element={<Booking />} />
