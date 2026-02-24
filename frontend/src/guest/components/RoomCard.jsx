@@ -160,8 +160,8 @@ const RoomCard = React.memo(function RoomCard({
           </div>
         ) : null}
 
-        <Button onClick={() => navigate(`/book/${room.id}`)} className="mt-2 w-full">
-          Book Now
+        <Button onClick={() => navigate(`/room/${room.id}`)} className="mt-2 w-full">
+          View Details
         </Button>
       </div>
     </Card>
