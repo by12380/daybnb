@@ -18,6 +18,7 @@ const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") as string;
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 interface RoomRecord {
+  [key: string]: unknown;
   id: string;
   title: string;
   location: string;
@@ -25,15 +26,16 @@ interface RoomRecord {
   type?: string;
   image?: string;
   tags?: string[];
-  price_per_day?: number;
+  price_per_day?: number | string;
   description?: string;
-  latitude?: number;
-  longitude?: number;
+  latitude?: number | string;
+  longitude?: number | string;
+  owner_id?: string | null;
   property_type?: string;
   place_type?: string;
-  bedrooms?: number;
-  beds?: number;
-  bathrooms?: number;
+  bedrooms?: number | string;
+  beds?: number | string;
+  bathrooms?: number | string;
   instant_book?: boolean;
   self_checkin?: boolean;
   allows_pets?: boolean;
@@ -46,7 +48,9 @@ interface RoomRecord {
 }
 
 interface AlgoliaRecord {
+  [key: string]: unknown;
   objectID: string;
+  id: string;
   title: string;
   location: string;
   guests: number;
@@ -55,7 +59,10 @@ interface AlgoliaRecord {
   tags?: string[];
   price_per_day: number;
   description?: string;
+  owner_id?: string | null;
   booked_dates?: string[];
+  latitude?: number;
+  longitude?: number;
   property_type?: string;
   place_type?: string;
   bedrooms?: number;
@@ -74,6 +81,8 @@ interface AlgoliaRecord {
   };
   created_at?: string;
   updated_at?: string;
+  created_at_ts?: number;
+  updated_at_ts?: number;
 }
 
 interface BookingRecord {
@@ -85,47 +94,135 @@ interface BookingRecord {
 
 const ACTIVE_BOOKING_STATUSES = ["pending", "approved", "confirmed"];
 
+function toNumber(value: unknown): number | undefined {
+  if (value === null || value === undefined || value === "") return undefined;
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function toInteger(value: unknown, fallback: number): number {
+  const parsed = toNumber(value);
+  if (parsed === undefined) return fallback;
+  return Math.trunc(parsed);
+}
+
+function toBoolean(value: unknown, fallback = false): boolean {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "true") return true;
+    if (normalized === "false") return false;
+  }
+  if (typeof value === "number") return value !== 0;
+  return fallback;
+}
+
+function normalizeStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((entry): entry is string => typeof entry === "string");
+}
+
+function normalizeFacetToken(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const normalized = value
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
+  return normalized || undefined;
+}
+
+function normalizeFacetArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return Array.from(
+    new Set(
+      value
+        .map((entry) => normalizeFacetToken(entry))
+        .filter((entry): entry is string => Boolean(entry))
+    )
+  );
+}
+
+function normalizePlaceType(value: unknown): string {
+  const normalized = normalizeFacetToken(value);
+  if (!normalized) return "entire_home";
+
+  if (["room", "private_room", "shared_room"].includes(normalized)) {
+    return "room";
+  }
+
+  if (
+    [
+      "entire_home",
+      "entirehome",
+      "entire_place",
+      "entireplace",
+      "home",
+    ].includes(normalized)
+  ) {
+    return "entire_home";
+  }
+
+  return normalized;
+}
+
+function toIsoDate(value: unknown): string | undefined {
+  if (typeof value !== "string" || !value.trim()) return undefined;
+  const parsedMs = Date.parse(value);
+  if (Number.isNaN(parsedMs)) return value;
+  return new Date(parsedMs).toISOString();
+}
+
 // Transform Supabase room record to Algolia record
 function transformToAlgoliaRecord(
   room: RoomRecord,
   bookedDates: string[] = []
 ): AlgoliaRecord {
+  const latitude = toNumber(room.latitude);
+  const longitude = toNumber(room.longitude);
+  const pricePerDay = toNumber(room.price_per_day) ?? 0;
+  const createdAt = toIsoDate(room.created_at);
+  const updatedAt = toIsoDate(room.updated_at);
+  const createdAtTs = createdAt ? Date.parse(createdAt) : NaN;
+  const updatedAtTs = updatedAt ? Date.parse(updatedAt) : NaN;
+
   const record: AlgoliaRecord = {
+    ...(room as Record<string, unknown>),
     objectID: room.id,
+    id: room.id,
     title: room.title,
     location: room.location,
-    guests: room.guests,
-    type: room.type,
+    guests: toInteger(room.guests, 0),
+    type: normalizeFacetToken(room.type),
     image: room.image,
-    tags: room.tags || [],
-    price_per_day: room.price_per_day ?? 0,
+    tags: normalizeStringArray(room.tags),
+    price_per_day: pricePerDay,
     description: room.description,
+    owner_id: room.owner_id ?? null,
     booked_dates: bookedDates,
-    property_type: room.property_type || "house",
-    place_type: room.place_type || "entire_home",
-    bedrooms: room.bedrooms ?? 1,
-    beds: room.beds ?? 1,
-    bathrooms: room.bathrooms ?? 1,
-    instant_book: room.instant_book ?? false,
-    self_checkin: room.self_checkin ?? false,
-    allows_pets: room.allows_pets ?? false,
-    is_guest_favorite: room.is_guest_favorite ?? false,
-    is_luxe: room.is_luxe ?? false,
-    amenities: room.amenities || [],
-    safety_features: room.safety_features || [],
-    created_at: room.created_at,
-    updated_at: room.updated_at,
+    latitude,
+    longitude,
+    property_type: normalizeFacetToken(room.property_type) || "house",
+    place_type: normalizePlaceType(room.place_type),
+    bedrooms: toInteger(room.bedrooms, 1),
+    beds: toInteger(room.beds, 1),
+    bathrooms: toInteger(room.bathrooms, 1),
+    instant_book: toBoolean(room.instant_book, false),
+    self_checkin: toBoolean(room.self_checkin, false),
+    allows_pets: toBoolean(room.allows_pets, false),
+    is_guest_favorite: toBoolean(room.is_guest_favorite, false),
+    is_luxe: toBoolean(room.is_luxe, false),
+    amenities: normalizeFacetArray(room.amenities),
+    safety_features: normalizeFacetArray(room.safety_features),
+    created_at: createdAt,
+    updated_at: updatedAt,
+    created_at_ts: Number.isFinite(createdAtTs) ? createdAtTs : undefined,
+    updated_at_ts: Number.isFinite(updatedAtTs) ? updatedAtTs : undefined,
   };
 
-  if (
-    room.latitude !== undefined &&
-    room.latitude !== null &&
-    room.longitude !== undefined &&
-    room.longitude !== null
-  ) {
+  if (latitude !== undefined && longitude !== undefined) {
     record._geoloc = {
-      lat: room.latitude,
-      lng: room.longitude,
+      lat: latitude,
+      lng: longitude,
     };
   }
 
@@ -342,8 +439,19 @@ serve(async (req) => {
           ],
           attributesForFaceting: [
             "filterOnly(booked_dates)",
+            "filterOnly(id)",
+            "filterOnly(owner_id)",
+            "searchable(title)",
+            "searchable(description)",
+            "filterOnly(image)",
             "filterOnly(price_per_day)",
             "filterOnly(guests)",
+            "filterOnly(latitude)",
+            "filterOnly(longitude)",
+            "filterOnly(created_at)",
+            "filterOnly(updated_at)",
+            "filterOnly(created_at_ts)",
+            "filterOnly(updated_at_ts)",
             "searchable(type)",
             "searchable(tags)",
             "searchable(location)",
