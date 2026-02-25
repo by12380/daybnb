@@ -86,6 +86,59 @@ exports.createCheckoutSession = asyncHandler(async (req, res) => {
 });
 
 /**
+ * POST /api/stripe/verify-session
+ * Verify a completed checkout session with Stripe and update the booking.
+ * Called by the PaymentSuccess page so we don't rely solely on webhooks.
+ */
+exports.verifySession = asyncHandler(async (req, res) => {
+  if (!stripe) throw ApiError.internal("Stripe is not configured");
+
+  const { sessionId, bookingId } = req.body;
+  if (!sessionId) throw ApiError.badRequest("sessionId is required");
+
+  const session = await stripe.checkout.sessions.retrieve(sessionId);
+
+  if (session.payment_status !== "paid") {
+    return res.json({
+      verified: false,
+      paymentStatus: session.payment_status,
+    });
+  }
+
+  const resolvedBookingId =
+    bookingId || session.metadata?.booking_id || session.client_reference_id;
+
+  if (resolvedBookingId && supabaseAdmin) {
+    const { data: existing } = await supabaseAdmin
+      .from("bookings")
+      .select("payment_status")
+      .eq("id", resolvedBookingId)
+      .single();
+
+    if (existing && existing.payment_status !== "paid") {
+      await supabaseAdmin
+        .from("bookings")
+        .update({
+          payment_status: "paid",
+          stripe_session_id: session.id,
+          stripe_payment_intent_id: session.payment_intent,
+          paid_at: new Date().toISOString(),
+          status: "confirmed",
+        })
+        .eq("id", resolvedBookingId);
+
+      console.log(`Booking ${resolvedBookingId} verified and marked as paid`);
+    }
+  }
+
+  res.json({
+    verified: true,
+    paymentStatus: "paid",
+    bookingId: resolvedBookingId,
+  });
+});
+
+/**
  * POST /api/stripe/webhook
  * Handle Stripe webhook events.
  * NOTE: This route needs the raw body (not JSON parsed).

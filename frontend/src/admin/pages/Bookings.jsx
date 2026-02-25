@@ -39,6 +39,17 @@ function getBookingStatusInfo(booking) {
   return { color: "bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400", text: "Upcoming" };
 }
 
+function getPaymentStatusInfo(booking) {
+  const status = booking.payment_status || "pending";
+  const method = booking.payment_method || "online";
+
+  if (status === "paid") return { color: "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400", text: "Paid", icon: "check" };
+  if (status === "failed") return { color: "bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400", text: "Failed", icon: "x" };
+  if (status === "expired") return { color: "bg-gray-50 text-gray-500 dark:bg-gray-900/30 dark:text-gray-400", text: "Expired", icon: "clock" };
+  if (method === "cash") return { color: "bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400", text: "Pay at Property", icon: "cash" };
+  return { color: "bg-orange-50 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400", text: "Pending", icon: "pending" };
+}
+
 const ViewBookingModal = React.memo(({ open, booking, room, userProfile, onClose }) => {
   if (!booking) return null;
   const statusInfo = getBookingStatusInfo(booking);
@@ -67,7 +78,50 @@ const ViewBookingModal = React.memo(({ open, booking, room, userProfile, onClose
             <span className="font-medium text-ink">Total Amount</span>
             <span className="text-xl font-bold text-brand-700 dark:text-brand-400">{formatPrice(booking.total_price || 0)}</span>
           </div>
+          {booking.original_price && booking.discount_amount > 0 && (
+            <div className="mt-2 border-t border-brand-100 pt-2 dark:border-brand-800">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted">Original Price</span>
+                <span className="text-muted line-through">{formatPrice(booking.original_price)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-green-600 dark:text-green-400">Discount ({booking.discount_applied || "offer"})</span>
+                <span className="text-green-600 dark:text-green-400">-{formatPrice(booking.discount_amount)}</span>
+              </div>
+            </div>
+          )}
         </div>
+        {/* Payment Info */}
+        {(() => {
+          const pi = getPaymentStatusInfo(booking);
+          return (
+            <div className="rounded-xl border border-border bg-surface/50 p-4 dark:border-dark-border dark:bg-dark-surface/50">
+              <p className="text-sm font-semibold text-ink dark:text-dark-ink">Payment Information</p>
+              <div className="mt-3 space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted">Payment Status</span>
+                  <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${pi.color}`}>{pi.text}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted">Payment Method</span>
+                  <span className="font-medium text-ink">{booking.payment_method === "cash" ? "Pay at Property (Cash)" : "Online (Stripe)"}</span>
+                </div>
+                {booking.paid_at && (
+                  <div className="flex justify-between">
+                    <span className="text-muted">Paid At</span>
+                    <span className="font-medium text-ink">{new Date(booking.paid_at).toLocaleString()}</span>
+                  </div>
+                )}
+                {booking.stripe_session_id && (
+                  <div className="flex justify-between">
+                    <span className="text-muted">Stripe Session</span>
+                    <span className="font-mono text-xs text-muted">{booking.stripe_session_id.slice(0, 20)}...</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
         <div className="border-t border-border pt-4">
           <p className="text-xs text-muted">Booking ID: <span className="font-mono">{booking.id}</span></p>
           <p className="text-xs text-muted">User ID: <span className="font-mono">{booking.user_id}</span></p>
@@ -204,6 +258,7 @@ export default function AdminBookings() {
 
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [paymentFilter, setPaymentFilter] = useState("all");
   const [ownerFilter, setOwnerFilter] = useState("admin"); // "admin" | "all" | owner_id
   const [owners, setOwners] = useState([]);
   const [viewingBooking, setViewingBooking] = useState(null);
@@ -247,6 +302,18 @@ export default function AdminBookings() {
       if (statusFilter === "rejected" && booking.status !== "rejected") return false;
       if (statusFilter === "upcoming") { if (booking.booking_date < today || booking.status === "rejected") return false; }
       if (statusFilter === "completed") { if (booking.booking_date >= today || booking.status === "rejected" || booking.status === "pending") return false; }
+
+      // Payment filter
+      if (paymentFilter !== "all") {
+        const ps = booking.payment_status || "pending";
+        const pm = booking.payment_method || "online";
+        if (paymentFilter === "paid" && ps !== "paid") return false;
+        if (paymentFilter === "pending" && (ps !== "pending" || pm === "cash")) return false;
+        if (paymentFilter === "cash" && pm !== "cash") return false;
+        if (paymentFilter === "failed" && ps !== "failed") return false;
+        if (paymentFilter === "expired" && ps !== "expired") return false;
+      }
+
       if (searchTerm) {
         const search = searchTerm.toLowerCase();
         const room = roomsMap[booking.room_id];
@@ -258,7 +325,7 @@ export default function AdminBookings() {
       }
       return true;
     });
-  }, [bookings, roomsMap, usersMap, searchTerm, statusFilter, ownerFilter, user?.id]);
+  }, [bookings, roomsMap, usersMap, searchTerm, statusFilter, paymentFilter, ownerFilter, user?.id]);
 
   const pendingCount = useMemo(() => filteredBookings.filter((b) => b.status === "pending").length, [filteredBookings]);
 
@@ -307,22 +374,30 @@ export default function AdminBookings() {
       <div className="flex flex-col gap-4 sm:flex-row">
         <div className="flex-1"><input type="text" placeholder="Search by room, guest name, email..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className={`${INPUT_STYLES} w-full`} /></div>
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={INPUT_STYLES}>
-          <option value="all">All Bookings</option>
+          <option value="all">All Statuses</option>
           <option value="pending">Pending Approval</option>
           <option value="approved">Approved</option>
           <option value="rejected">Rejected</option>
           <option value="upcoming">Upcoming</option>
           <option value="completed">Completed</option>
         </select>
+        <select value={paymentFilter} onChange={(e) => setPaymentFilter(e.target.value)} className={INPUT_STYLES}>
+          <option value="all">All Payments</option>
+          <option value="paid">Paid</option>
+          <option value="pending">Payment Pending</option>
+          <option value="cash">Pay at Property</option>
+          <option value="failed">Failed</option>
+          <option value="expired">Expired</option>
+        </select>
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-border bg-panel shadow-sm">
         {filteredBookings.length === 0 ? (
-          <div className="py-12 text-center"><p className="mt-4 text-sm font-medium text-ink">No bookings found</p><p className="mt-1 text-sm text-muted">{searchTerm || statusFilter !== "all" || ownerFilter !== "all" ? "Try adjusting your filters" : "Bookings will appear here when guests make reservations"}</p></div>
+          <div className="py-12 text-center"><p className="mt-4 text-sm font-medium text-ink">No bookings found</p><p className="mt-1 text-sm text-muted">{searchTerm || statusFilter !== "all" || paymentFilter !== "all" || ownerFilter !== "all" ? "Try adjusting your filters" : "Bookings will appear here when guests make reservations"}</p></div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead><tr className="border-b border-border bg-surface/60 text-left text-xs font-medium uppercase tracking-wider text-muted"><th className="px-6 py-3">Room</th><th className="px-6 py-3">Guest</th><th className="px-6 py-3">Date</th><th className="px-6 py-3">Status</th><th className="px-6 py-3">Amount</th><th className="px-6 py-3 text-right">Actions</th></tr></thead>
+              <thead><tr className="border-b border-border bg-surface/60 text-left text-xs font-medium uppercase tracking-wider text-muted"><th className="px-6 py-3">Room</th><th className="px-6 py-3">Guest</th><th className="px-6 py-3">Date</th><th className="px-6 py-3">Status</th><th className="px-6 py-3">Payment</th><th className="px-6 py-3">Amount</th><th className="px-6 py-3 text-right">Actions</th></tr></thead>
               <tbody>
                 {filteredBookings.map((booking) => {
                   const room = roomsMap[booking.room_id];
@@ -330,12 +405,27 @@ export default function AdminBookings() {
                   const statusInfo = getBookingStatusInfo(booking);
                   const isPending = booking.status === "pending";
 
+                  const paymentInfo = getPaymentStatusInfo(booking);
+
                   return (
                     <tr key={booking.id} className="border-b border-border last:border-0 hover:bg-surface/60">
                       <td className="px-6 py-4"><div className="flex items-center gap-3">{room?.image && <img src={room.image} alt={room?.title} className="h-10 w-10 rounded-lg object-cover" />}<div><p className="font-medium text-ink">{room?.title || "Unknown"}</p><p className="text-xs text-muted">{room?.location || "N/A"}</p></div></div></td>
                       <td className="px-6 py-4"><p className="text-sm font-medium text-ink">{booking.user_full_name || profile?.full_name || "Guest"}</p><p className="text-xs text-muted">{profile?.email || booking.user_email || "N/A"}</p></td>
                       <td className="px-6 py-4"><p className="text-sm text-ink">{formatDate(booking.booking_date)}</p></td>
                       <td className="px-6 py-4"><span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${statusInfo.color}`}>{statusInfo.text}</span></td>
+                      <td className="px-6 py-4">
+                        <div className="flex flex-col gap-1">
+                          <span className={`inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${paymentInfo.color}`}>
+                            {paymentInfo.icon === "check" && <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>}
+                            {paymentInfo.icon === "x" && <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>}
+                            {paymentInfo.icon === "clock" && <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+                            {paymentInfo.icon === "cash" && <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" /></svg>}
+                            {paymentInfo.icon === "pending" && <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+                            {paymentInfo.text}
+                          </span>
+                          <span className="text-[10px] text-muted">{booking.payment_method === "cash" ? "Cash" : "Stripe"}</span>
+                        </div>
+                      </td>
                       <td className="px-6 py-4"><span className="font-medium text-ink">{formatPrice(booking.total_price || 0)}</span></td>
                       <td className="px-6 py-4">
                         <div className="flex justify-end gap-2">

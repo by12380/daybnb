@@ -17,6 +17,10 @@ import {
   clearBookedDates,
 } from "../../redux/slices/bookingSlice.js";
 import { fetchRooms } from "../../redux/slices/roomSlice.js";
+import {
+  createCheckoutSession,
+  clearStripeError,
+} from "../../redux/slices/stripeSlice.js";
 
 function formatDate(dateStr) {
   if (!dateStr) return "N/A";
@@ -49,9 +53,12 @@ function getBookingStatusInfo(booking) {
   return { color: "text-green-700 dark:text-green-400", bg: "bg-green-50 dark:bg-green-900/30", border: "border-green-200 dark:border-green-700", text: "Upcoming", canModify: true };
 }
 
-const BookingCard = React.memo(({ booking, room, onEdit, onCancel, isHighlighted }) => {
+const BookingCard = React.memo(({ booking, room, onEdit, onCancel, onPayNow, payingBookingId, isHighlighted }) => {
   const statusInfo = getBookingStatusInfo(booking);
   const isPast = new Date(booking.booking_date) < new Date(new Date().toDateString());
+  const isPaid = booking.payment_status === "paid";
+  const canPayOnline = !isPaid && !isPast && booking.status !== "rejected" && booking.total_price > 0;
+  const isPayingThis = payingBookingId === booking.id;
 
   return (
     <Card className={`transition-all ${isHighlighted ? "ring-2 ring-brand-500 ring-offset-2" : ""}`}>
@@ -65,13 +72,29 @@ const BookingCard = React.memo(({ booking, room, onEdit, onCancel, isHighlighted
             />
           )}
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <h3 className="text-lg font-semibold text-ink dark:text-dark-ink">
                 {room?.title || "Room"}
               </h3>
               <span className={`rounded-full border px-2 py-0.5 text-xs font-medium ${statusInfo.bg} ${statusInfo.color} ${statusInfo.border}`}>
                 {statusInfo.text}
               </span>
+              {isPaid ? (
+                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:border-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                  <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                  Paid
+                </span>
+              ) : booking.payment_method === "cash" && !isPast && booking.status !== "rejected" ? (
+                <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                  <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                  Pay at Property
+                </span>
+              ) : !isPaid && booking.payment_status === "pending" && booking.payment_method !== "cash" && !isPast && booking.status !== "rejected" ? (
+                <span className="inline-flex items-center gap-1 rounded-full border border-orange-200 bg-orange-50 px-2 py-0.5 text-xs font-medium text-orange-600 dark:border-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
+                  <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                  Payment Pending
+                </span>
+              ) : null}
             </div>
             <p className="mt-1 text-sm text-muted dark:text-dark-muted">{room?.location || "Location unavailable"}</p>
             <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm">
@@ -98,25 +121,44 @@ const BookingCard = React.memo(({ booking, room, onEdit, onCancel, isHighlighted
             )}
           </div>
         </div>
-        {statusInfo.canModify && !isPast && (
-          <div className="flex gap-2 sm:flex-col">
-            <Button variant="outline" onClick={() => onEdit(booking)}>
-              Edit
-            </Button>
+        <div className="flex gap-2 sm:flex-col">
+          {canPayOnline && (
             <Button
-              variant="outline"
-              className="!border-red-200 !text-red-600 hover:!border-red-400 hover:!bg-red-50 dark:!border-red-700 dark:!text-red-400 dark:hover:!border-red-600 dark:hover:!bg-red-900/30"
-              onClick={() => onCancel(booking)}
+              onClick={() => onPayNow(booking)}
+              disabled={isPayingThis}
+              className="!bg-emerald-600 hover:!bg-emerald-700"
             >
-              Cancel
+              {isPayingThis ? (
+                <span className="flex items-center gap-2">
+                  <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                  Redirecting...
+                </span>
+              ) : (
+                <span className="flex items-center gap-1.5">
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
+                  Pay {formatPrice(booking.total_price)} Now
+                </span>
+              )}
             </Button>
-          </div>
-        )}
-        {booking.status === "rejected" && (
-          <div className="flex items-center">
+          )}
+          {statusInfo.canModify && !isPast && (
+            <>
+              <Button variant="outline" onClick={() => onEdit(booking)}>
+                Edit
+              </Button>
+              <Button
+                variant="outline"
+                className="!border-red-200 !text-red-600 hover:!border-red-400 hover:!bg-red-50 dark:!border-red-700 dark:!text-red-400 dark:hover:!border-red-600 dark:hover:!bg-red-900/30"
+                onClick={() => onCancel(booking)}
+              >
+                Cancel
+              </Button>
+            </>
+          )}
+          {booking.status === "rejected" && (
             <span className="text-xs text-red-500 dark:text-red-400">This booking was not approved</span>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </Card>
   );
@@ -281,6 +323,8 @@ const MyBookings = React.memo(() => {
 
   const [editingBooking, setEditingBooking] = useState(null);
   const [cancellingBooking, setCancellingBooking] = useState(null);
+  const [payingBookingId, setPayingBookingId] = useState(null);
+  const [payError, setPayError] = useState("");
 
   // Build rooms lookup map
   const roomsMap = React.useMemo(() => {
@@ -299,6 +343,40 @@ const MyBookings = React.memo(() => {
 
   const handleEdit = useCallback((booking) => setEditingBooking(booking), []);
   const handleCancel = useCallback((booking) => setCancellingBooking(booking), []);
+
+  const handlePayNow = useCallback(async (booking) => {
+    setPayError("");
+    setPayingBookingId(booking.id);
+    const room = roomsMap[booking.room_id];
+    try {
+      const result = await dispatch(
+        createCheckoutSession({
+          bookingId: booking.id,
+          roomTitle: room?.title || "Room Booking",
+          roomId: booking.room_id,
+          totalPrice: booking.total_price,
+          originalPrice: booking.original_price || booking.total_price,
+          discountAmount: booking.discount_amount || 0,
+          discountApplied: booking.discount_applied || null,
+          pricePerDay: booking.price_per_day,
+          bookingDate: booking.booking_date,
+          userEmail: user?.email,
+          userId: user?.id,
+        })
+      ).unwrap();
+
+      if (result?.url) {
+        window.location.href = result.url;
+      } else if (result?.sessionId) {
+        const { getStripe } = await import("../../lib/stripe.js");
+        const stripe = await getStripe();
+        if (stripe) await stripe.redirectToCheckout({ sessionId: result.sessionId });
+      }
+    } catch (err) {
+      setPayError(typeof err === "string" ? err : "Failed to start payment. Please try again.");
+      setPayingBookingId(null);
+    }
+  }, [dispatch, roomsMap, user?.email, user?.id]);
 
   const handleEditSave = useCallback(() => {
     setEditingBooking(null);
@@ -361,6 +439,12 @@ const MyBookings = React.memo(() => {
         <Link to="/"><Button variant="outline">Browse Rooms</Button></Link>
       </div>
 
+      {payError && (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-3 dark:border-red-800 dark:bg-red-900/20">
+          <p className="text-sm font-medium text-red-700 dark:text-red-400">{payError}</p>
+        </div>
+      )}
+
       {bookings.length === 0 ? (
         <Card>
           <div className="py-8 text-center">
@@ -390,7 +474,7 @@ const MyBookings = React.memo(() => {
                 </p>
               </div>
               {pendingBookings.map((booking) => (
-                <BookingCard key={booking.id} booking={booking} room={roomsMap[booking.room_id]} onEdit={handleEdit} onCancel={handleCancel} isHighlighted={booking.id === highlightedBookingId} />
+                <BookingCard key={booking.id} booking={booking} room={roomsMap[booking.room_id]} onEdit={handleEdit} onCancel={handleCancel} onPayNow={handlePayNow} payingBookingId={payingBookingId} isHighlighted={booking.id === highlightedBookingId} />
               ))}
             </div>
           )}
@@ -406,7 +490,7 @@ const MyBookings = React.memo(() => {
                 Approved ({upcomingBookings.length})
               </h2>
               {upcomingBookings.map((booking) => (
-                <BookingCard key={booking.id} booking={booking} room={roomsMap[booking.room_id]} onEdit={handleEdit} onCancel={handleCancel} isHighlighted={booking.id === highlightedBookingId} />
+                <BookingCard key={booking.id} booking={booking} room={roomsMap[booking.room_id]} onEdit={handleEdit} onCancel={handleCancel} onPayNow={handlePayNow} payingBookingId={payingBookingId} isHighlighted={booking.id === highlightedBookingId} />
               ))}
             </div>
           )}
@@ -415,7 +499,7 @@ const MyBookings = React.memo(() => {
             <div className="space-y-4">
               <h2 className="text-sm font-semibold text-ink dark:text-dark-ink">Past ({pastBookings.length})</h2>
               {pastBookings.map((booking) => (
-                <BookingCard key={booking.id} booking={booking} room={roomsMap[booking.room_id]} onEdit={handleEdit} onCancel={handleCancel} isHighlighted={booking.id === highlightedBookingId} />
+                <BookingCard key={booking.id} booking={booking} room={roomsMap[booking.room_id]} onEdit={handleEdit} onCancel={handleCancel} onPayNow={handlePayNow} payingBookingId={payingBookingId} isHighlighted={booking.id === highlightedBookingId} />
               ))}
             </div>
           )}
@@ -431,7 +515,7 @@ const MyBookings = React.memo(() => {
                 Not Approved ({rejectedBookings.length})
               </h2>
               {rejectedBookings.map((booking) => (
-                <BookingCard key={booking.id} booking={booking} room={roomsMap[booking.room_id]} onEdit={handleEdit} onCancel={handleCancel} isHighlighted={booking.id === highlightedBookingId} />
+                <BookingCard key={booking.id} booking={booking} room={roomsMap[booking.room_id]} onEdit={handleEdit} onCancel={handleCancel} onPayNow={handlePayNow} payingBookingId={payingBookingId} isHighlighted={booking.id === highlightedBookingId} />
               ))}
             </div>
           )}
