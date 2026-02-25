@@ -2,12 +2,6 @@ import { useEffect, useState } from "react";
 import { searchClient, indexName, isAlgoliaConfigured } from "../lib/algoliaClient.js";
 
 const MAX_RECOMMENDATIONS = 6;
-const RETRIEVE_FIELDS = [
-  "objectID", "title", "location", "image", "price_per_day", "guests",
-  "type", "tags", "amenities", "bedrooms", "beds", "bathrooms",
-  "instant_book", "allows_pets", "self_checkin", "is_guest_favorite",
-  "is_luxe", "property_type", "place_type",
-];
 
 function q(value) {
   return `"${String(value).replace(/"/g, "")}"`;
@@ -17,42 +11,36 @@ function excludeFilter(roomId) {
   return `NOT objectID:${q(roomId)}`;
 }
 
-function baseParams(roomId) {
+function baseRequest(roomId) {
   return {
+    indexName,
     hitsPerPage: MAX_RECOMMENDATIONS,
     filters: excludeFilter(roomId),
-    attributesToRetrieve: RETRIEVE_FIELDS,
   };
 }
 
-function buildQueries(roomId, room) {
+function buildRequests(roomId, room) {
   const hasGeo = room.latitude != null && room.longitude != null;
   const latLng = hasGeo ? `${room.latitude}, ${room.longitude}` : undefined;
   const exclude = excludeFilter(roomId);
-  const queries = [];
+  const requests = [];
 
   // Tier 1 — nearby + same type (50 km)
   if (hasGeo && room.type) {
-    queries.push({
-      indexName,
-      params: {
-        ...baseParams(roomId),
-        aroundLatLng: latLng,
-        aroundRadius: 50000,
-        filters: `${exclude} AND type:${q(room.type)}`,
-      },
+    requests.push({
+      ...baseRequest(roomId),
+      aroundLatLng: latLng,
+      aroundRadius: 50000,
+      filters: `${exclude} AND type:${q(room.type)}`,
     });
   }
 
   // Tier 2 — nearby any type (200 km)
   if (hasGeo) {
-    queries.push({
-      indexName,
-      params: {
-        ...baseParams(roomId),
-        aroundLatLng: latLng,
-        aroundRadius: 200000,
-      },
+    requests.push({
+      ...baseRequest(roomId),
+      aroundLatLng: latLng,
+      aroundRadius: 200000,
     });
   }
 
@@ -62,42 +50,30 @@ function buildQueries(roomId, room) {
     if (room.type) parts.push(`type:${q(room.type)}`);
     if (room.property_type) parts.push(`property_type:${q(room.property_type)}`);
 
-    queries.push({
-      indexName,
-      params: {
-        ...baseParams(roomId),
-        filters: `${exclude} AND (${parts.join(" OR ")})`,
-      },
+    requests.push({
+      ...baseRequest(roomId),
+      filters: `${exclude} AND (${parts.join(" OR ")})`,
     });
   }
 
   // Tier 4 — location text search
   if (room.location) {
-    queries.push({
-      indexName,
-      params: {
-        ...baseParams(roomId),
-        query: room.location,
-      },
+    requests.push({
+      ...baseRequest(roomId),
+      query: room.location,
     });
   }
 
   // Tier 5 — standout stays (guest favorites / luxe)
-  queries.push({
-    indexName,
-    params: {
-      ...baseParams(roomId),
-      filters: `${exclude} AND (is_guest_favorite:true OR is_luxe:true)`,
-    },
+  requests.push({
+    ...baseRequest(roomId),
+    filters: `${exclude} AND (is_guest_favorite:true OR is_luxe:true)`,
   });
 
-  // Tier 6 — catch-all: any other rooms (guarantees results if index has data)
-  queries.push({
-    indexName,
-    params: baseParams(roomId),
-  });
+  // Tier 6 — catch-all: any other rooms
+  requests.push(baseRequest(roomId));
 
-  return queries;
+  return requests;
 }
 
 function mergeHits(results, max) {
@@ -127,10 +103,10 @@ export function useRecommendations(roomId, room) {
     let cancelled = false;
     setLoading(true);
 
-    const queries = buildQueries(roomId, room);
+    const requests = buildRequests(roomId, room);
 
     searchClient
-      .search(queries)
+      .search({ requests })
       .then((res) => {
         if (!cancelled) {
           setRecommendations(mergeHits(res.results || [], MAX_RECOMMENDATIONS));
