@@ -86,6 +86,75 @@ exports.createCheckoutSession = asyncHandler(async (req, res) => {
 });
 
 /**
+ * POST /api/stripe/verify-checkout-session
+ * Fallback confirmation for successful Stripe redirects.
+ * Useful when webhook delivery is delayed/missed in local testing.
+ */
+exports.verifyCheckoutSession = asyncHandler(async (req, res) => {
+  if (!stripe) throw ApiError.internal("Stripe is not configured");
+  if (!supabaseAdmin) throw ApiError.internal("Supabase is not configured");
+
+  const { sessionId, bookingId } = req.body || {};
+  if (!sessionId) {
+    throw ApiError.badRequest("sessionId is required");
+  }
+
+  const session = await stripe.checkout.sessions.retrieve(sessionId);
+  if (!session) {
+    throw ApiError.notFound("Checkout session not found");
+  }
+
+  const isPaid =
+    session.payment_status === "paid" ||
+    (session.status === "complete" && session.mode === "payment");
+
+  if (!isPaid) {
+    return res.status(202).json({
+      paid: false,
+      paymentStatus: session.payment_status,
+      sessionStatus: session.status,
+    });
+  }
+
+  const resolvedBookingId =
+    session.metadata?.booking_id || session.client_reference_id || bookingId;
+
+  if (!resolvedBookingId) {
+    throw ApiError.badRequest("Unable to resolve bookingId for checkout session");
+  }
+
+  if (bookingId && String(bookingId) !== String(resolvedBookingId)) {
+    throw ApiError.badRequest("bookingId does not match checkout session metadata");
+  }
+
+  // Restrict updates to the authenticated user's own booking.
+  const { data: updatedBooking, error } = await supabaseAdmin
+    .from("bookings")
+    .update({
+      payment_status: "paid",
+      stripe_session_id: session.id,
+      stripe_payment_intent_id: session.payment_intent,
+      paid_at: new Date().toISOString(),
+      status: "confirmed",
+    })
+    .eq("id", resolvedBookingId)
+    .eq("user_id", req.user.id)
+    .select("id, payment_status, status")
+    .maybeSingle();
+
+  if (error) throw ApiError.internal(error.message);
+  if (!updatedBooking) {
+    throw ApiError.notFound("Booking not found for this user");
+  }
+
+  res.json({
+    paid: true,
+    booking: updatedBooking,
+    sessionId: session.id,
+  });
+});
+
+/**
  * POST /api/stripe/webhook
  * Handle Stripe webhook events.
  * NOTE: This route needs the raw body (not JSON parsed).

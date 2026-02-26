@@ -7,6 +7,7 @@ const router = Router();
 
 // Create checkout session (authenticated)
 router.post("/create-checkout-session", requireAuth, stripeController.createCheckoutSession);
+router.post("/verify-checkout-session", requireAuth, stripeController.verifyCheckoutSession);
 
 // Webhook – needs raw body, NOT JSON parsed.
 // We use express.raw() here so that Stripe can verify the signature.

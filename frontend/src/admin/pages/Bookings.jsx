@@ -39,9 +39,32 @@ function getBookingStatusInfo(booking) {
   return { color: "bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400", text: "Upcoming" };
 }
 
+function getPaymentStatusInfo(booking) {
+  const paymentStatus = String(booking?.payment_status || "").toLowerCase();
+
+  if (paymentStatus === "paid") {
+    return { color: "bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400", text: "Paid" };
+  }
+  if (paymentStatus === "pending") {
+    return { color: "bg-yellow-50 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400", text: "Pending" };
+  }
+  if (paymentStatus === "failed") {
+    return { color: "bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400", text: "Failed" };
+  }
+  if (paymentStatus === "expired") {
+    return { color: "bg-surface/70 text-muted", text: "Expired" };
+  }
+  if (paymentStatus === "pay_at_property" || booking?.payment_method === "cash") {
+    return { color: "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400", text: "Pay at Property" };
+  }
+
+  return { color: "bg-surface/70 text-muted", text: "N/A" };
+}
+
 const ViewBookingModal = React.memo(({ open, booking, room, userProfile, onClose }) => {
   if (!booking) return null;
   const statusInfo = getBookingStatusInfo(booking);
+  const paymentInfo = getPaymentStatusInfo(booking);
 
   return (
     <Modal title="Booking Details" open={open} onCancel={onClose} footer={<Button variant="outline" onClick={onClose}>Close</Button>} destroyOnClose>
@@ -52,9 +75,15 @@ const ViewBookingModal = React.memo(({ open, booking, room, userProfile, onClose
             <div><p className="font-semibold text-ink dark:text-dark-ink">{room.title}</p><p className="text-sm text-muted dark:text-dark-muted">{room.location}</p></div>
           </div>
         )}
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-muted dark:text-dark-muted">Status:</span>
-          <span className={`rounded-full px-3 py-1 text-xs font-medium ${statusInfo.color}`}>{statusInfo.text}</span>
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-muted dark:text-dark-muted">Status:</span>
+            <span className={`rounded-full px-3 py-1 text-xs font-medium ${statusInfo.color}`}>{statusInfo.text}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-muted dark:text-dark-muted">Payment:</span>
+            <span className={`rounded-full px-3 py-1 text-xs font-medium ${paymentInfo.color}`}>{paymentInfo.text}</span>
+          </div>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="sm:col-span-2"><p className="text-xs font-medium text-muted">Date</p><p className="mt-1 text-sm font-medium text-ink">{formatDate(booking.booking_date)}</p></div>
@@ -322,12 +351,13 @@ export default function AdminBookings() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead><tr className="border-b border-border bg-surface/60 text-left text-xs font-medium uppercase tracking-wider text-muted"><th className="px-6 py-3">Room</th><th className="px-6 py-3">Guest</th><th className="px-6 py-3">Date</th><th className="px-6 py-3">Status</th><th className="px-6 py-3">Amount</th><th className="px-6 py-3 text-right">Actions</th></tr></thead>
+              <thead><tr className="border-b border-border bg-surface/60 text-left text-xs font-medium uppercase tracking-wider text-muted"><th className="px-6 py-3">Room</th><th className="px-6 py-3">Guest</th><th className="px-6 py-3">Date</th><th className="px-6 py-3">Status</th><th className="px-6 py-3">Payment</th><th className="px-6 py-3">Amount</th><th className="px-6 py-3 text-right">Actions</th></tr></thead>
               <tbody>
                 {filteredBookings.map((booking) => {
                   const room = roomsMap[booking.room_id];
                   const profile = usersMap[booking.user_id];
                   const statusInfo = getBookingStatusInfo(booking);
+                  const paymentInfo = getPaymentStatusInfo(booking);
                   const isPending = booking.status === "pending";
 
                   return (
@@ -336,6 +366,7 @@ export default function AdminBookings() {
                       <td className="px-6 py-4"><p className="text-sm font-medium text-ink">{booking.user_full_name || profile?.full_name || "Guest"}</p><p className="text-xs text-muted">{profile?.email || booking.user_email || "N/A"}</p></td>
                       <td className="px-6 py-4"><p className="text-sm text-ink">{formatDate(booking.booking_date)}</p></td>
                       <td className="px-6 py-4"><span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${statusInfo.color}`}>{statusInfo.text}</span></td>
+                      <td className="px-6 py-4"><span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${paymentInfo.color}`}>{paymentInfo.text}</span></td>
                       <td className="px-6 py-4"><span className="font-medium text-ink">{formatPrice(booking.total_price || 0)}</span></td>
                       <td className="px-6 py-4">
                         <div className="flex justify-end gap-2">

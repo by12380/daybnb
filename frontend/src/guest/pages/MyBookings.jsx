@@ -17,6 +17,10 @@ import {
   clearBookedDates,
 } from "../../redux/slices/bookingSlice.js";
 import { fetchRooms } from "../../redux/slices/roomSlice.js";
+import {
+  createCheckoutSession,
+  clearStripeError,
+} from "../../redux/slices/stripeSlice.js";
 
 function formatDate(dateStr) {
   if (!dateStr) return "N/A";
@@ -49,9 +53,45 @@ function getBookingStatusInfo(booking) {
   return { color: "text-green-700 dark:text-green-400", bg: "bg-green-50 dark:bg-green-900/30", border: "border-green-200 dark:border-green-700", text: "Upcoming", canModify: true };
 }
 
-const BookingCard = React.memo(({ booking, room, onEdit, onCancel, isHighlighted }) => {
+function getPaymentStatusInfo(booking) {
+  const paymentStatus = String(booking?.payment_status || "").toLowerCase();
+
+  if (paymentStatus === "paid") {
+    return { color: "text-green-700 dark:text-green-400", bg: "bg-green-50 dark:bg-green-900/30", border: "border-green-200 dark:border-green-700", text: "Paid" };
+  }
+  if (paymentStatus === "pending") {
+    return { color: "text-yellow-700 dark:text-yellow-400", bg: "bg-yellow-50 dark:bg-yellow-900/30", border: "border-yellow-200 dark:border-yellow-700", text: "Payment Pending" };
+  }
+  if (paymentStatus === "failed") {
+    return { color: "text-red-600 dark:text-red-400", bg: "bg-red-50 dark:bg-red-900/30", border: "border-red-200 dark:border-red-700", text: "Payment Failed" };
+  }
+  if (paymentStatus === "expired") {
+    return { color: "text-muted", bg: "bg-surface/60", border: "border-border", text: "Payment Expired" };
+  }
+  if (paymentStatus === "pay_at_property" || booking?.payment_method === "cash") {
+    return { color: "text-blue-700 dark:text-blue-400", bg: "bg-blue-50 dark:bg-blue-900/30", border: "border-blue-200 dark:border-blue-700", text: "Pay at Property" };
+  }
+  return { color: "text-muted", bg: "bg-surface/60", border: "border-border", text: "N/A" };
+}
+
+const BookingCard = React.memo(({
+  booking,
+  room,
+  onEdit,
+  onCancel,
+  onPayOnline,
+  payingNow,
+  isHighlighted,
+}) => {
   const statusInfo = getBookingStatusInfo(booking);
+  const paymentInfo = getPaymentStatusInfo(booking);
   const isPast = new Date(booking.booking_date) < new Date(new Date().toDateString());
+  const canPayOnline =
+    !isPast &&
+    booking?.status !== "rejected" &&
+    Number(booking?.total_price || 0) > 0 &&
+    booking?.payment_status !== "paid" &&
+    (booking?.payment_status === "pay_at_property" || booking?.payment_method === "cash");
 
   return (
     <Card className={`transition-all ${isHighlighted ? "ring-2 ring-brand-500 ring-offset-2" : ""}`}>
@@ -72,6 +112,9 @@ const BookingCard = React.memo(({ booking, room, onEdit, onCancel, isHighlighted
               <span className={`rounded-full border px-2 py-0.5 text-xs font-medium ${statusInfo.bg} ${statusInfo.color} ${statusInfo.border}`}>
                 {statusInfo.text}
               </span>
+              <span className={`rounded-full border px-2 py-0.5 text-xs font-medium ${paymentInfo.bg} ${paymentInfo.color} ${paymentInfo.border}`}>
+                {paymentInfo.text}
+              </span>
             </div>
             <p className="mt-1 text-sm text-muted dark:text-dark-muted">{room?.location || "Location unavailable"}</p>
             <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm">
@@ -90,6 +133,11 @@ const BookingCard = React.memo(({ booking, room, onEdit, onCancel, isHighlighted
                 )}
               </div>
             )}
+            {canPayOnline && (
+              <p className="mt-2 text-xs text-muted dark:text-dark-muted">
+                Prefer card payment now? You can complete this booking securely online.
+              </p>
+            )}
             {(booking.user_full_name || booking.user_phone) && (
               <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted dark:text-dark-muted">
                 {booking.user_full_name && <span>Name: {booking.user_full_name}</span>}
@@ -98,22 +146,29 @@ const BookingCard = React.memo(({ booking, room, onEdit, onCancel, isHighlighted
             )}
           </div>
         </div>
-        {statusInfo.canModify && !isPast && (
-          <div className="flex gap-2 sm:flex-col">
-            <Button variant="outline" onClick={() => onEdit(booking)}>
-              Edit
+        <div className="flex gap-2 sm:flex-col">
+          {canPayOnline && (
+            <Button onClick={() => onPayOnline(booking)} disabled={payingNow}>
+              {payingNow ? "Redirecting..." : `Pay ${formatPrice(booking.total_price)} Online`}
             </Button>
-            <Button
-              variant="outline"
-              className="!border-red-200 !text-red-600 hover:!border-red-400 hover:!bg-red-50 dark:!border-red-700 dark:!text-red-400 dark:hover:!border-red-600 dark:hover:!bg-red-900/30"
-              onClick={() => onCancel(booking)}
-            >
-              Cancel
-            </Button>
-          </div>
-        )}
+          )}
+          {statusInfo.canModify && !isPast && (
+            <>
+              <Button variant="outline" onClick={() => onEdit(booking)}>
+                Edit
+              </Button>
+              <Button
+                variant="outline"
+                className="!border-red-200 !text-red-600 hover:!border-red-400 hover:!bg-red-50 dark:!border-red-700 dark:!text-red-400 dark:hover:!border-red-600 dark:hover:!bg-red-900/30"
+                onClick={() => onCancel(booking)}
+              >
+                Cancel
+              </Button>
+            </>
+          )}
+        </div>
         {booking.status === "rejected" && (
-          <div className="flex items-center">
+          <div className="flex gap-2 sm:flex-col">
             <span className="text-xs text-red-500 dark:text-red-400">This booking was not approved</span>
           </div>
         )}
@@ -276,11 +331,15 @@ const MyBookings = React.memo(() => {
     loading,
     error,
   } = useSelector((state) => state.bookings);
+  const { sessionUrl, loading: stripeLoading, error: stripeError } = useSelector(
+    (state) => state.stripe
+  );
 
   const { rooms: roomsList } = useSelector((state) => state.rooms);
 
   const [editingBooking, setEditingBooking] = useState(null);
   const [cancellingBooking, setCancellingBooking] = useState(null);
+  const [payingBookingId, setPayingBookingId] = useState(null);
 
   // Build rooms lookup map
   const roomsMap = React.useMemo(() => {
@@ -297,6 +356,12 @@ const MyBookings = React.memo(() => {
     }
   }, [dispatch, user?.id]);
 
+  useEffect(() => {
+    if (sessionUrl) {
+      window.location.href = sessionUrl;
+    }
+  }, [sessionUrl]);
+
   const handleEdit = useCallback((booking) => setEditingBooking(booking), []);
   const handleCancel = useCallback((booking) => setCancellingBooking(booking), []);
 
@@ -309,6 +374,41 @@ const MyBookings = React.memo(() => {
     setCancellingBooking(null);
     // Booking already removed from store by deleteBooking.fulfilled
   }, []);
+
+  const handlePayOnline = useCallback(
+    async (booking) => {
+      if (!booking?.id) return;
+      const amount = Number(booking?.total_price || 0);
+      if (amount <= 0) return;
+
+      const room = roomsMap[booking.room_id];
+      setPayingBookingId(booking.id);
+      dispatch(clearStripeError());
+
+      try {
+        await dispatch(
+          createCheckoutSession({
+            bookingId: booking.id,
+            roomTitle: room?.title || "Room Booking",
+            roomId: booking.room_id,
+            totalPrice: amount,
+            originalPrice: booking.original_price,
+            discountAmount: booking.discount_amount,
+            discountApplied: booking.discount_applied,
+            pricePerDay: booking.price_per_day,
+            bookingDate: booking.booking_date,
+            userEmail: booking.user_email || user?.email,
+            userId: booking.user_id || user?.id,
+          })
+        ).unwrap();
+      } catch (_err) {
+        // Error is already handled in stripe slice and surfaced in UI.
+      } finally {
+        setPayingBookingId(null);
+      }
+    },
+    [dispatch, roomsMap, user?.email, user?.id]
+  );
 
   if (authLoading || loading) {
     return (
@@ -357,6 +457,9 @@ const MyBookings = React.memo(() => {
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gradient dark:text-gradient-dark">My Bookings</p>
           <h1 className="mt-1 text-2xl font-semibold text-ink dark:text-dark-ink">Your Reservations</h1>
           <p className="mt-1 text-sm text-muted dark:text-dark-muted">Manage your daytime room bookings</p>
+          {stripeError ? (
+            <p className="mt-2 text-sm text-red-600 dark:text-red-400">{stripeError}</p>
+          ) : null}
         </div>
         <Link to="/"><Button variant="outline">Browse Rooms</Button></Link>
       </div>
@@ -390,7 +493,16 @@ const MyBookings = React.memo(() => {
                 </p>
               </div>
               {pendingBookings.map((booking) => (
-                <BookingCard key={booking.id} booking={booking} room={roomsMap[booking.room_id]} onEdit={handleEdit} onCancel={handleCancel} isHighlighted={booking.id === highlightedBookingId} />
+                <BookingCard
+                  key={booking.id}
+                  booking={booking}
+                  room={roomsMap[booking.room_id]}
+                  onEdit={handleEdit}
+                  onCancel={handleCancel}
+                  onPayOnline={handlePayOnline}
+                  payingNow={stripeLoading && payingBookingId === booking.id}
+                  isHighlighted={booking.id === highlightedBookingId}
+                />
               ))}
             </div>
           )}
@@ -406,7 +518,16 @@ const MyBookings = React.memo(() => {
                 Approved ({upcomingBookings.length})
               </h2>
               {upcomingBookings.map((booking) => (
-                <BookingCard key={booking.id} booking={booking} room={roomsMap[booking.room_id]} onEdit={handleEdit} onCancel={handleCancel} isHighlighted={booking.id === highlightedBookingId} />
+                <BookingCard
+                  key={booking.id}
+                  booking={booking}
+                  room={roomsMap[booking.room_id]}
+                  onEdit={handleEdit}
+                  onCancel={handleCancel}
+                  onPayOnline={handlePayOnline}
+                  payingNow={stripeLoading && payingBookingId === booking.id}
+                  isHighlighted={booking.id === highlightedBookingId}
+                />
               ))}
             </div>
           )}
@@ -415,7 +536,16 @@ const MyBookings = React.memo(() => {
             <div className="space-y-4">
               <h2 className="text-sm font-semibold text-ink dark:text-dark-ink">Past ({pastBookings.length})</h2>
               {pastBookings.map((booking) => (
-                <BookingCard key={booking.id} booking={booking} room={roomsMap[booking.room_id]} onEdit={handleEdit} onCancel={handleCancel} isHighlighted={booking.id === highlightedBookingId} />
+                <BookingCard
+                  key={booking.id}
+                  booking={booking}
+                  room={roomsMap[booking.room_id]}
+                  onEdit={handleEdit}
+                  onCancel={handleCancel}
+                  onPayOnline={handlePayOnline}
+                  payingNow={stripeLoading && payingBookingId === booking.id}
+                  isHighlighted={booking.id === highlightedBookingId}
+                />
               ))}
             </div>
           )}
@@ -431,7 +561,16 @@ const MyBookings = React.memo(() => {
                 Not Approved ({rejectedBookings.length})
               </h2>
               {rejectedBookings.map((booking) => (
-                <BookingCard key={booking.id} booking={booking} room={roomsMap[booking.room_id]} onEdit={handleEdit} onCancel={handleCancel} isHighlighted={booking.id === highlightedBookingId} />
+                <BookingCard
+                  key={booking.id}
+                  booking={booking}
+                  room={roomsMap[booking.room_id]}
+                  onEdit={handleEdit}
+                  onCancel={handleCancel}
+                  onPayOnline={handlePayOnline}
+                  payingNow={stripeLoading && payingBookingId === booking.id}
+                  isHighlighted={booking.id === highlightedBookingId}
+                />
               ))}
             </div>
           )}

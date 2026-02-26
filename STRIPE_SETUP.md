@@ -1,174 +1,141 @@
-# Stripe Payment Integration Setup
+# Stripe Sandbox Setup (Local Development)
 
-This guide will help you set up Stripe payments for DayBnB.
+This project currently creates checkout sessions through the backend API (`/api/stripe/create-checkout-session`) from the booking page.  
+Use this guide to run Stripe in test mode end-to-end on localhost.
 
-## Prerequisites
+## 1) Get Stripe test keys
 
-- A Stripe account (create one at https://stripe.com)
-- Supabase CLI installed (`npm install -g supabase`)
-- Your Supabase project linked
+1. Open https://dashboard.stripe.com/test/apikeys
+2. Copy:
+   - Publishable key (`pk_test_...`)
+   - Secret key (`sk_test_...`)
 
-## Step 1: Get Your Stripe API Keys
+Use test keys only for sandbox/dev.
 
-1. Go to https://dashboard.stripe.com/apikeys
-2. Copy your **Publishable key** (starts with `pk_test_` or `pk_live_`)
-3. Copy your **Secret key** (starts with `sk_test_` or `sk_live_`)
+## 2) Configure local env files
 
-> ⚠️ Use **test keys** during development. Switch to **live keys** only in production.
+Create or update these files:
 
-## Step 2: Configure Environment Variables
-
-### Frontend (.env file)
-
-Create or update your `.env` file in the project root:
+### `frontend/.env`
 
 ```env
-# Existing Supabase config
-VITE_SUPABASE_URL=your_supabase_url
+VITE_API_BASE_URL=http://localhost:5000/api
+VITE_SOCKET_URL=http://localhost:5000
+
+VITE_SUPABASE_URL=https://your-project-ref.supabase.co
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 
-# Add Stripe publishable key
-VITE_STRIPE_PUBLISHABLE_KEY=pk_test_your_publishable_key_here
+VITE_STRIPE_PUBLISHABLE_KEY=pk_test_your_publishable_key
 ```
 
-### Supabase Edge Functions (Secrets)
+### `backend/.env`
 
-Set the Stripe secret key as a Supabase secret:
+```env
+PORT=5000
+NODE_ENV=development
+CLIENT_URL=http://localhost:5173
 
-```bash
-# Login to Supabase CLI
-supabase login
+SUPABASE_URL=https://your-project-ref.supabase.co
+SUPABASE_ANON_KEY=your_supabase_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
 
-# Link your project (if not already linked)
-supabase link --project-ref your-project-ref
-
-# Set Stripe secrets
-supabase secrets set STRIPE_SECRET_KEY=sk_test_your_secret_key_here
-supabase secrets set STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret_here
+STRIPE_SECRET_KEY=sk_test_your_secret_key
+# Set this after you start `stripe listen` in step 4
+STRIPE_WEBHOOK_SECRET=whsec_from_stripe_cli
 ```
 
-## Step 3: Deploy Supabase Edge Functions
+## 3) Ensure booking table has payment fields
 
-Deploy the checkout and webhook functions:
-
-```bash
-# Deploy the checkout session function
-supabase functions deploy create-checkout-session
-
-# Deploy the webhook handler function
-supabase functions deploy stripe-webhook
-```
-
-## Step 4: Set Up Stripe Webhook
-
-1. Go to https://dashboard.stripe.com/webhooks
-2. Click **Add endpoint**
-3. Enter your webhook URL:
-   ```
-   https://your-project-ref.supabase.co/functions/v1/stripe-webhook
-   ```
-4. Select events to listen for:
-   - `checkout.session.completed`
-   - `checkout.session.expired`
-   - `payment_intent.payment_failed`
-5. Click **Add endpoint**
-6. Copy the **Signing secret** (starts with `whsec_`)
-7. Update your Supabase secret:
-   ```bash
-   supabase secrets set STRIPE_WEBHOOK_SECRET=whsec_your_signing_secret
-   ```
-
-## Step 5: Update Database Schema
-
-Add these columns to your `bookings` table in Supabase:
+Run this once in Supabase SQL editor:
 
 ```sql
--- Add payment-related columns to bookings table
 ALTER TABLE bookings
 ADD COLUMN IF NOT EXISTS payment_status TEXT DEFAULT 'pending',
 ADD COLUMN IF NOT EXISTS stripe_session_id TEXT,
 ADD COLUMN IF NOT EXISTS stripe_payment_intent_id TEXT,
 ADD COLUMN IF NOT EXISTS paid_at TIMESTAMPTZ;
 
--- Create index for faster lookups
 CREATE INDEX IF NOT EXISTS idx_bookings_payment_status ON bookings(payment_status);
 CREATE INDEX IF NOT EXISTS idx_bookings_stripe_session ON bookings(stripe_session_id);
 ```
 
-### Payment Status Values
+## 4) Run webhook forwarding in local sandbox
 
-- `pending` - Booking created, payment not yet attempted
-- `paid` - Payment successful
-- `expired` - Checkout session expired without payment
-- `failed` - Payment failed
+Install Stripe CLI and login:
 
-## Step 6: Test the Integration
+```bash
+stripe login
+```
 
-### Using Stripe Test Cards
+Forward Stripe webhooks to your local backend:
 
-Use these test card numbers in Stripe's test mode:
+```bash
+stripe listen --events checkout.session.completed,checkout.session.expired,payment_intent.payment_failed --forward-to http://localhost:5000/api/stripe/webhook
+```
 
-| Card Number | Description |
-|-------------|-------------|
-| `4242 4242 4242 4242` | Successful payment |
+Copy the `whsec_...` shown in the CLI output and set it in `backend/.env` as `STRIPE_WEBHOOK_SECRET`.
+
+If backend is already running, restart it after editing env.
+
+## 5) Run the app
+
+In two terminals:
+
+```bash
+# Terminal 1
+cd backend
+npm run dev
+
+# Terminal 2
+cd frontend
+npm run dev
+```
+
+## 6) Test payments in sandbox
+
+1. Sign in as a normal user.
+2. Open a room and create a booking with payment method `Pay Online`.
+3. You should be redirected to Stripe Checkout.
+4. Use a test card:
+
+| Card Number | Expected Result |
+|---|---|
+| `4242 4242 4242 4242` | Payment succeeds |
 | `4000 0000 0000 0002` | Card declined |
 | `4000 0000 0000 9995` | Insufficient funds |
 
-Use any future expiry date and any 3-digit CVC.
+Use any future expiry date, any 3-digit CVC, any ZIP.
 
-### Testing Flow
+5. After success:
+   - You return to `/payment-success`
+   - Backend webhook marks booking as paid (`payment_status = paid`, `status = confirmed`)
 
-1. Start your dev server: `npm run dev`
-2. Select a room and fill in booking details
-3. Click "Pay & Book"
-4. You'll be redirected to Stripe Checkout
-5. Use a test card to complete payment
-6. You'll be redirected to the success page
+## 7) Verify webhook + booking updates
 
-## Troubleshooting
+- Stripe CLI terminal should show `checkout.session.completed` delivered with HTTP `200`.
+- In Supabase `bookings` table, verify:
+  - `payment_status = paid`
+  - `stripe_session_id` is filled
+  - `stripe_payment_intent_id` is filled
+  - `paid_at` is filled
 
-### "Stripe not initialized" Error
+## Common issues
 
-- Check that `VITE_STRIPE_PUBLISHABLE_KEY` is set in your `.env` file
-- Restart your dev server after adding environment variables
+### "Stripe is not configured"
+- Check `STRIPE_SECRET_KEY` in `backend/.env`.
+- Restart backend after changing env.
 
-### "Failed to create checkout session" Error
+### "Stripe not initialized" in frontend
+- Check `VITE_STRIPE_PUBLISHABLE_KEY` in `frontend/.env`.
+- Restart frontend after changing env.
 
-- Verify your Supabase Edge Function is deployed
-- Check that `STRIPE_SECRET_KEY` is set in Supabase secrets
-- Check the Edge Function logs in Supabase dashboard
+### Payment succeeds but booking stays pending
+- `STRIPE_WEBHOOK_SECRET` is incorrect or missing.
+- `stripe listen` is not running.
+- Backend not reachable at `http://localhost:5000`.
 
-### Webhook Not Updating Bookings
+## Optional: Supabase Edge Function mode
 
-- Verify the webhook URL is correct
-- Check that `STRIPE_WEBHOOK_SECRET` matches your Stripe dashboard
-- Check Edge Function logs for errors
-- Ensure `SUPABASE_SERVICE_ROLE_KEY` is available to the function
-
-### CORS Errors
-
-The Edge Functions include CORS headers. If you still see CORS errors:
-- Check that your frontend origin is allowed
-- Verify the function is deployed correctly
-
-## Going Live
-
-When ready for production:
-
-1. Switch to Stripe live keys in your environment
-2. Update the webhook endpoint to use live mode
-3. Test with a real card (small amount)
-4. Monitor the Stripe dashboard for successful payments
-
-## Files Created
-
-- `src/lib/stripe.js` - Stripe client utilities
-- `src/guest/pages/PaymentSuccess.jsx` - Success page after payment
-- `src/guest/pages/PaymentCancel.jsx` - Cancel/retry page
-- `supabase/functions/create-checkout-session/index.ts` - Creates Stripe checkout
-- `supabase/functions/stripe-webhook/index.ts` - Handles Stripe webhooks
-
-## Support
-
-- Stripe Documentation: https://stripe.com/docs
-- Supabase Edge Functions: https://supabase.com/docs/guides/functions
+This repo also includes `supabase/functions/create-checkout-session` and `supabase/functions/stripe-webhook`.  
+If you choose that route, set Stripe secrets with `supabase secrets set ...` and deploy the functions.  
+For the current booking UI flow, backend mode is the active path.

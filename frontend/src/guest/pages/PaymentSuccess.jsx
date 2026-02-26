@@ -4,24 +4,52 @@ import { useDispatch, useSelector } from "react-redux";
 import Card from "../components/ui/Card.jsx";
 import Button from "../components/ui/Button.jsx";
 import { fetchBookingById, clearSelectedBooking } from "../../redux/slices/bookingSlice.js";
+import {
+  verifyCheckoutSession,
+  clearStripeError,
+} from "../../redux/slices/stripeSlice.js";
 
 const PaymentSuccess = () => {
   const dispatch = useDispatch();
   const [searchParams] = useSearchParams();
   const bookingId = searchParams.get("booking_id");
+  const sessionId = searchParams.get("session_id");
 
   const { selectedBooking: booking, loading, error } = useSelector(
     (state) => state.bookings
   );
+  const { error: stripeError } = useSelector((state) => state.stripe);
 
   useEffect(() => {
-    if (bookingId) {
-      dispatch(fetchBookingById(bookingId));
-    }
+    let isMounted = true;
+
+    const confirmPaymentAndFetch = async () => {
+      if (!bookingId) return;
+
+      // Fallback confirmation: ensures booking status updates even if webhook is delayed.
+      if (sessionId) {
+        try {
+          await dispatch(
+            verifyCheckoutSession({ sessionId, bookingId })
+          ).unwrap();
+        } catch (_err) {
+          // We still fetch booking data below and show any error from store.
+        }
+      }
+
+      if (isMounted) {
+        dispatch(fetchBookingById(bookingId));
+      }
+    };
+
+    confirmPaymentAndFetch();
+
     return () => {
+      isMounted = false;
+      dispatch(clearStripeError());
       dispatch(clearSelectedBooking());
     };
-  }, [dispatch, bookingId]);
+  }, [dispatch, bookingId, sessionId]);
 
   if (loading) {
     return (
@@ -74,6 +102,7 @@ const PaymentSuccess = () => {
         )}
 
         {error && <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p>}
+        {stripeError && <p className="mt-2 text-sm text-red-600 dark:text-red-400">{stripeError}</p>}
 
         <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
           <Link to="/my-bookings"><Button className="w-full sm:w-auto">View My Bookings</Button></Link>

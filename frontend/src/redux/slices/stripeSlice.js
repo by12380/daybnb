@@ -18,6 +18,21 @@ export const createCheckoutSession = createAsyncThunk(
   }
 );
 
+export const verifyCheckoutSession = createAsyncThunk(
+  "stripe/verifyCheckoutSession",
+  async ({ sessionId, bookingId }, { rejectWithValue }) => {
+    try {
+      const { data } = await api.post("/stripe/verify-checkout-session", {
+        sessionId,
+        bookingId,
+      });
+      return data;
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
 // ─── Slice ───────────────────────────────────────────────────
 
 const initialState = {
@@ -51,6 +66,17 @@ const stripeSlice = createSlice({
         state.sessionUrl = action.payload.url;
       })
       .addCase(createCheckoutSession.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      .addCase(verifyCheckoutSession.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(verifyCheckoutSession.fulfilled, (state) => {
+        state.loading = false;
+      })
+      .addCase(verifyCheckoutSession.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       });
