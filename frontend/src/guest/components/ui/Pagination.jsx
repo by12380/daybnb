@@ -11,7 +11,7 @@ const Pagination = React.memo(function Pagination({
   loading = false,
   showInfo = true,
   totalCount = 0,
-  pageSize = 10,
+  pageSize = 6,
   className = "",
 }) {
   // Generate page numbers to display
@@ -70,16 +70,16 @@ const Pagination = React.memo(function Pagination({
   const endItem = Math.min(currentPage * pageSize, totalCount);
 
   return (
-    <div className={`flex flex-col items-center gap-4 ${className}`}>
+    <div className={`flex flex-col items-center gap-5 ${className}`}>
       {/* Page info */}
       {showInfo && totalCount > 0 && (
-        <p className="text-sm text-muted dark:text-dark-muted">
+        <p className="text-sm tracking-wide text-muted dark:text-dark-muted">
           Showing{" "}
-          <span className="font-medium text-ink dark:text-dark-ink">
-            {startItem}-{endItem}
+          <span className="font-semibold text-ink dark:text-dark-ink">
+            {startItem}&ndash;{endItem}
           </span>{" "}
           of{" "}
-          <span className="font-medium text-ink dark:text-dark-ink">
+          <span className="font-semibold text-ink dark:text-dark-ink">
             {totalCount}
           </span>{" "}
           rooms
@@ -87,17 +87,19 @@ const Pagination = React.memo(function Pagination({
       )}
 
       {/* Pagination controls */}
-      <nav className="flex items-center gap-1" aria-label="Pagination">
+      <nav className="inline-flex items-center gap-2 rounded-2xl border border-border/60 bg-panel/80 px-3 py-2 shadow-sm backdrop-blur dark:border-dark-border/60 dark:bg-dark-panel/80" aria-label="Pagination">
         {/* Previous button */}
         <button
           type="button"
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage === 1 || loading}
-          className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-panel text-muted transition hover:border-brand-300 hover:bg-brand-50 hover:text-brand-600 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-border disabled:hover:bg-panel disabled:hover:text-muted dark:hover:border-brand-600 dark:hover:bg-brand-900/30 dark:hover:text-brand-400"
+          className="flex h-9 w-9 items-center justify-center rounded-xl text-muted transition hover:bg-brand-50 hover:text-brand-600 disabled:cursor-not-allowed disabled:opacity-30 dark:hover:bg-brand-900/30 dark:hover:text-brand-400"
           aria-label="Previous page"
         >
-          <ChevronLeftIcon className="h-5 w-5" />
+          <ChevronLeftIcon className="h-4 w-4" />
         </button>
+
+        <div className="mx-1 h-5 w-px bg-border/50 dark:bg-dark-border/50" />
 
         {/* Page numbers */}
         <div className="flex items-center gap-1">
@@ -105,9 +107,9 @@ const Pagination = React.memo(function Pagination({
             page === "..." ? (
               <span
                 key={`ellipsis-${index}`}
-                className="flex h-10 w-10 items-center justify-center text-muted dark:text-dark-muted"
+                className="flex h-9 w-6 items-center justify-center text-xs text-muted/60 dark:text-dark-muted/60"
               >
-                ...
+                &hellip;
               </span>
             ) : (
               <button
@@ -115,11 +117,11 @@ const Pagination = React.memo(function Pagination({
                 type="button"
                 onClick={() => onPageChange(page)}
                 disabled={loading}
-                className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-medium transition ${
+                className={`flex h-9 min-w-[2.25rem] items-center justify-center rounded-xl px-2 text-sm font-medium transition ${
                   page === currentPage
-                    ? "bg-brand-600 text-white shadow-lg shadow-brand-500/20 dark:bg-brand-500 dark:shadow-black/25"
-                    : "border border-border bg-panel text-ink hover:border-brand-300 hover:bg-brand-50 hover:text-brand-600 dark:text-dark-ink dark:hover:border-brand-600 dark:hover:bg-brand-900/30 dark:hover:text-brand-400"
-                } disabled:cursor-not-allowed disabled:opacity-40`}
+                    ? "bg-brand-600 text-white shadow-md shadow-brand-500/25 dark:bg-brand-500"
+                    : "text-ink hover:bg-surface/80 hover:text-brand-600 dark:text-dark-ink dark:hover:bg-dark-surface/80 dark:hover:text-brand-400"
+                } disabled:cursor-not-allowed disabled:opacity-30`}
                 aria-label={`Page ${page}`}
                 aria-current={page === currentPage ? "page" : undefined}
               >
@@ -129,15 +131,17 @@ const Pagination = React.memo(function Pagination({
           )}
         </div>
 
+        <div className="mx-1 h-5 w-px bg-border/50 dark:bg-dark-border/50" />
+
         {/* Next button */}
         <button
           type="button"
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage === totalPages || loading}
-          className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-panel text-muted transition hover:border-brand-300 hover:bg-brand-50 hover:text-brand-600 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-border disabled:hover:bg-panel disabled:hover:text-muted dark:hover:border-brand-600 dark:hover:bg-brand-900/30 dark:hover:text-brand-400"
+          className="flex h-9 w-9 items-center justify-center rounded-xl text-muted transition hover:bg-brand-50 hover:text-brand-600 disabled:cursor-not-allowed disabled:opacity-30 dark:hover:bg-brand-900/30 dark:hover:text-brand-400"
           aria-label="Next page"
         >
-          <ChevronRightIcon className="h-5 w-5" />
+          <ChevronRightIcon className="h-4 w-4" />
         </button>
       </nav>
     </div>

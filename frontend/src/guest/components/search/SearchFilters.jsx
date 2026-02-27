@@ -296,167 +296,191 @@ const SearchFilters = React.memo(function SearchFilters({
     onDateChange?.(null);
   }, [refineSearch, onDateChange]);
 
+  const hasActiveFilters = activeFilterItems.length > 0;
+
   return (
-    <div className="rounded-2xl border border-border bg-panel p-4 dark:border-dark-border dark:bg-dark-panel">
-      {/* Header */}
-      <button type="button" onClick={() => setIsExpanded(!isExpanded)} className="flex w-full items-center justify-between">
-        <div className="flex items-center gap-2">
+    <div className="flex max-h-[calc(100vh-6rem)] flex-col rounded-2xl border border-border bg-panel dark:border-dark-border dark:bg-dark-panel">
+      {/* Sticky Header */}
+      <div className="sticky top-0 z-10 flex items-center justify-between rounded-t-2xl border-b border-border/50 bg-panel px-4 py-3 dark:border-dark-border/50 dark:bg-dark-panel">
+        <button type="button" onClick={() => setIsExpanded(!isExpanded)} className="flex items-center gap-2">
           <FilterIcon className="h-5 w-5 text-brand-600 dark:text-brand-400" />
           <span className="font-semibold text-ink dark:text-dark-ink">Filters</span>
-          {activeFilterItems.length > 0 && (
+          {hasActiveFilters && (
             <span className="rounded-full bg-brand-600 px-1.5 py-0.5 text-[10px] font-bold text-white">{activeFilterItems.length}</span>
           )}
-        </div>
-        <ChevronDownIcon className={`h-5 w-5 text-muted transition-transform dark:text-dark-muted ${isExpanded ? "rotate-180" : ""}`} />
-      </button>
-
-      {isExpanded && (
-        <div className="mt-4 space-y-4">
-          {/* Active filter chips */}
-          <ActiveFilters items={activeFilterItems} onRemove={handleRemoveFilter} onClearAll={resetAll} />
-
-          {/* Date */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-ink dark:text-dark-ink">Date</label>
-            <DatePicker
-              className={INPUT_STYLES}
-              placeholder="Select date"
-              value={selectedDate ? dayjs(selectedDate) : null}
-              onChange={handleDateChange}
-              disabledDate={(current) => current && current < dayjs().startOf("day")}
-            />
-          </div>
-
-          {/* Type of Place */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-ink dark:text-dark-ink">Type of place</label>
-            <SegmentedControl options={PLACE_TYPES} value={placeType} onChange={setPlaceType} />
-          </div>
-
-          {/* Price Range */}
-          <PriceRangeFilter minPrice={minPrice} maxPrice={maxPrice} onMinChange={setMinPrice} onMaxChange={setMaxPrice} />
-
-          {/* Beds & Bathrooms */}
-          <div className="grid grid-cols-2 gap-2">
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-ink dark:text-dark-ink">Beds</label>
-              <select value={minBeds} onChange={(e) => setMinBeds(Number(e.target.value))} className={INPUT_STYLES + " w-full"}>
-                <option value={0}>Any</option>
-                {[1, 2, 3, 4, 5, 6, 8].map((n) => <option key={n} value={n}>{n}+</option>)}
-              </select>
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-ink dark:text-dark-ink">Bathrooms</label>
-              <select value={minBathrooms} onChange={(e) => setMinBathrooms(Number(e.target.value))} className={INPUT_STYLES + " w-full"}>
-                <option value={0}>Any</option>
-                {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}+</option>)}
-              </select>
-            </div>
-          </div>
-
-          {/* Booking Options */}
-          <FilterSection title="Booking options" defaultOpen>
-            <div className="flex flex-wrap gap-2">
-              {BOOKING_OPTIONS.map((opt) => {
-                const stateMap = { instant_book: instantBook, self_checkin: selfCheckin, allows_pets: allowsPets };
-                const setterMap = { instant_book: setInstantBook, self_checkin: setSelfCheckin, allows_pets: setAllowsPets };
-                return (
-                  <Chip
-                    key={opt.value}
-                    label={opt.label}
-                    active={stateMap[opt.value]}
-                    onClick={() => setterMap[opt.value]((prev) => !prev)}
-                  />
-                );
-              })}
-            </div>
-          </FilterSection>
-
-          {/* Standout Stays */}
-          <FilterSection title="Standout stays" defaultOpen>
-            <div className="flex flex-wrap gap-2">
-              {STANDOUT_STAYS.map((opt) => {
-                const stateMap = { is_guest_favorite: guestFavorite, is_luxe: luxe };
-                const setterMap = { is_guest_favorite: setGuestFavorite, is_luxe: setLuxe };
-                return (
-                  <Chip
-                    key={opt.value}
-                    label={opt.label}
-                    active={stateMap[opt.value]}
-                    onClick={() => setterMap[opt.value]((prev) => !prev)}
-                  />
-                );
-              })}
-            </div>
-          </FilterSection>
-
-          {/* Property Type */}
-          <FilterSection title="Property type" defaultOpen>
-            <div className="flex flex-wrap gap-2">
-              {PROPERTY_TYPES.map((pt) => (
-                <Chip
-                  key={pt.value}
-                  label={pt.label}
-                  active={selectedPropertyTypes.includes(pt.value)}
-                  onClick={() => handlePropertyTypeToggle(pt.value)}
-                />
-              ))}
-            </div>
-          </FilterSection>
-
-          {/* Room Type */}
-          {availableTypes.length > 0 && (
-            <FilterSection title="Room type">
-              <div className="flex flex-wrap gap-2">
-                {availableTypes.map((type) => (
-                  <Chip key={type} label={type} active={selectedTypes.includes(type)} onClick={() => handleTypeToggle(type)} />
-                ))}
-              </div>
-            </FilterSection>
-          )}
-
-          {/* Amenities */}
-          <FilterSection title="Amenities">
-            {AMENITY_GROUPS.map((group) => (
-              <div key={group.label} className="space-y-1.5">
-                <span className="text-xs font-semibold text-ink/60 dark:text-dark-ink/60">{group.label}</span>
-                <div className="flex flex-wrap gap-1.5">
-                  {group.items.map((item) => (
-                    <Chip
-                      key={item.value}
-                      label={item.label}
-                      active={selectedAmenities.includes(item.value)}
-                      onClick={() => handleAmenityToggle(item.value)}
-                    />
-                  ))}
-                </div>
-              </div>
-            ))}
-          </FilterSection>
-
-          {/* Safety */}
-          <FilterSection title="Safety">
-            <div className="flex flex-wrap gap-2">
-              {SAFETY_FEATURES.map((item) => (
-                <Chip
-                  key={item.value}
-                  label={item.label}
-                  active={selectedSafety.includes(item.value)}
-                  onClick={() => handleSafetyToggle(item.value)}
-                />
-              ))}
-            </div>
-          </FilterSection>
-
-          {/* Reset */}
+          <ChevronDownIcon className={`h-4 w-4 text-muted transition-transform dark:text-dark-muted ${isExpanded ? "rotate-180" : ""}`} />
+        </button>
+        {hasActiveFilters && (
           <button
             type="button"
             onClick={resetAll}
-            className="w-full rounded-xl border border-border bg-surface/60 px-4 py-2 text-sm font-medium text-muted transition hover:border-red-300 hover:bg-red-50 hover:text-red-600 dark:border-dark-border dark:bg-dark-surface/60 dark:text-dark-muted dark:hover:border-red-700 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-muted transition hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+            title="Reset all filters"
           >
-            Reset All Filters
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
           </button>
-        </div>
+        )}
+      </div>
+
+      {isExpanded && (
+        <>
+          {/* Scrollable Filter Content */}
+          <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-4 scrollbar-thin">
+            <div className="space-y-4">
+              {/* Active filter chips */}
+              <ActiveFilters items={activeFilterItems} onRemove={handleRemoveFilter} onClearAll={resetAll} />
+
+              {/* Date */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-ink dark:text-dark-ink">Date</label>
+                <DatePicker
+                  className={INPUT_STYLES}
+                  placeholder="Select date"
+                  value={selectedDate ? dayjs(selectedDate) : null}
+                  onChange={handleDateChange}
+                  disabledDate={(current) => current && current < dayjs().startOf("day")}
+                />
+              </div>
+
+              {/* Type of Place */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-ink dark:text-dark-ink">Type of place</label>
+                <SegmentedControl options={PLACE_TYPES} value={placeType} onChange={setPlaceType} />
+              </div>
+
+              {/* Price Range */}
+              <PriceRangeFilter minPrice={minPrice} maxPrice={maxPrice} onMinChange={setMinPrice} onMaxChange={setMaxPrice} />
+
+              {/* Beds & Bathrooms */}
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-ink dark:text-dark-ink">Beds</label>
+                  <select value={minBeds} onChange={(e) => setMinBeds(Number(e.target.value))} className={INPUT_STYLES + " w-full"}>
+                    <option value={0}>Any</option>
+                    {[1, 2, 3, 4, 5, 6, 8].map((n) => <option key={n} value={n}>{n}+</option>)}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-ink dark:text-dark-ink">Bathrooms</label>
+                  <select value={minBathrooms} onChange={(e) => setMinBathrooms(Number(e.target.value))} className={INPUT_STYLES + " w-full"}>
+                    <option value={0}>Any</option>
+                    {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}+</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {/* Booking Options */}
+              <FilterSection title="Booking options" defaultOpen>
+                <div className="flex flex-wrap gap-2">
+                  {BOOKING_OPTIONS.map((opt) => {
+                    const stateMap = { instant_book: instantBook, self_checkin: selfCheckin, allows_pets: allowsPets };
+                    const setterMap = { instant_book: setInstantBook, self_checkin: setSelfCheckin, allows_pets: setAllowsPets };
+                    return (
+                      <Chip
+                        key={opt.value}
+                        label={opt.label}
+                        active={stateMap[opt.value]}
+                        onClick={() => setterMap[opt.value]((prev) => !prev)}
+                      />
+                    );
+                  })}
+                </div>
+              </FilterSection>
+
+              {/* Standout Stays */}
+              <FilterSection title="Standout stays" defaultOpen>
+                <div className="flex flex-wrap gap-2">
+                  {STANDOUT_STAYS.map((opt) => {
+                    const stateMap = { is_guest_favorite: guestFavorite, is_luxe: luxe };
+                    const setterMap = { is_guest_favorite: setGuestFavorite, is_luxe: setLuxe };
+                    return (
+                      <Chip
+                        key={opt.value}
+                        label={opt.label}
+                        active={stateMap[opt.value]}
+                        onClick={() => setterMap[opt.value]((prev) => !prev)}
+                      />
+                    );
+                  })}
+                </div>
+              </FilterSection>
+
+              {/* Property Type */}
+              <FilterSection title="Property type" defaultOpen>
+                <div className="flex flex-wrap gap-2">
+                  {PROPERTY_TYPES.map((pt) => (
+                    <Chip
+                      key={pt.value}
+                      label={pt.label}
+                      active={selectedPropertyTypes.includes(pt.value)}
+                      onClick={() => handlePropertyTypeToggle(pt.value)}
+                    />
+                  ))}
+                </div>
+              </FilterSection>
+
+              {/* Room Type */}
+              {availableTypes.length > 0 && (
+                <FilterSection title="Room type">
+                  <div className="flex flex-wrap gap-2">
+                    {availableTypes.map((type) => (
+                      <Chip key={type} label={type} active={selectedTypes.includes(type)} onClick={() => handleTypeToggle(type)} />
+                    ))}
+                  </div>
+                </FilterSection>
+              )}
+
+              {/* Amenities */}
+              <FilterSection title="Amenities">
+                {AMENITY_GROUPS.map((group) => (
+                  <div key={group.label} className="space-y-1.5">
+                    <span className="text-xs font-semibold text-ink/60 dark:text-dark-ink/60">{group.label}</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {group.items.map((item) => (
+                        <Chip
+                          key={item.value}
+                          label={item.label}
+                          active={selectedAmenities.includes(item.value)}
+                          onClick={() => handleAmenityToggle(item.value)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </FilterSection>
+
+              {/* Safety */}
+              <FilterSection title="Safety">
+                <div className="flex flex-wrap gap-2">
+                  {SAFETY_FEATURES.map((item) => (
+                    <Chip
+                      key={item.value}
+                      label={item.label}
+                      active={selectedSafety.includes(item.value)}
+                      onClick={() => handleSafetyToggle(item.value)}
+                    />
+                  ))}
+                </div>
+              </FilterSection>
+            </div>
+          </div>
+
+          {/* Sticky Bottom Reset Button */}
+          <div className="sticky bottom-0 rounded-b-2xl border-t border-border/50 bg-panel px-4 py-3 dark:border-dark-border/50 dark:bg-dark-panel">
+            <button
+              type="button"
+              onClick={resetAll}
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-surface/60 px-4 py-2.5 text-sm font-medium text-muted transition hover:border-red-300 hover:bg-red-50 hover:text-red-600 dark:border-dark-border dark:bg-dark-surface/60 dark:text-dark-muted dark:hover:border-red-700 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Reset All Filters
+            </button>
+          </div>
+        </>
       )}
     </div>
   );

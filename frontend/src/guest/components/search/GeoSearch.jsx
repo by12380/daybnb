@@ -194,7 +194,7 @@ function GeoSearch({ className = "" }) {
     <div className={`space-y-6 ${className}`} id="geosearch">
       <InstantSearch searchClient={searchClient} indexName={indexName}>
         <Configure
-          hitsPerPage={12}
+          hitsPerPage={6}
           getRankingInfo={true}
           aroundLatLng={aroundLatLng}
           aroundRadius={userLocation ? searchRadius : undefined}
@@ -212,7 +212,7 @@ function GeoSearch({ className = "" }) {
 
         {/* Filters sidebar + Results */}
         <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
-          <aside className="lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto lg:scrollbar-thin">
+          <aside className="lg:sticky lg:top-4 lg:self-start">
             <SearchFilters
               onDateChange={handleDateChange}
               selectedDate={selectedDate}

@@ -2,6 +2,7 @@ const { supabaseAdmin } = require("../config/supabase");
 const asyncHandler = require("../utils/asyncHandler");
 const ApiError = require("../utils/ApiError");
 const { ROLES } = require("../middleware/rbac");
+const { syncRoomInsert, syncRoomUpdate, syncRoomDelete } = require("../utils/algoliaSync");
 
 /* ──────────────────────────────────────────────────────────
  * Helper: resolve which owner ID to scope queries to.
@@ -68,6 +69,7 @@ exports.createRoom = asyncHandler(async (req, res) => {
     property_type, place_type, bedrooms, beds, bathrooms,
     instant_book, self_checkin, allows_pets,
     is_guest_favorite, is_luxe, amenities, safety_features,
+    images, description,
   } = req.body;
 
   if (!title || !location) {
@@ -96,6 +98,8 @@ exports.createRoom = asyncHandler(async (req, res) => {
     is_luxe: Boolean(is_luxe),
     amenities: Array.isArray(amenities) ? amenities : [],
     safety_features: Array.isArray(safety_features) ? safety_features : [],
+    images: Array.isArray(images) ? images : [],
+    description: typeof description === "string" ? description.trim() : "",
   };
 
   const { data, error } = await supabaseAdmin
@@ -105,6 +109,8 @@ exports.createRoom = asyncHandler(async (req, res) => {
     .single();
 
   if (error) throw ApiError.internal(error.message);
+
+  syncRoomInsert(data);
 
   res.status(201).json({ room: data });
 });
@@ -124,6 +130,7 @@ exports.updateRoom = asyncHandler(async (req, res) => {
     property_type, place_type, bedrooms, beds, bathrooms,
     instant_book, self_checkin, allows_pets,
     is_guest_favorite, is_luxe, amenities, safety_features,
+    images, description,
   } = req.body;
 
   const updates = {};
@@ -146,6 +153,8 @@ exports.updateRoom = asyncHandler(async (req, res) => {
   if (is_luxe !== undefined) updates.is_luxe = Boolean(is_luxe);
   if (amenities !== undefined) updates.amenities = Array.isArray(amenities) ? amenities : [];
   if (safety_features !== undefined) updates.safety_features = Array.isArray(safety_features) ? safety_features : [];
+  if (images !== undefined) updates.images = Array.isArray(images) ? images : [];
+  if (description !== undefined) updates.description = typeof description === "string" ? description.trim() : "";
 
   const { data, error } = await supabaseAdmin
     .from("rooms")
@@ -157,6 +166,8 @@ exports.updateRoom = asyncHandler(async (req, res) => {
 
   if (error) throw ApiError.internal(error.message);
   if (!data) throw ApiError.notFound("Room not found or you don't own it");
+
+  syncRoomUpdate(data);
 
   res.json({ room: data });
 });
@@ -181,13 +192,17 @@ exports.deleteRoom = asyncHandler(async (req, res) => {
 
   if (!room) throw ApiError.notFound("Room not found or you don't own it");
 
+  const deletedId = req.params.id;
+
   const { error } = await supabaseAdmin
     .from("rooms")
     .delete()
-    .eq("id", req.params.id)
+    .eq("id", deletedId)
     .eq("owner_id", ownerId);
 
   if (error) throw ApiError.internal(error.message);
+
+  syncRoomDelete(deletedId);
 
   res.json({ message: "Room deleted successfully" });
 });

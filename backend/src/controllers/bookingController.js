@@ -3,6 +3,7 @@ const asyncHandler = require("../utils/asyncHandler");
 const ApiError = require("../utils/ApiError");
 const { ROLES } = require("../middleware/rbac");
 const { emitNotificationToUser, emitNotificationToRole } = require("../socket");
+const { syncBookingChange } = require("../utils/algoliaSync");
 
 /**
  * GET /api/bookings
@@ -229,6 +230,8 @@ exports.create = asyncHandler(async (req, res) => {
     emitNotificationToRole("admin", savedNotif || adminNotification);
   }
 
+  syncBookingChange("BOOKING_INSERT", data);
+
   res.status(201).json({ booking: data });
 });
 
@@ -368,6 +371,8 @@ exports.update = asyncHandler(async (req, res) => {
     }
   }
 
+  syncBookingChange("BOOKING_UPDATE", data, existingBooking);
+
   res.json({ booking: data });
 });
 
@@ -407,6 +412,8 @@ exports.approve = asyncHandler(async (req, res) => {
     .single();
 
   emitNotificationToUser(data.user_id, savedNotif || approvedNotif);
+
+  syncBookingChange("BOOKING_UPDATE", data);
 
   res.json({ booking: data });
 });
@@ -451,6 +458,8 @@ exports.reject = asyncHandler(async (req, res) => {
     .single();
 
   emitNotificationToUser(data.user_id, savedNotif || rejectedNotif);
+
+  syncBookingChange("BOOKING_UPDATE", data);
 
   res.json({ booking: data });
 });
@@ -564,6 +573,8 @@ exports.remove = asyncHandler(async (req, res) => {
       emitNotificationToRole("admin", savedNotif || adminNotification);
     }
   }
+
+  syncBookingChange("BOOKING_DELETE", null, existingBooking);
 
   res.json({ message: "Booking deleted successfully" });
 });

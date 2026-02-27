@@ -11,7 +11,7 @@ import LanguageSelector from "../../../components/LanguageSelector.jsx";
 export default function GuestNavbar() {
   const { t } = useTranslation();
   const { user, loading, signOut } = useAuth();
-  const { isAdmin } = useProfile();
+  const { isAdmin, isOwner } = useProfile();
   const navigate = useNavigate();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
@@ -144,6 +144,18 @@ export default function GuestNavbar() {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17v-2a4 4 0 014-4h2m-6 6h6m2 0a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v8a2 2 0 002 2h2" />
                         </svg>
                         {t("navbar.adminPanel")}
+                      </Link>
+                    )}
+                    {isOwner && (
+                      <Link
+                        to="/owner"
+                        onClick={() => setDropdownOpen(false)}
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-ink transition hover:bg-surface/60"
+                      >
+                        <svg className="h-5 w-5 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8.25 21v-4.875c0-.621.504-1.125 1.125-1.125h5.25c.621 0 1.125.504 1.125 1.125V21m0 0h4.5V3.545M12.75 21h7.5V10.75M2.25 21h1.5m18 0h-18M2.25 9l4.5-1.636M18.75 3l-1.5.545m0 6.205l3 1m1.5.5l-1.5-.5M6.75 7.364V3h-3v18m3-13.636l10.5-3.819" />
+                        </svg>
+                        {t("navbar.ownerPanel")}
                       </Link>
                     )}
                   </div>

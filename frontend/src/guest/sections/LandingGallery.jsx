@@ -21,7 +21,7 @@ import {
   SAFETY_FEATURES,
 } from "../utils/constants.js";
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 6;
 
 const SORT_OPTIONS = [
   { value: "", label: "Newest" },
@@ -118,10 +118,18 @@ function GalleryFilters({ filters, onChange }) {
 
   const [expanded, setExpanded] = useState(false);
 
+  const handleResetAll = () => onChange({
+    date: "", minPrice: "", maxPrice: "", placeType: "any",
+    minBeds: 0, minBathrooms: 0, instantBook: false, selfCheckin: false,
+    allowsPets: false, guestFavorite: false, luxe: false,
+    selectedPropertyTypes: [], selectedAmenities: [], selectedSafety: [],
+  });
+
   return (
-    <div className="rounded-2xl border border-border bg-panel p-4 dark:border-dark-border dark:bg-dark-panel">
-      <button type="button" onClick={() => setExpanded(!expanded)} className="flex w-full items-center justify-between">
-        <div className="flex items-center gap-2">
+    <div className="flex max-h-[calc(100vh-6rem)] flex-col rounded-2xl border border-border bg-panel dark:border-dark-border dark:bg-dark-panel">
+      {/* Sticky Header */}
+      <div className="sticky top-0 z-10 flex items-center justify-between rounded-t-2xl border-b border-border/50 bg-panel px-4 py-3 dark:border-dark-border/50 dark:bg-dark-panel">
+        <button type="button" onClick={() => setExpanded(!expanded)} className="flex items-center gap-2">
           <svg className="h-5 w-5 text-brand-600 dark:text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
           </svg>
@@ -129,132 +137,149 @@ function GalleryFilters({ filters, onChange }) {
           {activeCount > 0 && (
             <span className="rounded-full bg-brand-600 px-1.5 py-0.5 text-[10px] font-bold text-white">{activeCount}</span>
           )}
-        </div>
-        <svg className={`h-5 w-5 text-muted transition-transform ${expanded ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
-
-      {expanded && (
-        <div className="mt-4 space-y-4">
-          {/* Date */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-ink dark:text-dark-ink">Date</label>
-            <DatePicker
-              className={INPUT_STYLES}
-              placeholder="Select date"
-              value={date ? dayjs(date) : null}
-              onChange={(_, ds) => set("date", ds || "")}
-              disabledDate={(cur) => cur && cur < dayjs().startOf("day")}
-              allowClear
-            />
-          </div>
-
-          {/* Type of Place */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-ink dark:text-dark-ink">Type of place</label>
-            <SegmentedControl options={PLACE_TYPES} value={placeType} onChange={(v) => set("placeType", v)} />
-          </div>
-
-          {/* Price */}
-          <div className="space-y-2">
-            <label className="text-xs font-medium text-ink dark:text-dark-ink">Price/day</label>
-            <div className="flex items-center gap-1.5">
-              <div className="relative flex-1">
-                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted">$</span>
-                <input type="number" min={0} value={minPrice} onChange={(e) => set("minPrice", e.target.value)} placeholder="Min"
-                  className="w-full rounded-lg border border-border bg-surface px-2 py-1.5 pl-5 text-sm text-ink placeholder:text-muted focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-dark-border dark:bg-dark-surface dark:text-dark-ink" />
-              </div>
-              <span className="text-xs text-muted">&ndash;</span>
-              <div className="relative flex-1">
-                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted">$</span>
-                <input type="number" min={0} value={maxPrice} onChange={(e) => set("maxPrice", e.target.value)} placeholder="Max"
-                  className="w-full rounded-lg border border-border bg-surface px-2 py-1.5 pl-5 text-sm text-ink placeholder:text-muted focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-dark-border dark:bg-dark-surface dark:text-dark-ink" />
-              </div>
-            </div>
-          </div>
-
-          {/* Beds & Baths */}
-          <div className="grid grid-cols-2 gap-2">
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-ink dark:text-dark-ink">Beds</label>
-              <select value={minBeds} onChange={(e) => set("minBeds", Number(e.target.value))} className={INPUT_STYLES + " w-full"}>
-                <option value={0}>Any</option>
-                {[1,2,3,4,5,6,8].map((n) => <option key={n} value={n}>{n}+</option>)}
-              </select>
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-ink dark:text-dark-ink">Bathrooms</label>
-              <select value={minBathrooms} onChange={(e) => set("minBathrooms", Number(e.target.value))} className={INPUT_STYLES + " w-full"}>
-                <option value={0}>Any</option>
-                {[1,2,3,4,5].map((n) => <option key={n} value={n}>{n}+</option>)}
-              </select>
-            </div>
-          </div>
-
-          {/* Booking Options */}
-          <FilterSection title="Booking options" defaultOpen>
-            <div className="flex flex-wrap gap-2">
-              <Chip label="Instant Book" active={instantBook} onClick={() => set("instantBook", !instantBook)} />
-              <Chip label="Self check-in" active={selfCheckin} onClick={() => set("selfCheckin", !selfCheckin)} />
-              <Chip label="Allows pets" active={allowsPets} onClick={() => set("allowsPets", !allowsPets)} />
-            </div>
-          </FilterSection>
-
-          {/* Standout Stays */}
-          <FilterSection title="Standout stays" defaultOpen>
-            <div className="flex flex-wrap gap-2">
-              <Chip label="Guest favorite" active={guestFavorite} onClick={() => set("guestFavorite", !guestFavorite)} />
-              <Chip label="Luxe" active={luxe} onClick={() => set("luxe", !luxe)} />
-            </div>
-          </FilterSection>
-
-          {/* Property Type */}
-          <FilterSection title="Property type" defaultOpen>
-            <div className="flex flex-wrap gap-2">
-              {PROPERTY_TYPES.map((pt) => (
-                <Chip key={pt.value} label={pt.label} active={(selectedPropertyTypes || []).includes(pt.value)} onClick={() => toggleInArray("selectedPropertyTypes", pt.value)} />
-              ))}
-            </div>
-          </FilterSection>
-
-          {/* Amenities */}
-          <FilterSection title="Amenities">
-            {AMENITY_GROUPS.map((group) => (
-              <div key={group.label} className="space-y-1.5">
-                <span className="text-xs font-semibold text-ink/60 dark:text-dark-ink/60">{group.label}</span>
-                <div className="flex flex-wrap gap-1.5">
-                  {group.items.map((item) => (
-                    <Chip key={item.value} label={item.label} active={(selectedAmenities || []).includes(item.value)} onClick={() => toggleInArray("selectedAmenities", item.value)} />
-                  ))}
-                </div>
-              </div>
-            ))}
-          </FilterSection>
-
-          {/* Safety */}
-          <FilterSection title="Safety">
-            <div className="flex flex-wrap gap-2">
-              {SAFETY_FEATURES.map((item) => (
-                <Chip key={item.value} label={item.label} active={(selectedSafety || []).includes(item.value)} onClick={() => toggleInArray("selectedSafety", item.value)} />
-              ))}
-            </div>
-          </FilterSection>
-
-          {/* Reset */}
+          <svg className={`h-4 w-4 text-muted transition-transform ${expanded ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+        {activeCount > 0 && (
           <button
             type="button"
-            onClick={() => onChange({
-              date: "", minPrice: "", maxPrice: "", placeType: "any",
-              minBeds: 0, minBathrooms: 0, instantBook: false, selfCheckin: false,
-              allowsPets: false, guestFavorite: false, luxe: false,
-              selectedPropertyTypes: [], selectedAmenities: [], selectedSafety: [],
-            })}
-            className="w-full rounded-xl border border-border bg-surface/60 px-4 py-2 text-sm font-medium text-muted transition hover:border-red-300 hover:bg-red-50 hover:text-red-600 dark:border-dark-border dark:bg-dark-surface/60 dark:text-dark-muted dark:hover:border-red-700 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+            onClick={handleResetAll}
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-muted transition hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+            title="Reset all filters"
           >
-            Reset All Filters
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
           </button>
-        </div>
+        )}
+      </div>
+
+      {expanded && (
+        <>
+          {/* Scrollable Filter Content */}
+          <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-4 scrollbar-thin">
+            <div className="space-y-4">
+              {/* Date */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-ink dark:text-dark-ink">Date</label>
+                <DatePicker
+                  className={INPUT_STYLES}
+                  placeholder="Select date"
+                  value={date ? dayjs(date) : null}
+                  onChange={(_, ds) => set("date", ds || "")}
+                  disabledDate={(cur) => cur && cur < dayjs().startOf("day")}
+                  allowClear
+                />
+              </div>
+
+              {/* Type of Place */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-ink dark:text-dark-ink">Type of place</label>
+                <SegmentedControl options={PLACE_TYPES} value={placeType} onChange={(v) => set("placeType", v)} />
+              </div>
+
+              {/* Price */}
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-ink dark:text-dark-ink">Price/day</label>
+                <div className="flex items-center gap-1.5">
+                  <div className="relative flex-1">
+                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted">$</span>
+                    <input type="number" min={0} value={minPrice} onChange={(e) => set("minPrice", e.target.value)} placeholder="Min"
+                      className="w-full rounded-lg border border-border bg-surface px-2 py-1.5 pl-5 text-sm text-ink placeholder:text-muted focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-dark-border dark:bg-dark-surface dark:text-dark-ink" />
+                  </div>
+                  <span className="text-xs text-muted">&ndash;</span>
+                  <div className="relative flex-1">
+                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted">$</span>
+                    <input type="number" min={0} value={maxPrice} onChange={(e) => set("maxPrice", e.target.value)} placeholder="Max"
+                      className="w-full rounded-lg border border-border bg-surface px-2 py-1.5 pl-5 text-sm text-ink placeholder:text-muted focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-dark-border dark:bg-dark-surface dark:text-dark-ink" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Beds & Baths */}
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-ink dark:text-dark-ink">Beds</label>
+                  <select value={minBeds} onChange={(e) => set("minBeds", Number(e.target.value))} className={INPUT_STYLES + " w-full"}>
+                    <option value={0}>Any</option>
+                    {[1,2,3,4,5,6,8].map((n) => <option key={n} value={n}>{n}+</option>)}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-ink dark:text-dark-ink">Bathrooms</label>
+                  <select value={minBathrooms} onChange={(e) => set("minBathrooms", Number(e.target.value))} className={INPUT_STYLES + " w-full"}>
+                    <option value={0}>Any</option>
+                    {[1,2,3,4,5].map((n) => <option key={n} value={n}>{n}+</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {/* Booking Options */}
+              <FilterSection title="Booking options" defaultOpen>
+                <div className="flex flex-wrap gap-2">
+                  <Chip label="Instant Book" active={instantBook} onClick={() => set("instantBook", !instantBook)} />
+                  <Chip label="Self check-in" active={selfCheckin} onClick={() => set("selfCheckin", !selfCheckin)} />
+                  <Chip label="Allows pets" active={allowsPets} onClick={() => set("allowsPets", !allowsPets)} />
+                </div>
+              </FilterSection>
+
+              {/* Standout Stays */}
+              <FilterSection title="Standout stays" defaultOpen>
+                <div className="flex flex-wrap gap-2">
+                  <Chip label="Guest favorite" active={guestFavorite} onClick={() => set("guestFavorite", !guestFavorite)} />
+                  <Chip label="Luxe" active={luxe} onClick={() => set("luxe", !luxe)} />
+                </div>
+              </FilterSection>
+
+              {/* Property Type */}
+              <FilterSection title="Property type" defaultOpen>
+                <div className="flex flex-wrap gap-2">
+                  {PROPERTY_TYPES.map((pt) => (
+                    <Chip key={pt.value} label={pt.label} active={(selectedPropertyTypes || []).includes(pt.value)} onClick={() => toggleInArray("selectedPropertyTypes", pt.value)} />
+                  ))}
+                </div>
+              </FilterSection>
+
+              {/* Amenities */}
+              <FilterSection title="Amenities">
+                {AMENITY_GROUPS.map((group) => (
+                  <div key={group.label} className="space-y-1.5">
+                    <span className="text-xs font-semibold text-ink/60 dark:text-dark-ink/60">{group.label}</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {group.items.map((item) => (
+                        <Chip key={item.value} label={item.label} active={(selectedAmenities || []).includes(item.value)} onClick={() => toggleInArray("selectedAmenities", item.value)} />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </FilterSection>
+
+              {/* Safety */}
+              <FilterSection title="Safety">
+                <div className="flex flex-wrap gap-2">
+                  {SAFETY_FEATURES.map((item) => (
+                    <Chip key={item.value} label={item.label} active={(selectedSafety || []).includes(item.value)} onClick={() => toggleInArray("selectedSafety", item.value)} />
+                  ))}
+                </div>
+              </FilterSection>
+            </div>
+          </div>
+
+          {/* Sticky Bottom Reset Button */}
+          <div className="sticky bottom-0 rounded-b-2xl border-t border-border/50 bg-panel px-4 py-3 dark:border-dark-border/50 dark:bg-dark-panel">
+            <button
+              type="button"
+              onClick={handleResetAll}
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-surface/60 px-4 py-2.5 text-sm font-medium text-muted transition hover:border-red-300 hover:bg-red-50 hover:text-red-600 dark:border-dark-border dark:bg-dark-surface/60 dark:text-dark-muted dark:hover:border-red-700 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Reset All Filters
+            </button>
+          </div>
+        </>
       )}
     </div>
   );
@@ -416,7 +441,7 @@ const LandingGallery = React.memo(
       {/* Filters + Results grid */}
       <div className="mt-4 grid gap-6 lg:grid-cols-4">
         {/* Sidebar filters */}
-        <div className="lg:col-span-1">
+        <div className="lg:sticky lg:top-4 lg:col-span-1 lg:self-start">
           <GalleryFilters filters={filters} onChange={setFilters} />
         </div>
 

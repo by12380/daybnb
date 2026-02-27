@@ -101,6 +101,8 @@ const RoomFormModal = React.memo(({ open, room, onClose, onSave, isNew }) => {
   const [isLuxe, setIsLuxe] = useState(null);
   const [amenities, setAmenities] = useState([]);
   const [safetyFeatures, setSafetyFeatures] = useState([]);
+  const [images, setImages] = useState([]);
+  const [description, setDescription] = useState("");
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -127,6 +129,8 @@ const RoomFormModal = React.memo(({ open, room, onClose, onSave, isNew }) => {
         setIsLuxe(room.is_luxe ?? null);
         setAmenities(room.amenities || []);
         setSafetyFeatures(room.safety_features || []);
+        setImages(room.images || []);
+        setDescription(room.description || "");
       } else {
         setTitle(""); setLocation(""); setType("room"); setGuests(2);
         setPricePerDay(100); setImage(""); setTags("");
@@ -135,6 +139,7 @@ const RoomFormModal = React.memo(({ open, room, onClose, onSave, isNew }) => {
         setInstantBook(null); setSelfCheckin(null); setAllowsPets(null);
         setIsGuestFavorite(null); setIsLuxe(null);
         setAmenities([]); setSafetyFeatures([]);
+        setImages([]); setDescription("");
       }
       setError("");
     }
@@ -158,6 +163,7 @@ const RoomFormModal = React.memo(({ open, room, onClose, onSave, isNew }) => {
     if (!location.trim()) { setError("Please enter a location."); return; }
     setSaving(true);
 
+    const cleanImages = images.map((u) => u.trim()).filter(Boolean);
     const roomData = {
       title: title.trim(),
       location: location.trim(),
@@ -178,6 +184,8 @@ const RoomFormModal = React.memo(({ open, room, onClose, onSave, isNew }) => {
       is_luxe: isLuxe === null ? false : isLuxe,
       amenities,
       safety_features: safetyFeatures,
+      images: cleanImages,
+      description: description.trim(),
     };
 
     try {
@@ -190,7 +198,7 @@ const RoomFormModal = React.memo(({ open, room, onClose, onSave, isNew }) => {
     dispatch, title, location, type, guests, pricePerDay, image, tags,
     propertyType, placeType, bedrooms, beds, bathrooms,
     instantBook, selfCheckin, allowsPets, isGuestFavorite, isLuxe,
-    amenities, safetyFeatures, isNew, room?.id, onSave,
+    amenities, safetyFeatures, images, description, isNew, room?.id, onSave,
   ]);
 
   return (
@@ -218,12 +226,43 @@ const RoomFormModal = React.memo(({ open, room, onClose, onSave, isNew }) => {
           <FormInput label="Max Guests" type="number" min={1} max={20} value={guests} onChange={(e) => setGuests(e.target.value)} />
         </div>
         <FormInput label="Price per Day ($)" type="number" min={0} step={0.01} value={pricePerDay} onChange={(e) => setPricePerDay(e.target.value)} />
-        <FormInput label="Image URL" value={image} onChange={(e) => setImage(e.target.value)} placeholder="https://example.com/image.jpg" />
+        <FormInput label="Cover Image URL" value={image} onChange={(e) => setImage(e.target.value)} placeholder="https://example.com/image.jpg" />
         {image && (
           <div className="overflow-hidden rounded-xl border border-border">
             <img src={image} alt="Preview" className="h-32 w-full object-cover" onError={(e) => { e.target.style.display = "none"; }} />
           </div>
         )}
+
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <label className="text-sm font-medium text-muted">Gallery Images</label>
+            <button type="button" onClick={() => setImages((prev) => [...prev, ""])}
+              className="flex items-center gap-1 rounded-lg border border-brand-200 bg-brand-50 px-3 py-1.5 text-xs font-medium text-brand-700 transition hover:bg-brand-100 dark:border-brand-700 dark:bg-brand-900/30 dark:text-brand-300 dark:hover:bg-brand-900/50">
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v12m6-6H6" /></svg>
+              Add Image
+            </button>
+          </div>
+          {images.length === 0 && <p className="text-xs text-muted">No gallery images yet. Add URLs for the photo gallery.</p>}
+          <div className="space-y-2">
+            {images.map((url, idx) => (
+              <div key={idx} className="flex items-start gap-2">
+                <div className="flex-1 space-y-1">
+                  <input className={INPUT_STYLES + " w-full"} value={url} onChange={(e) => setImages((prev) => prev.map((u, i) => i === idx ? e.target.value : u))} placeholder={`Image URL ${idx + 1}`} />
+                  {url.trim() && <img src={url.trim()} alt="" className="h-16 w-24 rounded-lg border border-border object-cover" onError={(e) => { e.target.style.display = "none"; }} />}
+                </div>
+                <button type="button" onClick={() => setImages((prev) => prev.filter((_, i) => i !== idx))} className="mt-2 rounded-lg border border-border p-2 text-muted transition hover:border-red-200 hover:bg-red-50 hover:text-red-600">
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <label className="flex flex-col gap-2">
+          <span className="text-sm font-medium text-muted">Description</span>
+          <textarea className={`${INPUT_STYLES} min-h-[80px] resize-y`} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Describe the space, the neighborhood, what makes it special..." />
+        </label>
+
         <FormInput label="Tags (comma-separated)" value={tags} onChange={(e) => setTags(e.target.value)} placeholder="e.g., Ocean view, Wi-Fi, Workspace" />
 
         {/* ── Property Details ── */}

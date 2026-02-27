@@ -30,7 +30,8 @@
     "myProfile": "My Profile",
     "myBookings": "My Bookings",
     "likedRooms": "Liked Rooms",
-    "adminPanel": "Admin Panel"
+    "adminPanel": "Admin Panel",
+    "ownerPanel": "Owner Panel"
   },
   "hero": {
     "badge": "Day-Use Only",

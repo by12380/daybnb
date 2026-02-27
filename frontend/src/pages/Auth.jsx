@@ -116,22 +116,22 @@ const Auth = React.memo(() => {
   );
 
   // ── Redirect if already logged in ─────────────────────────
-  // Always navigate directly by role; profile details are optional.
+  // Skip during active login/signup to avoid racing with navigateByRole.
   useEffect(() => {
+    if (submitting) return;
     if (loading || profileLoading) return;
     if (!session) return;
 
-    // User is logged in — redirect normally
-    if (redirectTo && !isAdmin && !isOwner) {
-      navigate(redirectTo, { replace: true });
-    } else if (isAdmin) {
+    if (isAdmin) {
       navigate("/admin", { replace: true });
     } else if (isOwner) {
       navigate("/owner", { replace: true });
+    } else if (redirectTo) {
+      navigate(redirectTo, { replace: true });
     } else {
       navigate("/", { replace: true });
     }
-  }, [loading, profileLoading, navigate, redirectTo, session, profile, isAdmin, isOwner]);
+  }, [submitting, loading, profileLoading, navigate, redirectTo, session, profile, isAdmin, isOwner]);
 
   // ── Login handler ─────────────────────────────────────────
   const onLogin = useCallback(

@@ -7,7 +7,7 @@ import { supabase } from "../../lib/supabaseClient.js";
  */
 export function usePagination({
   table,
-  pageSize = 10,
+  pageSize = 6,
   orderBy = "created_at",
   orderAsc = false,
 }) {

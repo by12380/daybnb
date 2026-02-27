@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "./useAuth.js";
 import api from "../redux/api.js";
 
@@ -6,6 +6,19 @@ export function useProfile() {
   const { user, loading: authLoading } = useAuth();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const prevUserIdRef = useRef(user?.id);
+
+  // When the user id changes (login/logout), immediately mark as loading
+  // so consumers never see a stale profile with loading=false.
+  useEffect(() => {
+    if (user?.id !== prevUserIdRef.current) {
+      prevUserIdRef.current = user?.id;
+      setLoading(true);
+      if (!user?.id) {
+        setProfile(null);
+      }
+    }
+  }, [user?.id]);
 
   const fetchProfile = useCallback(async () => {
     if (!user?.id) {
