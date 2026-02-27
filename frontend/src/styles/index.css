@@ -63,6 +63,7 @@
   }
 }
 
+/* ── Ant Design DatePicker ───────────────────────────────── */
 .ant-picker {
   background-color: rgb(var(--color-panel) / 1);
   border-color: rgb(var(--color-border) / 1);
@@ -79,14 +80,31 @@
 }
 
 .ant-picker input {
-  color: rgb(var(--color-ink) / 1);
+  color: rgb(var(--color-ink) / 1) !important;
 }
 
 .ant-picker input::placeholder {
-  color: rgb(var(--color-muted) / 0.7);
+  color: rgb(var(--color-muted) / 0.7) !important;
 }
 
-/* Ant Design panels/modals (theme-aware via CSS vars) */
+.ant-picker-suffix {
+  color: rgb(var(--color-muted) / 1) !important;
+}
+
+.ant-picker-clear {
+  color: rgb(var(--color-muted) / 1);
+  background: rgb(var(--color-panel) / 1);
+}
+
+.ant-picker-clear:hover {
+  color: rgb(var(--color-ink) / 1);
+}
+
+.ant-picker-separator {
+  color: rgb(var(--color-muted) / 1) !important;
+}
+
+/* Ant Design dropdown panels (theme-aware via CSS vars) */
 .ant-picker-dropdown,
 .ant-picker-panel-container {
   background-color: rgb(var(--color-panel) / 1);
@@ -101,15 +119,137 @@
   color: rgb(var(--color-muted) / 1);
 }
 
+.ant-picker-header button:hover {
+  color: rgb(var(--color-ink) / 1);
+}
+
 .ant-picker-content th {
   color: rgb(var(--color-muted) / 1);
 }
 
 .ant-picker-cell {
+  color: rgb(var(--color-ink) / 0.5);
+}
+
+.ant-picker-cell-in-view {
   color: rgb(var(--color-ink) / 1);
 }
 
 .ant-picker-cell:hover .ant-picker-cell-inner {
+  background-color: rgb(var(--color-border) / 0.6);
+}
+
+.ant-picker-cell-selected .ant-picker-cell-inner {
+  color: #fff;
+}
+
+.ant-picker-today-btn {
+  color: #3b82f6;
+}
+
+.ant-picker-footer {
+  border-color: rgb(var(--color-border) / 1);
+}
+
+/* ── Ant Design Calendar ─────────────────────────────────── */
+.ant-picker-calendar {
+  background-color: transparent;
+  color: rgb(var(--color-ink) / 1);
+}
+
+.ant-picker-calendar .ant-picker-panel {
+  background-color: transparent;
+  border-top: none;
+}
+
+.ant-picker-calendar .ant-picker-body {
+  padding: 0;
+}
+
+/* ── Ant Design Input (general) ──────────────────────────── */
+.ant-input {
+  background-color: rgb(var(--color-panel) / 1) !important;
+  border-color: rgb(var(--color-border) / 1);
+  color: rgb(var(--color-ink) / 1) !important;
+}
+
+.ant-input::placeholder {
+  color: rgb(var(--color-muted) / 0.7) !important;
+}
+
+.ant-input-affix-wrapper {
+  background-color: rgb(var(--color-panel) / 1) !important;
+  border-color: rgb(var(--color-border) / 1);
+  color: rgb(var(--color-ink) / 1);
+}
+
+.ant-input-prefix,
+.ant-input-suffix {
+  color: rgb(var(--color-muted) / 1) !important;
+}
+
+/* ── Ant Design InputNumber ──────────────────────────────── */
+.ant-input-number {
+  background-color: rgb(var(--color-panel) / 1);
+  border-color: rgb(var(--color-border) / 1);
+  color: rgb(var(--color-ink) / 1);
+}
+
+.ant-input-number-input {
+  color: rgb(var(--color-ink) / 1) !important;
+}
+
+.ant-input-number-input::placeholder {
+  color: rgb(var(--color-muted) / 0.7) !important;
+}
+
+.ant-input-number-handler-wrap {
+  background: rgb(var(--color-panel) / 1);
+}
+
+.ant-input-number-handler {
+  border-color: rgb(var(--color-border) / 1);
+  color: rgb(var(--color-muted) / 1);
+}
+
+/* ── Ant Design Select ───────────────────────────────────── */
+.ant-select-selector {
+  background-color: rgb(var(--color-panel) / 1) !important;
+  border-color: rgb(var(--color-border) / 1) !important;
+  color: rgb(var(--color-ink) / 1) !important;
+}
+
+.ant-select-arrow {
+  color: rgb(var(--color-muted) / 1) !important;
+}
+
+.ant-select-clear {
+  color: rgb(var(--color-muted) / 1);
+  background: rgb(var(--color-panel) / 1);
+}
+
+.ant-select-selection-placeholder {
+  color: rgb(var(--color-muted) / 0.7) !important;
+}
+
+.ant-select-selection-item {
+  color: rgb(var(--color-ink) / 1);
+}
+
+.ant-select-dropdown {
+  background-color: rgb(var(--color-panel) / 1);
+  border: 1px solid rgb(var(--color-border) / 1);
+}
+
+.ant-select-item {
+  color: rgb(var(--color-ink) / 1);
+}
+
+.ant-select-item-option-active {
+  background-color: rgb(var(--color-border) / 0.4);
+}
+
+.ant-select-item-option-selected {
   background-color: rgb(var(--color-border) / 0.6);
 }
 

@@ -11,7 +11,17 @@ async function invokeFunction(functionName, body) {
   });
 
   if (error) {
-    throw new Error(error.message || `${functionName} call failed`);
+    const detail =
+      data?.error || data?.details || data?.message ||
+      (typeof data === "string" ? data : null);
+    const msg = detail
+      ? `${functionName}: ${detail}`
+      : (error.message || `${functionName} call failed`);
+    throw new Error(msg);
+  }
+
+  if (data?.error) {
+    throw new Error(data.error);
   }
 
   return data;
