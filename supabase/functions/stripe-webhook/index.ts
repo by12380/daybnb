@@ -48,7 +48,6 @@ serve(async (req) => {
               stripe_session_id: session.id,
               stripe_payment_intent_id: session.payment_intent,
               paid_at: new Date().toISOString(),
-              status: "confirmed", // Auto-confirm paid bookings
             })
             .eq("id", bookingId);
 

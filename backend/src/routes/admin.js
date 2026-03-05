@@ -1,6 +1,7 @@
 const { Router } = require("express");
 const adminController = require("../controllers/adminController");
 const offerController = require("../controllers/offerController");
+const { fullSync, configureIndex, isConfigured } = require("../utils/algoliaSync");
 const { requireAuth } = require("../middleware/auth");
 const { attachRole, requireRole, ROLES } = require("../middleware/rbac");
 
@@ -42,5 +43,26 @@ router.get("/offers", ...adminMiddleware, offerController.getAllAdmin);
 router.post("/offers", ...adminMiddleware, offerController.createAdmin);
 router.put("/offers/:id", ...adminMiddleware, offerController.updateAdmin);
 router.delete("/offers/:id", ...adminMiddleware, offerController.deleteAdmin);
+
+// ── Algolia Sync ────────────────────────────────────
+router.post("/algolia/full-sync", ...adminMiddleware, async (_req, res) => {
+  try {
+    if (!isConfigured()) return res.status(500).json({ error: "Algolia not configured. Set ALGOLIA_APP_ID and ALGOLIA_ADMIN_KEY in backend/.env" });
+    const result = await fullSync();
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post("/algolia/configure", ...adminMiddleware, async (_req, res) => {
+  try {
+    if (!isConfigured()) return res.status(500).json({ error: "Algolia not configured. Set ALGOLIA_APP_ID and ALGOLIA_ADMIN_KEY in backend/.env" });
+    const result = await configureIndex();
+    res.json({ success: true, result });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 module.exports = router;

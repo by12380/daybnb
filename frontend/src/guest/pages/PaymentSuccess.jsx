@@ -87,7 +87,7 @@ const PaymentSuccess = () => {
         </div>
 
         <h1 className="mt-6 text-2xl font-bold text-ink dark:text-dark-ink">Payment Successful!</h1>
-        <p className="mt-2 text-muted dark:text-dark-muted">Your booking has been confirmed and payment received.</p>
+        <p className="mt-2 text-muted dark:text-dark-muted">Payment received. Your booking is pending approval from the owner or admin.</p>
 
         {verified && (
           <div className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-sm font-medium text-emerald-700 dark:border-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">

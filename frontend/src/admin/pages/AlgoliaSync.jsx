@@ -1,7 +1,6 @@
 import React, { useState, useCallback } from "react";
+import api from "../../redux/api.js";
 import {
-  configureAlgoliaIndex,
-  fullSyncToAlgolia,
   configureAlgoliaBookingsIndex,
   fullSyncBookingsToAlgolia,
 } from "../../lib/algoliaSync.js";
@@ -73,25 +72,25 @@ export default function AlgoliaSync() {
   const handleConfigureIndex = useCallback(async () => {
     setConfigStatus("running");
     try {
-      const result = await configureAlgoliaIndex();
+      const { data } = await api.post("/admin/algolia/configure");
       setConfigStatus("success");
-      addLog("Configure Index", "success", "Index settings updated with all filterable attributes.", result);
+      addLog("Configure Index", "success", "Index settings updated with all filterable attributes.", data);
     } catch (err) {
       setConfigStatus("error");
-      addLog("Configure Index", "error", err.message);
+      addLog("Configure Index", "error", err.message || err.error || "Failed to configure index");
     }
   }, [addLog]);
 
   const handleFullSync = useCallback(async () => {
     setSyncStatus("running");
     try {
-      const result = await fullSyncToAlgolia();
+      const { data } = await api.post("/admin/algolia/full-sync");
       setSyncStatus("success");
-      const count = result?.result?.roomsCount ?? "?";
-      addLog("Full Sync", "success", `${count} rooms synced to Algolia with all fields.`, result);
+      const count = data?.roomsCount ?? "?";
+      addLog("Full Sync", "success", `${count} rooms synced to Algolia with all fields.`, data);
     } catch (err) {
       setSyncStatus("error");
-      addLog("Full Sync", "error", err.message);
+      addLog("Full Sync", "error", err.message || err.error || "Failed to sync");
     }
   }, [addLog]);
 
@@ -123,23 +122,23 @@ export default function AlgoliaSync() {
     setConfigStatus("running");
     setSyncStatus("running");
     try {
-      const configResult = await configureAlgoliaIndex();
+      const { data: configResult } = await api.post("/admin/algolia/configure");
       setConfigStatus("success");
       addLog("Configure Index", "success", "Index settings updated.", configResult);
     } catch (err) {
       setConfigStatus("error");
-      addLog("Configure Index", "error", err.message);
+      addLog("Configure Index", "error", err.message || "Failed to configure");
       setSyncStatus("idle");
       return;
     }
     try {
-      const syncResult = await fullSyncToAlgolia();
+      const { data: syncResult } = await api.post("/admin/algolia/full-sync");
       setSyncStatus("success");
-      const count = syncResult?.result?.roomsCount ?? "?";
+      const count = syncResult?.roomsCount ?? "?";
       addLog("Full Sync", "success", `${count} rooms synced with all fields.`, syncResult);
     } catch (err) {
       setSyncStatus("error");
-      addLog("Full Sync", "error", err.message);
+      addLog("Full Sync", "error", err.message || "Failed to sync");
     }
   }, [addLog]);
 

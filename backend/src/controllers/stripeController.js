@@ -123,7 +123,6 @@ exports.verifySession = asyncHandler(async (req, res) => {
           stripe_session_id: session.id,
           stripe_payment_intent_id: session.payment_intent,
           paid_at: new Date().toISOString(),
-          status: "confirmed",
         })
         .eq("id", resolvedBookingId);
 
@@ -177,7 +176,6 @@ exports.handleWebhook = async (req, res) => {
               stripe_session_id: session.id,
               stripe_payment_intent_id: session.payment_intent,
               paid_at: new Date().toISOString(),
-              status: "confirmed",
             })
             .eq("id", bookingId);
 

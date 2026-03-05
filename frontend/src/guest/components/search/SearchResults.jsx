@@ -245,7 +245,7 @@ function SearchResultCard({ hit, onBook, liked, onToggleLike, availability }) {
           className="mt-2 w-full"
           disabled={isFullyBooked}
         >
-          {isFullyBooked ? "Not Available" : "Book Now"}
+          {isFullyBooked ? "Not Available" : "View Details"}
         </Button>
       </div>
     </Card>
@@ -548,7 +548,7 @@ function SearchResults({ selectedDate }) {
 
   const handleBook = useCallback(
     (hit) => {
-      navigate(`/book/${hit.objectID}`);
+      navigate(`/room/${hit.objectID}`);
     },
     [navigate]
   );
