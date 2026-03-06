@@ -401,7 +401,7 @@ serve(async (req) => {
         break;
 
       case "FULL_SYNC":
-        // Full sync: fetch all rooms from Supabase and sync to Algolia
+        // Full sync: fetch all rooms from Supabase and upsert to Algolia
         const { data: rooms, error: fetchError } = await supabase
           .from("rooms")
           .select("*");
@@ -417,11 +417,42 @@ serve(async (req) => {
             transformToAlgoliaRecord(room, bookingsByRoom[room.id] || [])
           );
           
-          // Clear existing index and add all records
-          await clearObjects();
+          // Upsert all records (non-destructive — no index clear)
           result = await saveObjects(algoliaRecords);
-          console.log(`Full sync completed: ${rooms.length} rooms synced to Algolia`);
-          result = { ...result, roomsCount: rooms.length };
+
+          // Remove stale records that no longer exist in Supabase
+          let staleRemoved = 0;
+          try {
+            const validIdSet = new Set(roomIds);
+            const allAlgoliaIds: string[] = [];
+            let cursor: string | null = null;
+            do {
+              const browseBody = cursor
+                ? { cursor }
+                : { params: "hitsPerPage=1000&attributesToRetrieve=[]" };
+              const browseRes = await algoliaRequest("POST", "/browse", browseBody) as { hits?: { objectID: string }[]; cursor?: string };
+              if (!browseRes) break;
+              for (const hit of (browseRes.hits || [])) {
+                allAlgoliaIds.push(hit.objectID);
+              }
+              cursor = browseRes.cursor || null;
+            } while (cursor);
+
+            const staleIds = allAlgoliaIds.filter((id) => !validIdSet.has(id));
+            if (staleIds.length > 0) {
+              const deleteRequests = staleIds.map((id) => ({
+                action: "deleteObject" as const,
+                body: { objectID: id },
+              }));
+              await algoliaRequest("POST", "/batch", { requests: deleteRequests });
+              staleRemoved = staleIds.length;
+            }
+          } catch (cleanupErr) {
+            console.warn("Stale record cleanup failed (non-fatal):", cleanupErr);
+          }
+
+          console.log(`Full sync completed: ${rooms.length} rooms synced, ${staleRemoved} stale removed`);
+          result = { ...(result as Record<string, unknown>), roomsCount: rooms.length, staleRemoved };
         } else {
           result = { message: "No rooms to sync", roomsCount: 0 };
         }

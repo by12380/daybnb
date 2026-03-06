@@ -3,6 +3,7 @@ require("dotenv").config();
 const http = require("http");
 const app = require("./src/app");
 const { initializeSocket } = require("./src/socket");
+const { startAutoSync } = require("./src/utils/algoliaSync");
 
 const PORT = process.env.PORT || 5000;
 
@@ -25,4 +26,6 @@ server.listen(PORT, () => {
   │                                            │
   └────────────────────────────────────────────┘
   `);
+
+  startAutoSync();
 });

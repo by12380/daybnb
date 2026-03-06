@@ -2,6 +2,7 @@ const { stripe } = require("../config/stripe");
 const { supabaseAdmin } = require("../config/supabase");
 const asyncHandler = require("../utils/asyncHandler");
 const ApiError = require("../utils/ApiError");
+const { syncBookingChange } = require("../utils/algoliaSync");
 
 /**
  * POST /api/stripe/create-checkout-session
@@ -116,7 +117,7 @@ exports.verifySession = asyncHandler(async (req, res) => {
       .single();
 
     if (existing && existing.payment_status !== "paid") {
-      await supabaseAdmin
+      const { data: updatedBooking } = await supabaseAdmin
         .from("bookings")
         .update({
           payment_status: "paid",
@@ -124,7 +125,13 @@ exports.verifySession = asyncHandler(async (req, res) => {
           stripe_payment_intent_id: session.payment_intent,
           paid_at: new Date().toISOString(),
         })
-        .eq("id", resolvedBookingId);
+        .eq("id", resolvedBookingId)
+        .select()
+        .single();
+
+      if (updatedBooking) {
+        syncBookingChange("BOOKING_UPDATE", updatedBooking);
+      }
 
       console.log(`Booking ${resolvedBookingId} verified and marked as paid`);
     }
@@ -169,7 +176,7 @@ exports.handleWebhook = async (req, res) => {
         const bookingId = session.metadata?.booking_id;
 
         if (bookingId && supabaseAdmin) {
-          const { error } = await supabaseAdmin
+          const { data: updatedBooking, error } = await supabaseAdmin
             .from("bookings")
             .update({
               payment_status: "paid",
@@ -177,11 +184,17 @@ exports.handleWebhook = async (req, res) => {
               stripe_payment_intent_id: session.payment_intent,
               paid_at: new Date().toISOString(),
             })
-            .eq("id", bookingId);
+            .eq("id", bookingId)
+            .select()
+            .single();
 
           if (error) {
             console.error("Error updating booking:", error);
             return res.status(500).json({ error: error.message });
+          }
+
+          if (updatedBooking) {
+            syncBookingChange("BOOKING_UPDATE", updatedBooking);
           }
 
           console.log(`Booking ${bookingId} marked as paid`);
