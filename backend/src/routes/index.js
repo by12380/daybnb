@@ -13,11 +13,13 @@ const adminRoutes = require("./admin");
 const ownerRoutes = require("./owner");
 const chatRoutes = require("./chat");
 const offerRoutes = require("./offers");
+const bannerRoutes = require("./banners");
 
 const router = Router();
 
 router.use("/auth", authRoutes);
 router.use("/rooms", roomRoutes);
+router.use("/banners", bannerRoutes);
 router.use("/bookings", bookingRoutes);
 router.use("/users", userRoutes);
 router.use("/reviews", reviewRoutes);

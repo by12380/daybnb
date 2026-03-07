@@ -1,6 +1,6 @@
 import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import LandingHero from "../sections/LandingHero.jsx";
+import HeroSlider from "../sections/HeroSlider.jsx";
 import LandingFeatures from "../sections/LandingFeatures.jsx";
 import LandingCategories from "../sections/LandingCategories.jsx";
 import LandingHowItWorks from "../sections/LandingHowItWorks.jsx";
@@ -39,7 +39,7 @@ const Landing = React.memo(() => {
       <WelcomeOfferBanner className="mb-4" />
 
       <section id="hero" className="py-8">
-        <LandingHero />
+        <HeroSlider />
       </section>
 
       <section id="search" className="py-8">
