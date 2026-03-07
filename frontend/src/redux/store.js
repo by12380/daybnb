@@ -11,6 +11,7 @@ import stripeReducer from "./slices/stripeSlice";
 import ownerReducer from "./slices/ownerSlice";
 import chatReducer from "./slices/chatSlice";
 import offerReducer from "./slices/offerSlice";
+import heroBannerReducer from "./slices/heroBannerSlice";
 
 const store = configureStore({
   reducer: {
@@ -25,6 +26,7 @@ const store = configureStore({
     owner: ownerReducer,
     chat: chatReducer,
     offers: offerReducer,
+    heroBanners: heroBannerReducer,
   },
 });
 

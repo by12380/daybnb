@@ -13,6 +13,7 @@ const adminRoutes = require("./admin");
 const ownerRoutes = require("./owner");
 const chatRoutes = require("./chat");
 const offerRoutes = require("./offers");
+const heroBannerRoutes = require("./heroBanners");
 
 const router = Router();
 
@@ -29,5 +30,6 @@ router.use("/admin", adminRoutes);
 router.use("/owner", ownerRoutes);
 router.use("/chat", chatRoutes);
 router.use("/offers", offerRoutes);
+router.use("/hero-banners", heroBannerRoutes);
 
 module.exports = router;
