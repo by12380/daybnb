@@ -102,19 +102,51 @@ function normalizePayload(body, { partial = false, existingBanner = null } = {})
     payload.text_alignment = textAlignment;
   }
 
-  if (!partial || body.box_x !== undefined) {
-    payload.box_x = toClampedNumber(body.box_x, {
+  if (!partial || body.box_x_desktop !== undefined) {
+    payload.box_x_desktop = toClampedNumber(body.box_x_desktop, {
       min: 0,
       max: 92,
       fallback: 8,
     });
   }
 
-  if (!partial || body.box_y !== undefined) {
-    payload.box_y = toClampedNumber(body.box_y, {
+  if (!partial || body.box_y_desktop !== undefined) {
+    payload.box_y_desktop = toClampedNumber(body.box_y_desktop, {
       min: 0,
       max: 76,
       fallback: 18,
+    });
+  }
+
+  if (!partial || body.box_x_tablet !== undefined) {
+    payload.box_x_tablet = toClampedNumber(body.box_x_tablet, {
+      min: 0,
+      max: 92,
+      fallback: 6,
+    });
+  }
+
+  if (!partial || body.box_y_tablet !== undefined) {
+    payload.box_y_tablet = toClampedNumber(body.box_y_tablet, {
+      min: 0,
+      max: 76,
+      fallback: 12,
+    });
+  }
+
+  if (!partial || body.box_x_mobile !== undefined) {
+    payload.box_x_mobile = toClampedNumber(body.box_x_mobile, {
+      min: 0,
+      max: 92,
+      fallback: 4,
+    });
+  }
+
+  if (!partial || body.box_y_mobile !== undefined) {
+    payload.box_y_mobile = toClampedNumber(body.box_y_mobile, {
+      min: 0,
+      max: 76,
+      fallback: 8,
     });
   }
 

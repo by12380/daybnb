@@ -18,8 +18,12 @@ create table if not exists public.hero_banners (
   gradient_direction text not null default 'to-r',
   background_opacity numeric(3,2) not null default 1,
   text_alignment text not null default 'left',
-  box_x numeric(5,2) not null default 8,
-  box_y numeric(5,2) not null default 18,
+  box_x_desktop numeric(5,2) not null default 8,
+  box_y_desktop numeric(5,2) not null default 18,
+  box_x_tablet numeric(5,2) not null default 6,
+  box_y_tablet numeric(5,2) not null default 12,
+  box_x_mobile numeric(5,2) not null default 4,
+  box_y_mobile numeric(5,2) not null default 8,
   box_width_desktop numeric(5,2) not null default 42,
   box_width_tablet numeric(5,2) not null default 56,
   box_width_mobile numeric(5,2) not null default 88,
@@ -36,10 +40,18 @@ create table if not exists public.hero_banners (
     check (text_alignment in ('left', 'center', 'right')),
   constraint hero_banners_background_opacity_check
     check (background_opacity >= 0 and background_opacity <= 1),
-  constraint hero_banners_box_x_check
-    check (box_x >= 0 and box_x <= 92),
-  constraint hero_banners_box_y_check
-    check (box_y >= 0 and box_y <= 76),
+  constraint hero_banners_box_x_desktop_check
+    check (box_x_desktop >= 0 and box_x_desktop <= 92),
+  constraint hero_banners_box_y_desktop_check
+    check (box_y_desktop >= 0 and box_y_desktop <= 76),
+  constraint hero_banners_box_x_tablet_check
+    check (box_x_tablet >= 0 and box_x_tablet <= 92),
+  constraint hero_banners_box_y_tablet_check
+    check (box_y_tablet >= 0 and box_y_tablet <= 76),
+  constraint hero_banners_box_x_mobile_check
+    check (box_x_mobile >= 0 and box_x_mobile <= 92),
+  constraint hero_banners_box_y_mobile_check
+    check (box_y_mobile >= 0 and box_y_mobile <= 76),
   constraint hero_banners_box_width_desktop_check
     check (box_width_desktop >= 24 and box_width_desktop <= 90),
   constraint hero_banners_box_width_tablet_check

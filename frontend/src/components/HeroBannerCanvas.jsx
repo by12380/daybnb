@@ -12,15 +12,38 @@ const TEXT_ALIGN_CLASSES = {
   right: "items-end text-right",
 };
 
+function useViewportDevice() {
+  const [device, setDevice] = React.useState(() => {
+    if (typeof window === "undefined") return "desktop";
+    const w = window.innerWidth;
+    if (w < 640) return "mobile";
+    if (w < 1024) return "tablet";
+    return "desktop";
+  });
+
+  React.useEffect(() => {
+    function handleResize() {
+      const w = window.innerWidth;
+      setDevice(w < 640 ? "mobile" : w < 1024 ? "tablet" : "desktop");
+    }
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  return device;
+}
+
 const HeroBannerCanvas = React.memo(function HeroBannerCanvas({
   banner,
-  device = "desktop",
+  device: deviceProp,
   className = "",
   style,
   containerRef,
   onTextBoxPointerDown,
   preview = false,
 }) {
+  const viewportDevice = useViewportDevice();
+  const device = deviceProp || viewportDevice;
   const normalized = normalizeHeroBanner(banner);
   const widthPercent = getHeroBoxWidthPercent(normalized, device);
   const position = clampHeroBoxPosition(normalized, device);

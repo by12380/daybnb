@@ -12,8 +12,12 @@ export const HERO_BANNER_DEFAULTS = {
   gradient_direction: "to-r",
   background_opacity: 1,
   text_alignment: "left",
-  box_x: 8,
-  box_y: 18,
+  box_x_desktop: 8,
+  box_y_desktop: 18,
+  box_x_tablet: 6,
+  box_y_tablet: 12,
+  box_x_mobile: 4,
+  box_y_mobile: 8,
   box_width_desktop: 42,
   box_width_tablet: 56,
   box_width_mobile: 88,
@@ -81,8 +85,12 @@ export function normalizeHeroBanner(banner = {}) {
       banner.background_opacity,
       HERO_BANNER_DEFAULTS.background_opacity
     ),
-    box_x: toNumber(banner.box_x, HERO_BANNER_DEFAULTS.box_x),
-    box_y: toNumber(banner.box_y, HERO_BANNER_DEFAULTS.box_y),
+    box_x_desktop: toNumber(banner.box_x_desktop, HERO_BANNER_DEFAULTS.box_x_desktop),
+    box_y_desktop: toNumber(banner.box_y_desktop, HERO_BANNER_DEFAULTS.box_y_desktop),
+    box_x_tablet: toNumber(banner.box_x_tablet, HERO_BANNER_DEFAULTS.box_x_tablet),
+    box_y_tablet: toNumber(banner.box_y_tablet, HERO_BANNER_DEFAULTS.box_y_tablet),
+    box_x_mobile: toNumber(banner.box_x_mobile, HERO_BANNER_DEFAULTS.box_x_mobile),
+    box_y_mobile: toNumber(banner.box_y_mobile, HERO_BANNER_DEFAULTS.box_y_mobile),
     box_width_desktop: toNumber(
       banner.box_width_desktop,
       HERO_BANNER_DEFAULTS.box_width_desktop
@@ -107,14 +115,21 @@ export function getHeroBoxWidthPercent(banner, device = "desktop") {
   return normalized.box_width_desktop;
 }
 
-export function clampHeroBoxPosition(banner, device = "desktop") {
+export function getHeroBoxPosition(banner, device = "desktop") {
   const normalized = normalizeHeroBanner(banner);
-  const width = getHeroBoxWidthPercent(normalized, device);
+  if (device === "mobile") return { x: normalized.box_x_mobile, y: normalized.box_y_mobile };
+  if (device === "tablet") return { x: normalized.box_x_tablet, y: normalized.box_y_tablet };
+  return { x: normalized.box_x_desktop, y: normalized.box_y_desktop };
+}
+
+export function clampHeroBoxPosition(banner, device = "desktop") {
+  const width = getHeroBoxWidthPercent(banner, device);
   const maxLeft = Math.max(0, 100 - width);
+  const pos = getHeroBoxPosition(banner, device);
 
   return {
-    left: Math.min(Math.max(normalized.box_x, 0), maxLeft),
-    top: Math.min(Math.max(normalized.box_y, 0), 76),
+    left: Math.min(Math.max(pos.x, 0), maxLeft),
+    top: Math.min(Math.max(pos.y, 0), 76),
   };
 }
 
