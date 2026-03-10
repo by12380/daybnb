@@ -25,7 +25,8 @@ backend/
     │   └── errorHandler.js   # global error handler (ApiError-aware)
     ├── utils/
     │   ├── ApiError.js       # Custom error: badRequest, unauthorized, forbidden, notFound, conflict, internal
-    │   └── asyncHandler.js   # Wraps async route handlers to catch rejections
+    │   ├── asyncHandler.js   # Wraps async route handlers to catch rejections
+    │   └── algoliaSync.js    # Server-side Algolia sync (REST API, no SDK)
     ├── routes/
     │   ├── index.js          # Mounts all sub-routers under /api
     │   ├── auth.js
@@ -37,10 +38,11 @@ backend/
     │   ├── contact.js
     │   ├── stripe.js
     │   ├── likes.js
-    │   ├── admin.js
+    │   ├── admin.js          # Includes hero banner admin CRUD + Algolia sync endpoints
     │   ├── owner.js
     │   ├── chat.js
-    │   └── offers.js
+    │   ├── offers.js
+    │   └── heroBanners.js    # Public hero banner route (GET /)
     ├── controllers/
     │   ├── authController.js
     │   ├── roomController.js
@@ -54,7 +56,8 @@ backend/
     │   ├── adminController.js
     │   ├── ownerController.js
     │   ├── chatController.js
-    │   └── offerController.js
+    │   ├── offerController.js
+    │   └── heroBannerController.js  # Hero banner CRUD (admin) + public getActive
     └── socket/
         └── index.js          # Socket.IO server: auth, rooms, notifications, chat events
 ```
@@ -142,6 +145,12 @@ Typical protected route: `requireAuth → attachRole → [requireRole(...)] → 
 | POST | `/offers` | Create offer |
 | PUT | `/offers/:id` | Update offer |
 | DELETE | `/offers/:id` | Delete offer |
+| GET | `/hero-banners` | All hero banners (sorted by sort_order, created_at) |
+| POST | `/hero-banners` | Create hero banner (sets created_by to req.user.id) |
+| PUT | `/hero-banners/:id` | Update hero banner (partial update, fetches existing first) |
+| DELETE | `/hero-banners/:id` | Delete hero banner |
+| POST | `/algolia/full-sync` | Trigger full Algolia sync of all rooms |
+| POST | `/algolia/configure` | Configure Algolia index settings |
 
 ### Owner (`/api/owner`) — Owner or Admin impersonating
 | Method | Path | Description |
@@ -169,6 +178,11 @@ Typical protected route: `requireAuth → attachRole → [requireRole(...)] → 
 | GET | `/active` | All currently active offers |
 | GET | `/banners` | Active offers with show_banner=true |
 | GET | `/room/:roomId` | Best offer for a specific room |
+
+### Hero Banners (`/api/hero-banners`) — Public
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/` | Active hero banners ordered by sort_order (is_active=true only) |
 
 ### Reviews (`/api/reviews`)
 | Method | Path | Auth | Description |
@@ -261,3 +275,44 @@ Booking events trigger notifications persisted in `notifications` table and emit
 - `booking_rejected` → notifies customer
 - `booking_updated` → notifies room owner or admins
 - `booking_cancelled` → notifies room owner or admins
+
+## Hero Banner Controller (`heroBannerController.js`)
+
+Handles CRUD for the `hero_banners` table. Key implementation details:
+
+- **Validation**: `normalizePayload(body, { partial, existingBanner })` validates and coerces all fields. Supports full (create) and partial (update) modes.
+- **Valid enums**: `VALID_BACKGROUND_TYPES` (`image`, `solid`, `gradient`), `VALID_TEXT_ALIGNMENTS` (`left`, `center`, `right`), `VALID_GRADIENT_DIRECTIONS` (8 directions).
+- **Numeric clamping**: `toClampedNumber(value, { min, max, fallback, integer })` for all position/width/opacity fields.
+- **Nullable text**: `toNullableText(value)` trims strings, returns `null` for empty.
+- **Image requirement**: Enforces `background_image` is required when `background_type === "image"`.
+- **Update flow**: `updateAdmin` first fetches the existing banner to compare partial updates against current state (especially for image requirement check).
+- All handlers use `supabaseAdmin` (bypasses RLS).
+
+## Algolia Sync Utility (`backend/src/utils/algoliaSync.js`)
+
+Server-side Algolia synchronization using direct REST API calls (no Algolia SDK dependency).
+
+### Configuration
+
+- `ALGOLIA_APP_ID`, `ALGOLIA_ADMIN_KEY`, `ALGOLIA_INDEX_NAME` (default: `daybnb_places`) from env
+- `isConfigured()` — returns true if both app ID and admin key are set
+- `ALGOLIA_SYNC_INTERVAL_MS` — auto-sync interval (default: 30 minutes)
+
+### Key Functions
+
+| Function | Description |
+|----------|-------------|
+| `fullSync()` | Fetches all rooms from Supabase, enriches with average ratings and booked dates, replaces the entire Algolia index |
+| `upsertRecord(room)` | Upserts a single room record to Algolia |
+| `deleteRecord(roomId)` | Deletes a single record from Algolia |
+| `configureIndex()` | Sets searchable attributes, facets, ranking, and geo settings on the Algolia index |
+| `startAutoSync()` | Starts a periodic full sync on `AUTO_SYNC_INTERVAL_MS` |
+| `stopAutoSync()` | Stops the periodic sync |
+
+### Algolia Record Shape
+
+Each room is indexed with: `objectID` (room id), all room fields, `_geoloc` (lat/lng), `averageRating`, `reviewCount`, `bookedDates[]` (dates with active bookings).
+
+### Retry Logic
+
+API requests use exponential backoff with up to `RETRY_ATTEMPTS` (3) retries and `RETRY_BASE_DELAY_MS` (1000ms) base delay.

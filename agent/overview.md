@@ -20,6 +20,7 @@ Daybnb is a daytime room/space booking platform (like Airbnb but for day-use). T
 | i18n | react-i18next (15 languages) |
 | Theme | Dark/light mode via CSS variables + Tailwind `dark:` class |
 | Animation | framer-motion |
+| Carousel | react-slick (used for hero banner slider on landing page) |
 
 ## Running the Project
 
@@ -47,6 +48,10 @@ Daybnb is a daytime room/space booking platform (like Airbnb but for day-use). T
 - `SUPABASE_SERVICE_ROLE_KEY` — Supabase service role key (bypasses RLS)
 - `STRIPE_SECRET_KEY` — Stripe secret key
 - `STRIPE_WEBHOOK_SECRET` — Stripe webhook signing secret
+- `ALGOLIA_APP_ID` — Algolia application ID (for server-side sync)
+- `ALGOLIA_ADMIN_KEY` — Algolia admin API key (for server-side sync)
+- `ALGOLIA_INDEX_NAME` — Algolia index name (default: `daybnb_places`)
+- `ALGOLIA_SYNC_INTERVAL_MS` — Auto-sync interval in ms (default: 30 minutes)
 
 ## User Roles & Auth Flow
 
@@ -70,9 +75,11 @@ Daybnb is a daytime room/space booking platform (like Airbnb but for day-use). T
 /
 ├── frontend/          # React SPA
 ├── backend/           # Express API server
-├── supabase/          # DB migrations, seed data, edge functions
+├── supabase/          # DB migrations, seed data, edge functions, schema files
 ├── agent/             # AI agent reference docs (this folder)
 ├── .gitignore
+├── package.json       # Root-level package.json (workspace-level)
+├── package-lock.json
 ├── README.md
 ├── ALGOLIA_SETUP.md
 └── STRIPE_SETUP.md
@@ -97,3 +104,14 @@ All backend API routes are prefixed with `/api`. Route index: `backend/src/route
 - Custom `ApiError` class for structured HTTP errors (400, 401, 403, 404, 409, 500).
 - Backend has two Supabase clients: `supabase` (respects RLS) and `supabaseAdmin` (bypasses RLS via service role key).
 - Stripe checkout uses Supabase Edge Functions (`create-checkout-session`, `stripe-webhook`).
+- Backend has a server-side Algolia sync utility (`backend/src/utils/algoliaSync.js`) that uses the Algolia REST API directly (no SDK). Supports full-sync, per-record upsert/delete, index configuration, and optional auto-sync on an interval.
+
+## Key Features Summary
+
+| Feature | Description |
+|---------|-------------|
+| Hero Banners | Admin-managed landing page slider with per-device (desktop/tablet/mobile) text box positioning, drag-to-reposition in editor, background types (image/solid/gradient), live preview. Stored in `hero_banners` table. If no active banners exist, a default static hero is rendered. |
+| Room Detail Page | Public page at `/room/:roomId` showing full room details, amenities, reviews, offer pricing, and booking CTA. |
+| Offers & Campaigns | Discount system with room-specific, owner-level, and site-wide scopes. Includes campaign banners and welcome offer banners on the landing page. |
+| Chat | Real-time two-party chat via Socket.IO + REST API. Available to customers, owners, and admins. |
+| Algolia Search | Client-side `react-instantsearch` with geo-search support. Server-side sync from Supabase to Algolia via admin trigger or auto-interval. |

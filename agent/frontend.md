@@ -16,32 +16,38 @@
 ## Routing (`frontend/src/routes/AppRouter.jsx`)
 
 ```
-/                     → Landing (GuestLayout)
-/contact              → ContactUs (GuestLayout)
-/auth                 → Auth (GuestLayout)
-/book/:roomId         → Booking (GuestLayout, RequireAuth)
-/profile              → Profile (GuestLayout, RequireAuth)
-/my-bookings          → MyBookings (GuestLayout, RequireAuth)
-/liked-rooms          → LikedRooms (GuestLayout, RequireAuth)
-/payment-success      → PaymentSuccess (GuestLayout, RequireAuth)
-/payment-cancel       → PaymentCancel (GuestLayout, RequireAuth)
-/host                 → Dashboard (MainLayout)
-/admin                → AdminDashboard (AdminLayout, RequireAdmin)
-/admin/bookings       → AdminBookings
-/admin/users          → AdminUsers
-/admin/rooms          → AdminRooms
-/admin/messages       → AdminMessages
-/admin/chat           → AdminChat
-/admin/owners         → AdminOwners
-/admin/offers         → AdminOffers
-/admin/algolia        → AdminAlgoliaSync
-/owner                → OwnerDashboard (OwnerLayout, RequireOwner)
-/owner/rooms          → OwnerRooms
-/owner/bookings       → OwnerBookings
-/owner/customers      → OwnerCustomers
-/owner/chat           → OwnerChat
-/owner/offers         → OwnerOffers
+/                                → Landing (GuestLayout)
+/contact                         → ContactUs (GuestLayout)
+/room/:roomId                    → RoomDetail (GuestLayout, public)
+/auth                            → Auth (GuestLayout)
+/book/:roomId                    → Booking (GuestLayout, RequireAuth)
+/profile                         → Profile (GuestLayout, RequireAuth)
+/my-bookings                     → MyBookings (GuestLayout, RequireAuth)
+/liked-rooms                     → LikedRooms (GuestLayout, RequireAuth)
+/payment-success                 → PaymentSuccess (GuestLayout, RequireAuth)
+/payment-cancel                  → PaymentCancel (GuestLayout, RequireAuth)
+/host                            → Dashboard (MainLayout)
+/admin                           → AdminDashboard (AdminLayout, RequireAdmin)
+/admin/bookings                  → AdminBookings
+/admin/users                     → AdminUsers
+/admin/rooms                     → AdminRooms
+/admin/messages                  → AdminMessages
+/admin/chat                      → AdminChat
+/admin/owners                    → AdminOwners
+/admin/offers                    → AdminOffers
+/admin/hero-banners              → AdminHeroBanners
+/admin/hero-banners/new          → AdminHeroBannerEditor (create mode)
+/admin/hero-banners/:bannerId/edit → AdminHeroBannerEditor (edit mode)
+/admin/algolia                   → AdminAlgoliaSync
+/owner                           → OwnerDashboard (OwnerLayout, RequireOwner)
+/owner/rooms                     → OwnerRooms
+/owner/bookings                  → OwnerBookings
+/owner/customers                 → OwnerCustomers
+/owner/chat                      → OwnerChat
+/owner/offers                    → OwnerOffers
 ```
+
+Note: Landing page auto-redirects admins to `/admin` and owners to `/owner` via `useProfile()` hook.
 
 ## Directory Structure
 
@@ -72,13 +78,16 @@ frontend/src/
 │       ├── stripeSlice.js    # createCheckoutSession
 │       ├── ownerSlice.js     # owner-scoped: rooms, bookings, customers, stats
 │       ├── chatSlice.js      # conversations, messages, contacts, real-time incoming
-│       └── offerSlice.js     # admin offers, owner offers, public active/banners/roomOffer
+│       ├── offerSlice.js     # admin offers, owner offers, public active/banners/roomOffer
+│       └── heroBannerSlice.js # admin CRUD + public fetch for hero banners
 ├── lib/
 │   ├── supabaseClient.js     # Supabase browser client (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY)
 │   ├── algoliaClient.js      # Algolia search client + helpers (buildFilters, getUserLocation)
 │   ├── algoliaSync.js        # Algolia sync utilities
 │   ├── stripe.js             # getStripe(), createCheckoutSession(), redirectToCheckout()
 │   ├── socket.js             # connectSocket(token), disconnectSocket(), getSocket()
+│   ├── socketClient.js       # createAuthenticatedSocket() — creates a socket.io client with Supabase JWT
+│   ├── heroBanner.js         # Hero banner constants, defaults, normalization, position/width helpers
 │   └── SocketProvider.jsx    # React context for socket instance, useSocket() hook
 ├── theme/
 │   ├── ThemeProvider.jsx     # dark/light context, useTheme() hook
@@ -94,6 +103,7 @@ frontend/src/
 │   ├── useWelcomeOffer.js    # first-visit welcome offer logic
 │   └── useCampaignBanner.js  # campaign banner display logic
 ├── components/
+│   ├── HeroBannerCanvas.jsx  # Shared hero banner renderer (used by landing slider + admin editor)
 │   ├── Navbar.jsx
 │   └── LanguageSelector.jsx
 ├── layouts/
@@ -103,7 +113,8 @@ frontend/src/
 │   └── Dashboard.jsx         # /host dashboard
 ├── guest/                    # Guest (customer) feature module
 │   ├── pages/
-│   │   ├── Landing.jsx       # homepage with sections
+│   │   ├── Landing.jsx       # homepage with sections (auto-redirects admin→/admin, owner→/owner)
+│   │   ├── RoomDetail.jsx    # /room/:roomId — full room detail page (public, no auth required)
 │   │   ├── Booking.jsx       # room booking page with calendar + payment
 │   │   ├── Profile.jsx       # user profile editor
 │   │   ├── MyBookings.jsx    # list of user's bookings
@@ -155,6 +166,8 @@ frontend/src/
 │   │   ├── Chat.jsx
 │   │   ├── Owners.jsx
 │   │   ├── Offers.jsx
+│   │   ├── HeroBanners.jsx        # List/manage hero banners (toggle active, delete)
+│   │   ├── HeroBannerEditor.jsx   # Create/edit hero banner with live preview, drag-to-position, per-device layout
 │   │   └── AlgoliaSync.jsx
 │   └── components/
 │       ├── NotificationDropdown.jsx
@@ -189,6 +202,7 @@ frontend/src/
   owner:         { rooms[], roomsTotal, bookings[], bookingsTotal, customers[], customersTotal, customerBookings[], stats, loading, error }
   chat:          { contacts[], conversations[], activeConversationId, messages{}, loading, messagesLoading, error }
   offers:        { offers[], total, activeOffers[], banners[], roomOffer, loading, error }
+  heroBanners:   { adminBanners[], publicBanners[], loading, publicLoading, publicLoaded, error }
 }
 ```
 
@@ -228,3 +242,66 @@ frontend/src/
 - GeoSearch component uses browser geolocation + Algolia aroundLatLng
 - Filters: price range, availability date, amenities
 - Fallback to backend `/api/rooms` if Algolia is not configured
+
+## Hero Banner System
+
+Admin-managed landing page slider. If no active banners exist, `LandingHero` renders a default static hero with i18n text.
+
+### Data Flow
+
+1. `LandingHero` dispatches `fetchPublicHeroBanners` → `GET /api/hero-banners` (public, no auth)
+2. If `publicBanners.length > 0`, renders a `react-slick` carousel of `HeroBannerCanvas` components
+3. If empty, renders `DefaultLandingHero` (unchanged from original design)
+
+### Admin Editor (`HeroBannerEditor.jsx`)
+
+- Create/edit form at `/admin/hero-banners/new` and `/admin/hero-banners/:bannerId/edit`
+- Live preview with device switcher (desktop/tablet/mobile) — preview sizes match real device aspect ratios
+- Drag-to-reposition: pointer events on the text box update `box_x_<device>` / `box_y_<device>` in real time
+- Range sliders for X position (0–92%), Y position (0–76%), width per device
+- Background type picker: image URL, solid color (color picker), or gradient (two colors + direction)
+- Background opacity slider (0–1)
+- Text alignment (left/center/right)
+- Sort order (integer, ascending) controls carousel slide order
+- Visibility toggle (is_active)
+
+### `HeroBannerCanvas` Component
+
+Shared renderer used in both the landing page slider and admin editor preview. Accepts:
+- `banner` — normalized banner object
+- `device` — `"desktop"` | `"tablet"` | `"mobile"` (optional; auto-detects from viewport width if omitted)
+- `preview` — boolean, disables CTA link clicks when true
+- `containerRef` — for drag positioning in the editor
+- `onTextBoxPointerDown` — callback for drag-to-reposition
+
+Uses `useViewportDevice()` hook internally to detect breakpoints: `<640px` = mobile, `<1024px` = tablet, else desktop.
+
+### `lib/heroBanner.js` Exports
+
+- `HERO_BANNER_DEFAULTS` — default field values for new banners
+- `HERO_BACKGROUND_TYPES`, `HERO_TEXT_ALIGNMENTS`, `HERO_GRADIENT_DIRECTIONS`, `HERO_PREVIEW_DEVICES` — option lists
+- `HERO_PREVIEW_FRAMES` — aspect ratios and labels per device
+- `normalizeHeroBanner(banner)` — merges with defaults, coerces numerics
+- `getHeroBoxWidthPercent(banner, device)` — returns width% for a device
+- `getHeroBoxPosition(banner, device)` — returns `{ x, y }` for a device
+- `clampHeroBoxPosition(banner, device)` — returns clamped `{ left, top }` within bounds
+- `getHeroGradientCssDirection(direction)` — converts `"to-r"` → `"to right"` etc.
+- `getHeroBackgroundLayerStyle(banner)` — returns CSS style object for the background layer
+- `getHeroPreviewWidth(device)`, `getHeroPreviewFrame(device)` — preview sizing helpers
+
+### `socketClient.js`
+
+Standalone utility to create an authenticated Socket.IO client instance. Reads the current Supabase session token and connects to the socket URL derived from `VITE_API_BASE_URL`. Used as an alternative/complement to `SocketProvider` for cases needing a one-off socket connection.
+
+## Room Detail Page (`/room/:roomId`)
+
+Public page (no auth required) that displays full room information:
+- Room images, title, location, property/place type, guest capacity
+- Amenities grid (with icons from `AMENITY_ICONS` map in the component)
+- Safety features
+- Room badges (instant book, guest favorite, luxe, allows pets, self check-in)
+- Review list with star ratings + review form (requires auth)
+- Offer pricing (fetches best offer via `fetchOfferForRoom`)
+- Booking CTA linking to `/book/:roomId`
+
+Dispatches: `fetchRoomById`, `fetchReviewsByRoom`, `fetchOfferForRoom`. Cleans up on unmount via `clearSelectedRoom`, `clearReviews`, `clearRoomOffer`.

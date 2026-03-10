@@ -207,6 +207,48 @@ Landing page promotional banners (legacy/alternative to offers.show_banner).
 | created_at | TIMESTAMPTZ | |
 | updated_at | TIMESTAMPTZ | |
 
+### `hero_banners`
+Admin-managed landing page hero slider banners with per-device responsive text box positioning.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | UUID (PK) | `gen_random_uuid()` |
+| title | TEXT | NOT NULL |
+| subtitle | TEXT | Nullable |
+| badge_text | TEXT | Nullable, shown as a pill above the title |
+| cta_text | TEXT | Nullable, call-to-action button label |
+| cta_link | TEXT | Nullable, CTA destination URL/anchor |
+| background_type | TEXT | `"image"`, `"solid"`, `"gradient"` (CHECK constraint) |
+| background_image | TEXT | Nullable, required when `background_type = 'image'` |
+| background_color | TEXT | Default `"#2563eb"`, used for solid backgrounds |
+| gradient_from | TEXT | Default `"#2563eb"` |
+| gradient_to | TEXT | Default `"#7c3aed"` |
+| gradient_direction | TEXT | Default `"to-r"`. Values: `to-r`, `to-l`, `to-b`, `to-t`, `to-tr`, `to-tl`, `to-br`, `to-bl` |
+| background_opacity | NUMERIC(3,2) | Default 1, range 0–1 |
+| text_alignment | TEXT | `"left"`, `"center"`, `"right"` (CHECK) |
+| box_x_desktop | NUMERIC(5,2) | Default 8, range 0–92 |
+| box_y_desktop | NUMERIC(5,2) | Default 18, range 0–76 |
+| box_x_tablet | NUMERIC(5,2) | Default 6, range 0–92 |
+| box_y_tablet | NUMERIC(5,2) | Default 12, range 0–76 |
+| box_x_mobile | NUMERIC(5,2) | Default 4, range 0–92 |
+| box_y_mobile | NUMERIC(5,2) | Default 8, range 0–76 |
+| box_width_desktop | NUMERIC(5,2) | Default 42, range 24–90 |
+| box_width_tablet | NUMERIC(5,2) | Default 56, range 30–94 |
+| box_width_mobile | NUMERIC(5,2) | Default 88, range 40–98 |
+| sort_order | INT | Default 0, ascending order in carousel |
+| is_active | BOOLEAN | Default true |
+| created_by | UUID | References profiles.id (SET NULL on delete) |
+| created_at | TIMESTAMPTZ | Default `now()` |
+| updated_at | TIMESTAMPTZ | Auto-updated via trigger `set_hero_banners_updated_at` |
+
+**CHECK constraints**: background_type, gradient_direction, text_alignment, background_opacity (0–1), all box_x/box_y (0–92 / 0–76), all box_width per device, and `background_type <> 'image' OR background_image IS NOT NULL`.
+
+**Index**: `idx_hero_banners_active_sort` on `(is_active, sort_order, created_at DESC)`.
+
+**Schema file**: `supabase/hero_banners_schema.sql` (full create table).
+
+**Migration**: `supabase/migrate_hero_banners_per_device_position.sql` — migrates from an earlier version with shared `box_x`/`box_y` columns to per-device `box_x_desktop`/`box_y_desktop`/`box_x_tablet`/`box_y_tablet`/`box_x_mobile`/`box_y_mobile` columns.
+
 ## Supabase Edge Functions
 
 Located in `supabase/functions/`:
@@ -240,3 +282,18 @@ Key indexes defined in migrations:
 - `rooms`: property_type, place_type, instant_book, allows_pets, amenities (GIN), safety_features (GIN), owner_id
 - `offers`: room_id, owner_id, (is_active + start_date + end_date), show_banner
 - `special_offer_campaigns`: (is_active + start_date + end_date)
+- `hero_banners`: (is_active, sort_order, created_at DESC)
+
+## Supabase SQL Files
+
+Files in `supabase/` directory (not all are timestamped migrations):
+
+| File | Purpose |
+|------|---------|
+| `hero_banners_schema.sql` | Full CREATE TABLE for `hero_banners` with constraints, index, and updated_at trigger |
+| `migrate_hero_banners_per_device_position.sql` | Migration from shared box_x/box_y to per-device columns |
+| `offers_schema.sql` | Schema for `offers` table |
+| `seed_rooms.sql` | Seed data for rooms |
+| `migrations/20260217_create_offers_table.sql` | Create offers table migration |
+| `migrations/20260218_add_room_filter_columns.sql` | Add filter columns to rooms |
+| `migrations/20260223_add_room_detail_columns.sql` | Add detail columns to rooms |
