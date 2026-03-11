@@ -114,4 +114,6 @@ All backend API routes are prefixed with `/api`. Route index: `backend/src/route
 | Room Detail Page | Public page at `/room/:roomId` showing full room details, amenities, reviews, offer pricing, and booking CTA. |
 | Offers & Campaigns | Discount system with room-specific, owner-level, and site-wide scopes. Includes campaign banners and welcome offer banners on the landing page. |
 | Chat | Real-time two-party chat via Socket.IO + REST API. Available to customers, owners, and admins. |
+| Check-In/Out | Admin and owner can check in/out guests for today's bookings. Status flow: confirmed → checked_in → checked_out. |
+| Booking History | 4-tab history page (No-show, Completed, Rejected, Cancelled by Guest) in both admin and owner panels. No-show auto-detected for past bookings never checked in or never reviewed. Cancellation is soft-delete (status="cancelled"). |
 | Algolia Search | Client-side `react-instantsearch` with geo-search support. Server-side sync from Supabase to Algolia via admin trigger or auto-interval. |

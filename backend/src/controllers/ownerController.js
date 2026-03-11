@@ -395,6 +395,239 @@ exports.rejectBooking = asyncHandler(async (req, res) => {
   res.json({ booking: data });
 });
 
+/**
+ * PATCH /api/owner/bookings/:id/check-in
+ */
+exports.checkInBooking = asyncHandler(async (req, res) => {
+  if (!supabaseAdmin) throw ApiError.internal("Supabase is not configured");
+
+  const ownerId = resolveOwnerId(req);
+  if (!ownerId) throw ApiError.forbidden("Owner context required");
+
+  const { data: booking } = await supabaseAdmin
+    .from("bookings")
+    .select("*")
+    .eq("id", req.params.id)
+    .maybeSingle();
+
+  if (!booking) throw ApiError.notFound("Booking not found");
+
+  const { data: room } = await supabaseAdmin
+    .from("rooms")
+    .select("*")
+    .eq("id", booking.room_id)
+    .eq("owner_id", ownerId)
+    .maybeSingle();
+
+  if (!room) throw ApiError.forbidden("This booking is not on one of your rooms");
+
+  if (!["approved", "confirmed"].includes(booking.status)) {
+    throw ApiError.badRequest(`Cannot check in a booking with status "${booking.status}". Must be approved or confirmed.`);
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from("bookings")
+    .update({ status: "checked_in", checked_in_at: new Date().toISOString() })
+    .eq("id", req.params.id)
+    .select()
+    .single();
+
+  if (error) throw ApiError.internal(error.message);
+
+  data.room = room;
+
+  const { emitNotificationToUser } = require("../socket");
+  const notification = {
+    recipient_user_id: data.user_id,
+    type: "booking_updated",
+    title: "Checked In!",
+    body: `You have been checked in for your booking on ${data.booking_date}.`,
+    data: { booking_id: data.id, room_id: data.room_id, booking_date: data.booking_date },
+  };
+
+  const { data: savedNotif } = await supabaseAdmin
+    .from("notifications")
+    .insert(notification)
+    .select()
+    .single();
+
+  emitNotificationToUser(data.user_id, savedNotif || notification);
+
+  res.json({ booking: data });
+});
+
+/**
+ * PATCH /api/owner/bookings/:id/check-out
+ */
+exports.checkOutBooking = asyncHandler(async (req, res) => {
+  if (!supabaseAdmin) throw ApiError.internal("Supabase is not configured");
+
+  const ownerId = resolveOwnerId(req);
+  if (!ownerId) throw ApiError.forbidden("Owner context required");
+
+  const { data: booking } = await supabaseAdmin
+    .from("bookings")
+    .select("*")
+    .eq("id", req.params.id)
+    .maybeSingle();
+
+  if (!booking) throw ApiError.notFound("Booking not found");
+
+  const { data: room } = await supabaseAdmin
+    .from("rooms")
+    .select("*")
+    .eq("id", booking.room_id)
+    .eq("owner_id", ownerId)
+    .maybeSingle();
+
+  if (!room) throw ApiError.forbidden("This booking is not on one of your rooms");
+
+  if (booking.status !== "checked_in") {
+    throw ApiError.badRequest(`Cannot check out a booking with status "${booking.status}". Must be checked_in.`);
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from("bookings")
+    .update({ status: "checked_out", checked_out_at: new Date().toISOString() })
+    .eq("id", req.params.id)
+    .select()
+    .single();
+
+  if (error) throw ApiError.internal(error.message);
+
+  data.room = room;
+
+  const { emitNotificationToUser } = require("../socket");
+  const notification = {
+    recipient_user_id: data.user_id,
+    type: "booking_updated",
+    title: "Checked Out",
+    body: `You have been checked out for your booking on ${data.booking_date}. Thank you for your stay!`,
+    data: { booking_id: data.id, room_id: data.room_id, booking_date: data.booking_date },
+  };
+
+  const { data: savedNotif } = await supabaseAdmin
+    .from("notifications")
+    .insert(notification)
+    .select()
+    .single();
+
+  emitNotificationToUser(data.user_id, savedNotif || notification);
+
+  res.json({ booking: data });
+});
+
+/**
+ * GET /api/owner/bookings/today
+ */
+exports.getTodayBookings = asyncHandler(async (req, res) => {
+  if (!supabaseAdmin) throw ApiError.internal("Supabase is not configured");
+
+  const ownerId = resolveOwnerId(req);
+  if (!ownerId) throw ApiError.forbidden("Owner context required");
+
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+
+  const { data: ownerRooms } = await supabaseAdmin
+    .from("rooms")
+    .select("*")
+    .eq("owner_id", ownerId);
+
+  const roomIds = (ownerRooms || []).map((r) => r.id);
+
+  if (roomIds.length === 0) {
+    return res.json({ bookings: [], total: 0 });
+  }
+
+  const roomsMap = {};
+  (ownerRooms || []).forEach((r) => { roomsMap[r.id] = r; });
+
+  const { data, error, count } = await supabaseAdmin
+    .from("bookings")
+    .select("*", { count: "exact" })
+    .eq("booking_date", today)
+    .in("room_id", roomIds)
+    .in("status", ["approved", "confirmed", "checked_in"])
+    .order("created_at", { ascending: true });
+
+  if (error) throw ApiError.internal(error.message);
+
+  const bookingsWithRoom = (data || []).map((b) => ({
+    ...b,
+    room: roomsMap[b.room_id] || null,
+  }));
+
+  res.json({ bookings: bookingsWithRoom, total: count });
+});
+
+/**
+ * GET /api/owner/bookings/history?tab=no_show|completed|rejected|cancelled
+ */
+exports.getBookingHistory = asyncHandler(async (req, res) => {
+  if (!supabaseAdmin) throw ApiError.internal("Supabase is not configured");
+
+  const ownerId = resolveOwnerId(req);
+  if (!ownerId) throw ApiError.forbidden("Owner context required");
+
+  const { tab, limit = 50, offset = 0 } = req.query;
+
+  if (!tab || !["no_show", "completed", "rejected", "cancelled"].includes(tab)) {
+    throw ApiError.badRequest("tab query parameter is required: no_show, completed, rejected, cancelled");
+  }
+
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+
+  const { data: ownerRooms } = await supabaseAdmin
+    .from("rooms")
+    .select("*")
+    .eq("owner_id", ownerId);
+
+  const roomIds = (ownerRooms || []).map((r) => r.id);
+
+  if (roomIds.length === 0) {
+    return res.json({ bookings: [], total: 0 });
+  }
+
+  const roomsMap = {};
+  (ownerRooms || []).forEach((r) => { roomsMap[r.id] = r; });
+
+  let query = supabaseAdmin
+    .from("bookings")
+    .select("*", { count: "exact" })
+    .in("room_id", roomIds)
+    .order("booking_date", { ascending: false })
+    .range(Number(offset), Number(offset) + Number(limit) - 1);
+
+  switch (tab) {
+    case "no_show":
+      query = query
+        .lt("booking_date", today)
+        .in("status", ["pending", "approved", "confirmed"]);
+      break;
+    case "completed":
+      query = query.eq("status", "checked_out");
+      break;
+    case "rejected":
+      query = query.eq("status", "rejected");
+      break;
+    case "cancelled":
+      query = query.eq("status", "cancelled");
+      break;
+  }
+
+  const { data, error, count } = await query;
+  if (error) throw ApiError.internal(error.message);
+
+  const bookingsWithRoom = (data || []).map((b) => ({
+    ...b,
+    room: roomsMap[b.room_id] || null,
+  }));
+
+  res.json({ bookings: bookingsWithRoom, total: count });
+});
+
 /* ══════════════════════════════════════════════════════════
  * CUSTOMERS — Users who have booked on the owner's rooms
  * ══════════════════════════════════════════════════════════ */

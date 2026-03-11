@@ -80,12 +80,14 @@ Room reservations.
 | original_price | NUMERIC | Before discount |
 | discount_amount | NUMERIC | |
 | discount_applied | TEXT | Offer name/ID that was applied |
-| status | TEXT | `"pending"`, `"approved"`, `"confirmed"`, `"rejected"` |
+| status | TEXT | `"pending"`, `"approved"`, `"confirmed"`, `"checked_in"`, `"checked_out"`, `"rejected"`, `"cancelled"`, `"no_show"` |
 | payment_method | TEXT | `"online"`, `"pay_at_property"` |
 | payment_status | TEXT | `"pending"`, `"paid"`, `"pay_at_property"` |
+| checked_in_at | TIMESTAMPTZ | Set when guest is checked in |
+| checked_out_at | TIMESTAMPTZ | Set when guest is checked out |
 | created_at | TIMESTAMPTZ | |
 
-**Status flow**: `pending` → `approved` (by owner/admin) → `confirmed` (after payment). Can be `rejected` at any point.
+**Status flow**: `pending` → `approved` (by owner/admin) → `confirmed` (after payment) → `checked_in` → `checked_out`. Can be `rejected` at any point. `cancelled` = soft-deleted by guest. `no_show` = past booking date with no check-in (auto-detected in history queries).
 
 ### `notifications`
 In-app notification system.
@@ -297,3 +299,4 @@ Files in `supabase/` directory (not all are timestamped migrations):
 | `migrations/20260217_create_offers_table.sql` | Create offers table migration |
 | `migrations/20260218_add_room_filter_columns.sql` | Add filter columns to rooms |
 | `migrations/20260223_add_room_detail_columns.sql` | Add detail columns to rooms |
+| `migrations/20260310_add_checkin_checkout_statuses.sql` | Add checked_in_at/checked_out_at columns to bookings |

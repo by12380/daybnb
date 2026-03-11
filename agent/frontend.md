@@ -38,10 +38,14 @@
 /admin/hero-banners              → AdminHeroBanners
 /admin/hero-banners/new          → AdminHeroBannerEditor (create mode)
 /admin/hero-banners/:bannerId/edit → AdminHeroBannerEditor (edit mode)
+/admin/check-in-out              → AdminCheckInOut
+/admin/booking-history           → AdminBookingHistory
 /admin/algolia                   → AdminAlgoliaSync
 /owner                           → OwnerDashboard (OwnerLayout, RequireOwner)
 /owner/rooms                     → OwnerRooms
 /owner/bookings                  → OwnerBookings
+/owner/check-in-out              → OwnerCheckInOut
+/owner/booking-history           → OwnerBookingHistory
 /owner/customers                 → OwnerCustomers
 /owner/chat                      → OwnerChat
 /owner/offers                    → OwnerOffers
@@ -168,6 +172,8 @@ frontend/src/
 │   │   ├── Offers.jsx
 │   │   ├── HeroBanners.jsx        # List/manage hero banners (toggle active, delete)
 │   │   ├── HeroBannerEditor.jsx   # Create/edit hero banner with live preview, drag-to-position, per-device layout
+│   │   ├── CheckInOut.jsx         # Today's guest check-in/check-out management
+│   │   ├── BookingHistory.jsx     # 4-tab history: No-show, Completed, Rejected, Cancelled by Guest
 │   │   └── AlgoliaSync.jsx
 │   └── components/
 │       ├── NotificationDropdown.jsx
@@ -178,6 +184,8 @@ frontend/src/
     │   ├── Dashboard.jsx
     │   ├── Rooms.jsx
     │   ├── Bookings.jsx
+    │   ├── CheckInOut.jsx         # Today's guest check-in/check-out management
+    │   ├── BookingHistory.jsx     # 4-tab history: No-show, Completed, Rejected, Cancelled by Guest
     │   ├── Customers.jsx
     │   ├── Chat.jsx
     │   └── Offers.jsx
@@ -193,13 +201,13 @@ frontend/src/
 {
   auth:          { user, profile, session, role, loading, error }
   rooms:         { rooms[], selectedRoom, total, loading, error }
-  bookings:      { bookings[], selectedBooking, bookedDates[], total, loading, error }
+  bookings:      { bookings[], selectedBooking, bookedDates[], total, todayBookings[], todayTotal, historyBookings[], historyTotal, loading, todayLoading, historyLoading, error }
   reviews:       { reviews[], loading, error }
   notifications: { notifications[], unreadCount, loading, error }
   contact:       { messages[], unreadCount, submitSuccess, loading, error }
   users:         { users[], selectedUser, userBookings[], total, loading, error }
   stripe:        { sessionId, sessionUrl, loading, error }
-  owner:         { rooms[], roomsTotal, bookings[], bookingsTotal, customers[], customersTotal, customerBookings[], stats, loading, error }
+  owner:         { rooms[], roomsTotal, bookings[], bookingsTotal, todayBookings[], todayTotal, historyBookings[], historyTotal, customers[], customersTotal, customerBookings[], stats, loading, todayLoading, historyLoading, error }
   chat:          { contacts[], conversations[], activeConversationId, messages{}, loading, messagesLoading, error }
   offers:        { offers[], total, activeOffers[], banners[], roomOffer, loading, error }
   heroBanners:   { adminBanners[], publicBanners[], loading, publicLoading, publicLoaded, error }

@@ -30,6 +30,8 @@ router.put("/rooms/:id", ...ownerMiddleware, ownerController.updateRoom);
 router.delete("/rooms/:id", ...ownerMiddleware, ownerController.deleteRoom);
 
 // ── Bookings ─────────────────────────────────────────
+router.get("/bookings/today", ...ownerMiddleware, ownerController.getTodayBookings);
+router.get("/bookings/history", ...ownerMiddleware, ownerController.getBookingHistory);
 router.get("/bookings", ...ownerMiddleware, ownerController.getMyBookings);
 router.patch(
   "/bookings/:id/approve",
@@ -40,6 +42,16 @@ router.patch(
   "/bookings/:id/reject",
   ...ownerMiddleware,
   ownerController.rejectBooking
+);
+router.patch(
+  "/bookings/:id/check-in",
+  ...ownerMiddleware,
+  ownerController.checkInBooking
+);
+router.patch(
+  "/bookings/:id/check-out",
+  ...ownerMiddleware,
+  ownerController.checkOutBooking
 );
 
 // ── Customers ────────────────────────────────────────

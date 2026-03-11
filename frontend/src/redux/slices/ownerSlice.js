@@ -89,6 +89,54 @@ export const rejectOwnerBooking = createAsyncThunk(
   }
 );
 
+export const checkInOwnerBooking = createAsyncThunk(
+  "owner/checkInBooking",
+  async (id, { rejectWithValue }) => {
+    try {
+      const { data } = await api.patch(`/owner/bookings/${id}/check-in`);
+      return data;
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
+export const checkOutOwnerBooking = createAsyncThunk(
+  "owner/checkOutBooking",
+  async (id, { rejectWithValue }) => {
+    try {
+      const { data } = await api.patch(`/owner/bookings/${id}/check-out`);
+      return data;
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
+export const fetchOwnerTodayBookings = createAsyncThunk(
+  "owner/fetchTodayBookings",
+  async (_, { rejectWithValue }) => {
+    try {
+      const { data } = await api.get("/owner/bookings/today");
+      return data;
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
+export const fetchOwnerBookingHistory = createAsyncThunk(
+  "owner/fetchBookingHistory",
+  async (params = {}, { rejectWithValue }) => {
+    try {
+      const { data } = await api.get("/owner/bookings/history", { params });
+      return data;
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
 // ─── Customers ───────────────────────────────────────────────
 
 export const fetchOwnerCustomers = createAsyncThunk(
@@ -136,11 +184,17 @@ const initialState = {
   roomsTotal: 0,
   bookings: [],
   bookingsTotal: 0,
+  todayBookings: [],
+  todayTotal: 0,
+  historyBookings: [],
+  historyTotal: 0,
   customers: [],
   customersTotal: 0,
   customerBookings: [],
   stats: null,
   loading: false,
+  todayLoading: false,
+  historyLoading: false,
   error: null,
 };
 
@@ -210,6 +264,40 @@ const ownerSlice = createSlice({
         if (idx !== -1) state.bookings[idx] = updated;
       })
       .addCase(rejectOwnerBooking.rejected, (state, action) => { state.loading = false; state.error = action.payload; });
+
+    // Check-in
+    builder
+      .addCase(checkInOwnerBooking.fulfilled, (state, action) => {
+        const updated = action.payload.booking;
+        const idx = state.bookings.findIndex((b) => b.id === updated.id);
+        if (idx !== -1) state.bookings[idx] = updated;
+        const tIdx = state.todayBookings.findIndex((b) => b.id === updated.id);
+        if (tIdx !== -1) state.todayBookings[tIdx] = { ...state.todayBookings[tIdx], ...updated };
+      })
+      .addCase(checkInOwnerBooking.rejected, (state, action) => { state.error = action.payload; });
+
+    // Check-out
+    builder
+      .addCase(checkOutOwnerBooking.fulfilled, (state, action) => {
+        const updated = action.payload.booking;
+        const idx = state.bookings.findIndex((b) => b.id === updated.id);
+        if (idx !== -1) state.bookings[idx] = updated;
+        state.todayBookings = state.todayBookings.filter((b) => b.id !== updated.id);
+        state.todayTotal = Math.max(0, state.todayTotal - 1);
+      })
+      .addCase(checkOutOwnerBooking.rejected, (state, action) => { state.error = action.payload; });
+
+    // Today's bookings
+    builder
+      .addCase(fetchOwnerTodayBookings.pending, (state) => { state.todayLoading = true; state.error = null; })
+      .addCase(fetchOwnerTodayBookings.fulfilled, (state, action) => { state.todayLoading = false; state.todayBookings = action.payload.bookings; state.todayTotal = action.payload.total; })
+      .addCase(fetchOwnerTodayBookings.rejected, (state, action) => { state.todayLoading = false; state.error = action.payload; });
+
+    // Booking history
+    builder
+      .addCase(fetchOwnerBookingHistory.pending, (state) => { state.historyLoading = true; state.error = null; })
+      .addCase(fetchOwnerBookingHistory.fulfilled, (state, action) => { state.historyLoading = false; state.historyBookings = action.payload.bookings; state.historyTotal = action.payload.total; })
+      .addCase(fetchOwnerBookingHistory.rejected, (state, action) => { state.historyLoading = false; state.error = action.payload; });
 
     // Customers
     builder

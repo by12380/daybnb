@@ -113,13 +113,17 @@ Typical protected route: `requireAuth → attachRole → [requireRole(...)] → 
 |--------|------|------|-------------|
 | GET | `/availability/:roomId` | None | Booked dates for a room |
 | GET | `/booked-rooms?date=` | None | Room IDs booked on a date |
+| GET | `/today` | Admin/Owner | Today's bookings for check-in/out management |
+| GET | `/history?tab=` | Admin/Owner | Booking history by tab: no_show, completed, rejected, cancelled |
 | GET | `/` | requireAuth + attachRole | List bookings (role-scoped) |
 | GET | `/:id` | requireAuth + attachRole | Single booking (access control) |
 | POST | `/` | requireAuth + attachRole | Create booking (notifies owner/admin) |
 | PUT | `/:id` | requireAuth + attachRole | Update booking |
 | PATCH | `/:id/approve` | Admin/Owner | Approve (notifies customer) |
 | PATCH | `/:id/reject` | Admin/Owner | Reject with reason (notifies customer) |
-| DELETE | `/:id` | requireAuth + attachRole | Cancel booking (notifies owner/admin) |
+| PATCH | `/:id/check-in` | Admin/Owner | Check in guest (approved/confirmed → checked_in) |
+| PATCH | `/:id/check-out` | Admin/Owner | Check out guest (checked_in → checked_out) |
+| DELETE | `/:id` | requireAuth + attachRole | Cancel booking — soft-delete, sets status to "cancelled" (notifies owner/admin) |
 
 ### Users (`/api/users`) — Admin only
 | Method | Path | Description |
@@ -161,9 +165,13 @@ Typical protected route: `requireAuth → attachRole → [requireRole(...)] → 
 | POST | `/rooms` | Create room (owned by current owner) |
 | PUT | `/rooms/:id` | Update own room |
 | DELETE | `/rooms/:id` | Delete own room |
+| GET | `/bookings/today` | Today's bookings on owner's rooms for check-in/out |
+| GET | `/bookings/history?tab=` | Booking history by tab: no_show, completed, rejected, cancelled |
 | GET | `/bookings` | Bookings on owner's rooms |
 | PATCH | `/bookings/:id/approve` | Approve booking |
 | PATCH | `/bookings/:id/reject` | Reject booking |
+| PATCH | `/bookings/:id/check-in` | Check in guest |
+| PATCH | `/bookings/:id/check-out` | Check out guest |
 | GET | `/customers` | Customers who booked owner's rooms |
 | GET | `/customers/:customerId` | Single customer |
 | GET | `/customers/:customerId/bookings` | Customer's bookings on owner's rooms |

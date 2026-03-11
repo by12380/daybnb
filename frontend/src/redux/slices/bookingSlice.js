@@ -99,6 +99,54 @@ export const fetchAvailability = createAsyncThunk(
   }
 );
 
+export const checkInBooking = createAsyncThunk(
+  "bookings/checkIn",
+  async (id, { rejectWithValue }) => {
+    try {
+      const { data } = await api.patch(`/bookings/${id}/check-in`);
+      return data;
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
+export const checkOutBooking = createAsyncThunk(
+  "bookings/checkOut",
+  async (id, { rejectWithValue }) => {
+    try {
+      const { data } = await api.patch(`/bookings/${id}/check-out`);
+      return data;
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
+export const fetchTodayBookings = createAsyncThunk(
+  "bookings/fetchToday",
+  async (_, { rejectWithValue }) => {
+    try {
+      const { data } = await api.get("/bookings/today");
+      return data;
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
+export const fetchBookingHistory = createAsyncThunk(
+  "bookings/fetchHistory",
+  async (params = {}, { rejectWithValue }) => {
+    try {
+      const { data } = await api.get("/bookings/history", { params });
+      return data;
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
 // ─── Slice ───────────────────────────────────────────────────
 
 const initialState = {
@@ -106,7 +154,13 @@ const initialState = {
   selectedBooking: null,
   bookedDates: [],
   total: 0,
+  todayBookings: [],
+  todayTotal: 0,
+  historyBookings: [],
+  historyTotal: 0,
   loading: false,
+  todayLoading: false,
+  historyLoading: false,
   error: null,
 };
 
@@ -122,6 +176,14 @@ const bookingSlice = createSlice({
     },
     clearBookedDates(state) {
       state.bookedDates = [];
+    },
+    clearTodayBookings(state) {
+      state.todayBookings = [];
+      state.todayTotal = 0;
+    },
+    clearHistoryBookings(state) {
+      state.historyBookings = [];
+      state.historyTotal = 0;
     },
   },
   extraReducers: (builder) => {
@@ -256,10 +318,68 @@ const bookingSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       });
+
+    // Check-in
+    builder
+      .addCase(checkInBooking.fulfilled, (state, action) => {
+        const updated = action.payload.booking;
+        const idx = state.bookings.findIndex((b) => b.id === updated.id);
+        if (idx !== -1) state.bookings[idx] = updated;
+        const tIdx = state.todayBookings.findIndex((b) => b.id === updated.id);
+        if (tIdx !== -1) state.todayBookings[tIdx] = { ...state.todayBookings[tIdx], ...updated };
+      })
+      .addCase(checkInBooking.rejected, (state, action) => {
+        state.error = action.payload;
+      });
+
+    // Check-out
+    builder
+      .addCase(checkOutBooking.fulfilled, (state, action) => {
+        const updated = action.payload.booking;
+        const idx = state.bookings.findIndex((b) => b.id === updated.id);
+        if (idx !== -1) state.bookings[idx] = updated;
+        state.todayBookings = state.todayBookings.filter((b) => b.id !== updated.id);
+        state.todayTotal = Math.max(0, state.todayTotal - 1);
+      })
+      .addCase(checkOutBooking.rejected, (state, action) => {
+        state.error = action.payload;
+      });
+
+    // Today's bookings
+    builder
+      .addCase(fetchTodayBookings.pending, (state) => {
+        state.todayLoading = true;
+        state.error = null;
+      })
+      .addCase(fetchTodayBookings.fulfilled, (state, action) => {
+        state.todayLoading = false;
+        state.todayBookings = action.payload.bookings;
+        state.todayTotal = action.payload.total;
+      })
+      .addCase(fetchTodayBookings.rejected, (state, action) => {
+        state.todayLoading = false;
+        state.error = action.payload;
+      });
+
+    // Booking history
+    builder
+      .addCase(fetchBookingHistory.pending, (state) => {
+        state.historyLoading = true;
+        state.error = null;
+      })
+      .addCase(fetchBookingHistory.fulfilled, (state, action) => {
+        state.historyLoading = false;
+        state.historyBookings = action.payload.bookings;
+        state.historyTotal = action.payload.total;
+      })
+      .addCase(fetchBookingHistory.rejected, (state, action) => {
+        state.historyLoading = false;
+        state.error = action.payload;
+      });
   },
 });
 
-export const { clearBookingError, clearSelectedBooking, clearBookedDates } =
+export const { clearBookingError, clearSelectedBooking, clearBookedDates, clearTodayBookings, clearHistoryBookings } =
   bookingSlice.actions;
 
 export default bookingSlice.reducer;

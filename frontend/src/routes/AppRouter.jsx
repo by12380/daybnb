@@ -28,6 +28,8 @@ import AdminOffers from "../admin/pages/Offers.jsx";
 import AdminHeroBanners from "../admin/pages/HeroBanners.jsx";
 import AdminHeroBannerEditor from "../admin/pages/HeroBannerEditor.jsx";
 import AdminAlgoliaSync from "../admin/pages/AlgoliaSync.jsx";
+import AdminCheckInOut from "../admin/pages/CheckInOut.jsx";
+import AdminBookingHistory from "../admin/pages/BookingHistory.jsx";
 
 // Owner imports
 import OwnerLayout from "../owner/components/layout/OwnerLayout.jsx";
@@ -37,6 +39,8 @@ import OwnerBookings from "../owner/pages/Bookings.jsx";
 import OwnerCustomers from "../owner/pages/Customers.jsx";
 import OwnerChat from "../owner/pages/Chat.jsx";
 import OwnerOffers from "../owner/pages/Offers.jsx";
+import OwnerCheckInOut from "../owner/pages/CheckInOut.jsx";
+import OwnerBookingHistory from "../owner/pages/BookingHistory.jsx";
 
 // Admin chat
 import AdminChat from "../admin/pages/Chat.jsx";
@@ -82,6 +86,8 @@ export default function AppRouter() {
             <Route path="/admin/hero-banners" element={<AdminHeroBanners />} />
             <Route path="/admin/hero-banners/new" element={<AdminHeroBannerEditor />} />
             <Route path="/admin/hero-banners/:bannerId/edit" element={<AdminHeroBannerEditor />} />
+            <Route path="/admin/check-in-out" element={<AdminCheckInOut />} />
+            <Route path="/admin/booking-history" element={<AdminBookingHistory />} />
             <Route path="/admin/algolia" element={<AdminAlgoliaSync />} />
           </Route>
         </Route>
@@ -94,6 +100,8 @@ export default function AppRouter() {
             <Route path="/owner/bookings" element={<OwnerBookings />} />
             <Route path="/owner/customers" element={<OwnerCustomers />} />
             <Route path="/owner/chat" element={<OwnerChat />} />
+            <Route path="/owner/check-in-out" element={<OwnerCheckInOut />} />
+            <Route path="/owner/booking-history" element={<OwnerBookingHistory />} />
             <Route path="/owner/offers" element={<OwnerOffers />} />
           </Route>
         </Route>

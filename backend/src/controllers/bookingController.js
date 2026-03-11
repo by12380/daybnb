@@ -117,7 +117,7 @@ exports.create = asyncHandler(async (req, res) => {
     .select("id")
     .eq("room_id", room_id)
     .eq("booking_date", booking_date)
-    .in("status", ["pending", "approved", "confirmed"])
+    .in("status", ["pending", "approved", "confirmed", "checked_in"])
     .limit(1);
 
   if (existing && existing.length > 0) {
@@ -466,20 +466,23 @@ exports.reject = asyncHandler(async (req, res) => {
 
 /**
  * DELETE /api/bookings/:id  (admin, room owner, or booking customer)
+ * Soft-delete: sets status to "cancelled" instead of removing the row.
  */
 exports.remove = asyncHandler(async (req, res) => {
   if (!supabaseAdmin) throw ApiError.internal("Supabase is not configured");
 
-  // Check ownership
   const { data: existingBooking } = await supabaseAdmin
     .from("bookings")
-    .select("id, user_id, room_id, booking_date, user_email, user_full_name")
+    .select("id, user_id, room_id, booking_date, user_email, user_full_name, status")
     .eq("id", req.params.id)
     .maybeSingle();
 
   if (!existingBooking) throw ApiError.notFound("Booking not found");
 
-  // Access control
+  if (["cancelled", "checked_out"].includes(existingBooking.status)) {
+    throw ApiError.badRequest("This booking is already " + existingBooking.status);
+  }
+
   const isAdmin = req.userRole === ROLES.ADMIN;
   const isBookingOwner = existingBooking.user_id === req.user.id;
   let isRoomOwner = false;
@@ -498,14 +501,15 @@ exports.remove = asyncHandler(async (req, res) => {
     throw ApiError.forbidden("Access denied");
   }
 
-  const { error } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from("bookings")
-    .delete()
-    .eq("id", req.params.id);
+    .update({ status: "cancelled" })
+    .eq("id", req.params.id)
+    .select()
+    .single();
 
   if (error) throw ApiError.internal(error.message);
 
-  // Notify the room owner when a customer cancels booking.
   if (!isAdmin) {
     const cancelledBy =
       existingBooking.user_full_name ||
@@ -530,7 +534,6 @@ exports.remove = asyncHandler(async (req, res) => {
     }
 
     if (room?.owner_id && ownerRole === ROLES.OWNER && room.owner_id !== req.user.id) {
-      // Room belongs to an owner – notify only the owner
       const ownerNotification = {
         recipient_user_id: room.owner_id,
         type: "booking_cancelled",
@@ -551,7 +554,6 @@ exports.remove = asyncHandler(async (req, res) => {
 
       emitNotificationToUser(room.owner_id, savedOwnerNotif || ownerNotification);
     } else if (!room?.owner_id || ownerRole === ROLES.ADMIN) {
-      // Room belongs to admin or has no owner – notify admins
       const adminNotification = {
         recipient_role: "admin",
         type: "booking_cancelled",
@@ -574,9 +576,257 @@ exports.remove = asyncHandler(async (req, res) => {
     }
   }
 
-  syncBookingChange("BOOKING_DELETE", null, existingBooking);
+  syncBookingChange("BOOKING_UPDATE", data, existingBooking);
 
-  res.json({ message: "Booking deleted successfully" });
+  res.json({ message: "Booking cancelled successfully", booking: data });
+});
+
+/**
+ * PATCH /api/bookings/:id/check-in  (admin or room owner)
+ */
+exports.checkIn = asyncHandler(async (req, res) => {
+  if (!supabaseAdmin) throw ApiError.internal("Supabase is not configured");
+
+  const { data: booking } = await supabaseAdmin
+    .from("bookings")
+    .select("*")
+    .eq("id", req.params.id)
+    .maybeSingle();
+
+  if (!booking) throw ApiError.notFound("Booking not found");
+
+  if (!["approved", "confirmed"].includes(booking.status)) {
+    throw ApiError.badRequest(`Cannot check in a booking with status "${booking.status}". Must be approved or confirmed.`);
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from("bookings")
+    .update({ status: "checked_in", checked_in_at: new Date().toISOString() })
+    .eq("id", req.params.id)
+    .select()
+    .single();
+
+  if (error) throw ApiError.internal(error.message);
+
+  const notification = {
+    recipient_user_id: data.user_id,
+    type: "booking_updated",
+    title: "Checked In!",
+    body: `You have been checked in for your booking on ${data.booking_date}.`,
+    data: { booking_id: data.id, room_id: data.room_id, booking_date: data.booking_date },
+  };
+
+  const { data: savedNotif } = await supabaseAdmin
+    .from("notifications")
+    .insert(notification)
+    .select()
+    .single();
+
+  emitNotificationToUser(data.user_id, savedNotif || notification);
+
+  syncBookingChange("BOOKING_UPDATE", data);
+
+  res.json({ booking: data });
+});
+
+/**
+ * PATCH /api/bookings/:id/check-out  (admin or room owner)
+ */
+exports.checkOut = asyncHandler(async (req, res) => {
+  if (!supabaseAdmin) throw ApiError.internal("Supabase is not configured");
+
+  const { data: booking } = await supabaseAdmin
+    .from("bookings")
+    .select("*")
+    .eq("id", req.params.id)
+    .maybeSingle();
+
+  if (!booking) throw ApiError.notFound("Booking not found");
+
+  if (booking.status !== "checked_in") {
+    throw ApiError.badRequest(`Cannot check out a booking with status "${booking.status}". Must be checked_in.`);
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from("bookings")
+    .update({ status: "checked_out", checked_out_at: new Date().toISOString() })
+    .eq("id", req.params.id)
+    .select()
+    .single();
+
+  if (error) throw ApiError.internal(error.message);
+
+  const notification = {
+    recipient_user_id: data.user_id,
+    type: "booking_updated",
+    title: "Checked Out",
+    body: `You have been checked out for your booking on ${data.booking_date}. Thank you for your stay!`,
+    data: { booking_id: data.id, room_id: data.room_id, booking_date: data.booking_date },
+  };
+
+  const { data: savedNotif } = await supabaseAdmin
+    .from("notifications")
+    .insert(notification)
+    .select()
+    .single();
+
+  emitNotificationToUser(data.user_id, savedNotif || notification);
+
+  syncBookingChange("BOOKING_UPDATE", data);
+
+  res.json({ booking: data });
+});
+
+/**
+ * GET /api/bookings/today
+ * Returns today's bookings (approved/confirmed/checked_in) for check-in/check-out management.
+ * Admin: bookings on admin-owned rooms (no owner or admin is owner).
+ * Owner: bookings on their rooms.
+ */
+exports.getTodayBookings = asyncHandler(async (req, res) => {
+  if (!supabaseAdmin) throw ApiError.internal("Supabase is not configured");
+
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+
+  let roomIds = [];
+
+  if (req.userRole === ROLES.ADMIN) {
+    const { data: adminRooms } = await supabaseAdmin
+      .from("rooms")
+      .select("id, owner_id");
+
+    roomIds = (adminRooms || [])
+      .filter((r) => !r.owner_id || r.owner_id === req.user.id)
+      .map((r) => r.id);
+  } else if (req.userRole === ROLES.OWNER) {
+    const ownerId = req.impersonating ? req.effectiveUserId : req.user.id;
+    const { data: ownerRooms } = await supabaseAdmin
+      .from("rooms")
+      .select("id")
+      .eq("owner_id", ownerId);
+
+    roomIds = (ownerRooms || []).map((r) => r.id);
+  }
+
+  if (roomIds.length === 0) {
+    return res.json({ bookings: [], total: 0 });
+  }
+
+  const { data, error, count } = await supabaseAdmin
+    .from("bookings")
+    .select("*", { count: "exact" })
+    .eq("booking_date", today)
+    .in("room_id", roomIds)
+    .in("status", ["approved", "confirmed", "checked_in"])
+    .order("created_at", { ascending: true });
+
+  if (error) throw ApiError.internal(error.message);
+
+  const roomIdsInBookings = [...new Set((data || []).map((b) => b.room_id))];
+  let roomsMap = {};
+  if (roomIdsInBookings.length > 0) {
+    const { data: rooms } = await supabaseAdmin
+      .from("rooms")
+      .select("*")
+      .in("id", roomIdsInBookings);
+    (rooms || []).forEach((r) => { roomsMap[r.id] = r; });
+  }
+
+  const bookingsWithRoom = (data || []).map((b) => ({
+    ...b,
+    room: roomsMap[b.room_id] || null,
+  }));
+
+  res.json({ bookings: bookingsWithRoom, total: count });
+});
+
+/**
+ * GET /api/bookings/history
+ * Returns booking history categorized by tab: no_show, completed, rejected, cancelled.
+ * Query params: tab (required), limit, offset
+ */
+exports.getBookingHistory = asyncHandler(async (req, res) => {
+  if (!supabaseAdmin) throw ApiError.internal("Supabase is not configured");
+
+  const { tab, limit = 50, offset = 0 } = req.query;
+
+  if (!tab || !["no_show", "completed", "rejected", "cancelled"].includes(tab)) {
+    throw ApiError.badRequest("tab query parameter is required: no_show, completed, rejected, cancelled");
+  }
+
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+
+  let roomIds = [];
+
+  if (req.userRole === ROLES.ADMIN) {
+    const { data: adminRooms } = await supabaseAdmin
+      .from("rooms")
+      .select("id, owner_id");
+
+    roomIds = (adminRooms || [])
+      .filter((r) => !r.owner_id || r.owner_id === req.user.id)
+      .map((r) => r.id);
+  } else if (req.userRole === ROLES.OWNER) {
+    const ownerId = req.impersonating ? req.effectiveUserId : req.user.id;
+    const { data: ownerRooms } = await supabaseAdmin
+      .from("rooms")
+      .select("id")
+      .eq("owner_id", ownerId);
+
+    roomIds = (ownerRooms || []).map((r) => r.id);
+  }
+
+  if (roomIds.length === 0) {
+    return res.json({ bookings: [], total: 0 });
+  }
+
+  let query = supabaseAdmin
+    .from("bookings")
+    .select("*", { count: "exact" })
+    .in("room_id", roomIds)
+    .order("booking_date", { ascending: false })
+    .range(Number(offset), Number(offset) + Number(limit) - 1);
+
+  switch (tab) {
+    case "no_show":
+      // Past bookings that were approved/confirmed but never checked in,
+      // OR past bookings still pending (admin never reviewed)
+      query = query
+        .lt("booking_date", today)
+        .in("status", ["pending", "approved", "confirmed"]);
+      break;
+    case "completed":
+      query = query.eq("status", "checked_out");
+      break;
+    case "rejected":
+      query = query.eq("status", "rejected");
+      break;
+    case "cancelled":
+      query = query.eq("status", "cancelled");
+      break;
+  }
+
+  const { data, error, count } = await query;
+  if (error) throw ApiError.internal(error.message);
+
+  const roomIdsInBookings = [...new Set((data || []).map((b) => b.room_id))];
+  let roomsMap = {};
+  if (roomIdsInBookings.length > 0) {
+    const { data: rooms } = await supabaseAdmin
+      .from("rooms")
+      .select("*")
+      .in("id", roomIdsInBookings);
+    (rooms || []).forEach((r) => { roomsMap[r.id] = r; });
+  }
+
+  const bookingsWithRoom = (data || []).map((b) => ({
+    ...b,
+    room: roomsMap[b.room_id] || null,
+  }));
+
+  res.json({ bookings: bookingsWithRoom, total: count });
 });
 
 /**
@@ -590,7 +840,7 @@ exports.getAvailability = asyncHandler(async (req, res) => {
     .from("bookings")
     .select("booking_date, status")
     .eq("room_id", req.params.roomId)
-    .in("status", ["pending", "approved", "confirmed"]);
+    .in("status", ["pending", "approved", "confirmed", "checked_in"]);
 
   if (error) throw ApiError.internal(error.message);
 
@@ -601,8 +851,7 @@ exports.getAvailability = asyncHandler(async (req, res) => {
 
 /**
  * GET /api/bookings/booked-rooms?date=YYYY-MM-DD
- * Returns an array of room IDs that are booked on the given date
- * (status: pending, approved, or confirmed).
+ * Returns an array of room IDs that are booked on the given date.
  */
 exports.getBookedRoomsByDate = asyncHandler(async (req, res) => {
   if (!supabase) throw ApiError.internal("Supabase is not configured");
@@ -614,7 +863,7 @@ exports.getBookedRoomsByDate = asyncHandler(async (req, res) => {
     .from("bookings")
     .select("room_id")
     .eq("booking_date", date)
-    .in("status", ["pending", "approved", "confirmed"]);
+    .in("status", ["pending", "approved", "confirmed", "checked_in"]);
 
   if (error) throw ApiError.internal(error.message);
 
