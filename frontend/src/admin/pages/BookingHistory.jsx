@@ -1,7 +1,12 @@
 import React, { useCallback, useEffect, useState } from "react";
+import { DatePicker } from "antd";
+import dayjs from "dayjs";
 import { useDispatch, useSelector } from "react-redux";
 import { formatPrice } from "../../guest/utils/format.js";
+import Button from "../../guest/components/ui/Button.jsx";
+import Pagination from "../../guest/components/ui/Pagination.jsx";
 import { INPUT_STYLES } from "../../guest/components/ui/FormInput.jsx";
+import useClientPagination from "../../hooks/useClientPagination.js";
 import {
   fetchBookingHistory,
   clearHistoryBookings,
@@ -20,6 +25,8 @@ const TABS = [
   { key: "rejected", label: "Rejected", color: "red" },
   { key: "cancelled", label: "Cancelled by Guest", color: "gray" },
 ];
+
+const PAGE_SIZE = 10;
 
 function getTabStatusBadge(tab, booking) {
   switch (tab) {
@@ -44,6 +51,7 @@ export default function AdminBookingHistory() {
 
   const [activeTab, setActiveTab] = useState("no_show");
   const [searchTerm, setSearchTerm] = useState("");
+  const [dateFilter, setDateFilter] = useState("");
 
   useEffect(() => {
     dispatch(fetchBookingHistory({ tab: activeTab, limit: 200 }));
@@ -53,18 +61,33 @@ export default function AdminBookingHistory() {
   const handleTabChange = useCallback((tab) => {
     setActiveTab(tab);
     setSearchTerm("");
+    setDateFilter("");
   }, []);
 
   const filteredBookings = React.useMemo(() => {
-    if (!searchTerm) return historyBookings || [];
-    const search = searchTerm.toLowerCase();
     return (historyBookings || []).filter((b) => {
+      if (dateFilter && b.booking_date !== dateFilter) return false;
+      if (!searchTerm) return true;
+      const search = searchTerm.toLowerCase();
       const matchesRoom = b.room?.title?.toLowerCase().includes(search);
       const matchesGuest = b.user_full_name?.toLowerCase().includes(search);
       const matchesEmail = b.user_email?.toLowerCase().includes(search);
       return matchesRoom || matchesGuest || matchesEmail;
     });
-  }, [historyBookings, searchTerm]);
+  }, [historyBookings, searchTerm, dateFilter]);
+
+  const {
+    currentPage,
+    paginatedItems,
+    totalPages,
+    totalCount,
+    goToPage,
+    resetPagination,
+  } = useClientPagination(filteredBookings, PAGE_SIZE);
+
+  useEffect(() => {
+    resetPagination();
+  }, [activeTab, searchTerm, dateFilter, resetPagination]);
 
   return (
     <div className="space-y-6">
@@ -99,6 +122,17 @@ export default function AdminBookingHistory() {
             className={`${INPUT_STYLES} w-full`}
           />
         </div>
+        <DatePicker
+          className={INPUT_STYLES}
+          placeholder="Filter by date"
+          value={dateFilter ? dayjs(dateFilter) : null}
+          onChange={(_, dateString) => setDateFilter(dateString || "")}
+        />
+        {dateFilter && (
+          <Button variant="outline" onClick={() => setDateFilter("")}>
+            Clear Date
+          </Button>
+        )}
         <div className="text-sm text-muted self-center">
           {filteredBookings.length} booking{filteredBookings.length !== 1 ? "s" : ""}
         </div>
@@ -136,7 +170,7 @@ export default function AdminBookingHistory() {
                 </tr>
               </thead>
               <tbody>
-                {filteredBookings.map((booking) => {
+                {paginatedItems.map((booking) => {
                   const statusBadge = getTabStatusBadge(activeTab, booking);
                   return (
                     <tr key={booking.id} className="border-b border-border last:border-0 hover:bg-surface/60">
@@ -173,6 +207,15 @@ export default function AdminBookingHistory() {
           </div>
         )}
       </div>
+
+      <Pagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        totalCount={totalCount}
+        pageSize={PAGE_SIZE}
+        onPageChange={goToPage}
+        itemLabel="bookings"
+      />
     </div>
   );
 }

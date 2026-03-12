@@ -5,7 +5,9 @@ import { useDispatch, useSelector } from "react-redux";
 import { useAuth } from "../../auth/useAuth.js";
 import { formatPrice } from "../../guest/utils/format.js";
 import Button from "../../guest/components/ui/Button.jsx";
+import Pagination from "../../guest/components/ui/Pagination.jsx";
 import FormInput, { INPUT_STYLES } from "../../guest/components/ui/FormInput.jsx";
+import useClientPagination from "../../hooks/useClientPagination.js";
 import {
   fetchBookings,
   updateBooking,
@@ -49,6 +51,8 @@ function getPaymentStatusInfo(booking) {
   if (method === "cash") return { color: "bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400", text: "Pay at Property", icon: "cash" };
   return { color: "bg-orange-50 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400", text: "Pending", icon: "pending" };
 }
+
+const PAGE_SIZE = 10;
 
 const ViewBookingModal = React.memo(({ open, booking, room, userProfile, onClose }) => {
   if (!booking) return null;
@@ -259,6 +263,7 @@ export default function AdminBookings() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [paymentFilter, setPaymentFilter] = useState("all");
+  const [dateFilter, setDateFilter] = useState("");
   const [ownerFilter, setOwnerFilter] = useState("admin"); // "admin" | "all" | owner_id
   const [owners, setOwners] = useState([]);
   const [viewingBooking, setViewingBooking] = useState(null);
@@ -302,6 +307,7 @@ export default function AdminBookings() {
       if (statusFilter === "rejected" && booking.status !== "rejected") return false;
       if (statusFilter === "upcoming") { if (booking.booking_date < today || booking.status === "rejected") return false; }
       if (statusFilter === "completed") { if (booking.booking_date >= today || booking.status === "rejected" || booking.status === "pending") return false; }
+      if (dateFilter && booking.booking_date !== dateFilter) return false;
 
       // Payment filter
       if (paymentFilter !== "all") {
@@ -325,11 +331,23 @@ export default function AdminBookings() {
       }
       return true;
     });
-  }, [bookings, roomsMap, usersMap, searchTerm, statusFilter, paymentFilter, ownerFilter, user?.id]);
+  }, [bookings, roomsMap, usersMap, searchTerm, statusFilter, paymentFilter, dateFilter, ownerFilter, user?.id]);
 
   const pendingCount = useMemo(() => filteredBookings.filter((b) => b.status === "pending").length, [filteredBookings]);
+  const {
+    currentPage,
+    paginatedItems,
+    totalPages,
+    totalCount,
+    goToPage,
+    resetPagination,
+  } = useClientPagination(filteredBookings, PAGE_SIZE);
 
   const refreshData = useCallback(() => { dispatch(fetchBookings({ limit: 200 })); }, [dispatch]);
+
+  useEffect(() => {
+    resetPagination();
+  }, [searchTerm, statusFilter, paymentFilter, dateFilter, ownerFilter, resetPagination]);
 
   const handleEditSave = useCallback(() => { setEditingBooking(null); refreshData(); }, [refreshData]);
   const handleDeleteConfirm = useCallback(() => { setDeletingBooking(null); }, []);
@@ -389,6 +407,17 @@ export default function AdminBookings() {
           <option value="failed">Failed</option>
           <option value="expired">Expired</option>
         </select>
+        <DatePicker
+          className={INPUT_STYLES}
+          placeholder="Filter by date"
+          value={dateFilter ? dayjs(dateFilter) : null}
+          onChange={(_, dateString) => setDateFilter(dateString || "")}
+        />
+        {dateFilter && (
+          <Button variant="outline" onClick={() => setDateFilter("")}>
+            Clear Date
+          </Button>
+        )}
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-border bg-panel shadow-sm">
@@ -399,7 +428,7 @@ export default function AdminBookings() {
             <table className="w-full">
               <thead><tr className="border-b border-border bg-surface/60 text-left text-xs font-medium uppercase tracking-wider text-muted"><th className="px-6 py-3">Room</th><th className="px-6 py-3">Guest</th><th className="px-6 py-3">Date</th><th className="px-6 py-3">Status</th><th className="px-6 py-3">Payment</th><th className="px-6 py-3">Amount</th><th className="px-6 py-3 text-right">Actions</th></tr></thead>
               <tbody>
-                {filteredBookings.map((booking) => {
+                {paginatedItems.map((booking) => {
                   const room = roomsMap[booking.room_id];
                   const profile = usersMap[booking.user_id];
                   const statusInfo = getBookingStatusInfo(booking);
@@ -448,6 +477,15 @@ export default function AdminBookings() {
           </div>
         )}
       </div>
+
+      <Pagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        totalCount={totalCount}
+        pageSize={PAGE_SIZE}
+        onPageChange={goToPage}
+        itemLabel="bookings"
+      />
 
       <ViewBookingModal open={!!viewingBooking} booking={viewingBooking} room={viewingBooking ? roomsMap[viewingBooking.room_id] : null} userProfile={viewingBooking ? usersMap[viewingBooking.user_id] : null} onClose={() => setViewingBooking(null)} />
       <EditBookingModal open={!!editingBooking} booking={editingBooking} room={editingBooking ? roomsMap[editingBooking.room_id] : null} onClose={() => setEditingBooking(null)} onSave={handleEditSave} />

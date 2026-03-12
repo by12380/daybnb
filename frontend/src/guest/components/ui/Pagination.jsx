@@ -12,6 +12,7 @@ const Pagination = React.memo(function Pagination({
   showInfo = true,
   totalCount = 0,
   pageSize = 6,
+  itemLabel = "rooms",
   className = "",
 }) {
   // Generate page numbers to display
@@ -82,7 +83,7 @@ const Pagination = React.memo(function Pagination({
           <span className="font-semibold text-ink dark:text-dark-ink">
             {totalCount}
           </span>{" "}
-          rooms
+          {itemLabel}
         </p>
       )}
 

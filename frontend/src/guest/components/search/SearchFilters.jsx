@@ -335,6 +335,8 @@ const SearchFilters = React.memo(function SearchFilters({
               {/* Date */}
               <div className="space-y-2">
                 <label className="text-sm font-medium text-ink dark:text-dark-ink mr-2">Date</label>
+
+                <label className="text-sm font-medium text-ink dark:text-dark-ink">Date</label>
                 <DatePicker
                   className={INPUT_STYLES}
                   placeholder="Select date"

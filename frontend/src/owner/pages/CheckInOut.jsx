@@ -3,6 +3,8 @@ import { Modal } from "antd";
 import { useDispatch, useSelector } from "react-redux";
 import { formatPrice } from "../../guest/utils/format.js";
 import Button from "../../guest/components/ui/Button.jsx";
+import Pagination from "../../guest/components/ui/Pagination.jsx";
+import useClientPagination from "../../hooks/useClientPagination.js";
 import {
   fetchOwnerTodayBookings,
   checkInOwnerBooking,
@@ -27,6 +29,8 @@ function getStatusBadge(status) {
       return { color: "bg-surface/60 text-muted", text: status };
   }
 }
+
+const PAGE_SIZE = 10;
 
 const ConfirmModal = React.memo(({ open, booking, action, onClose, onConfirm }) => {
   const dispatch = useDispatch();
@@ -89,6 +93,7 @@ export default function OwnerCheckInOut() {
 
   const [confirmAction, setConfirmAction] = useState(null);
   const [selectedBooking, setSelectedBooking] = useState(null);
+  const [statusFilter, setStatusFilter] = useState("all");
 
   useEffect(() => {
     dispatch(fetchOwnerTodayBookings());
@@ -116,6 +121,30 @@ export default function OwnerCheckInOut() {
 
   const awaitingCount = (todayBookings || []).filter((b) => ["approved", "confirmed"].includes(b.status)).length;
   const checkedInCount = (todayBookings || []).filter((b) => b.status === "checked_in").length;
+  const filteredBookings = (todayBookings || []).filter((booking) => {
+    if (statusFilter === "awaiting") return ["approved", "confirmed"].includes(booking.status);
+    if (statusFilter === "checked_in") return booking.status === "checked_in";
+    return true;
+  });
+  const {
+    currentPage,
+    paginatedItems,
+    totalPages,
+    totalCount,
+    goToPage,
+    resetPagination,
+  } = useClientPagination(filteredBookings, PAGE_SIZE);
+
+  useEffect(() => {
+    resetPagination();
+  }, [statusFilter, todayBookings, resetPagination]);
+
+  const cardClassName = (cardKey, baseClassName) => {
+    const isActive = statusFilter === cardKey;
+    return `${baseClassName} cursor-pointer transition ${
+      isActive ? "ring-2 ring-brand-500 ring-offset-2 ring-offset-panel dark:ring-offset-panel" : "hover:-translate-y-0.5 hover:shadow-md"
+    }`;
+  };
 
   if (todayLoading && (!todayBookings || todayBookings.length === 0)) {
     return (
@@ -138,28 +167,30 @@ export default function OwnerCheckInOut() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <div className="rounded-2xl border border-border bg-panel p-5 shadow-sm">
+        <button type="button" onClick={() => setStatusFilter("all")} className={cardClassName("all", "rounded-2xl border border-border bg-panel p-5 text-left shadow-sm")}>
           <p className="text-sm font-medium text-muted">Total Today</p>
           <p className="mt-1 text-3xl font-bold text-ink dark:text-dark-ink">{(todayBookings || []).length}</p>
-        </div>
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 shadow-sm dark:border-amber-800 dark:bg-amber-900/20">
+        </button>
+        <button type="button" onClick={() => setStatusFilter("awaiting")} className={cardClassName("awaiting", "rounded-2xl border border-amber-200 bg-amber-50 p-5 text-left shadow-sm dark:border-amber-800 dark:bg-amber-900/20")}>
           <p className="text-sm font-medium text-amber-700 dark:text-amber-400">Awaiting Check-In</p>
           <p className="mt-1 text-3xl font-bold text-amber-700 dark:text-amber-400">{awaitingCount}</p>
-        </div>
-        <div className="rounded-2xl border border-green-200 bg-green-50 p-5 shadow-sm dark:border-green-800 dark:bg-green-900/20">
+        </button>
+        <button type="button" onClick={() => setStatusFilter("checked_in")} className={cardClassName("checked_in", "rounded-2xl border border-green-200 bg-green-50 p-5 text-left shadow-sm dark:border-green-800 dark:bg-green-900/20")}>
           <p className="text-sm font-medium text-green-700 dark:text-green-400">Checked In</p>
           <p className="mt-1 text-3xl font-bold text-green-700 dark:text-green-400">{checkedInCount}</p>
-        </div>
+        </button>
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-border bg-panel shadow-sm">
-        {(!todayBookings || todayBookings.length === 0) ? (
+        {filteredBookings.length === 0 ? (
           <div className="py-16 text-center">
             <svg className="mx-auto h-12 w-12 text-muted/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
-            <p className="mt-4 text-sm font-medium text-ink dark:text-dark-ink">No bookings for today</p>
-            <p className="mt-1 text-sm text-muted">Guests with approved bookings for today will appear here</p>
+            <p className="mt-4 text-sm font-medium text-ink dark:text-dark-ink">No bookings match this filter</p>
+            <p className="mt-1 text-sm text-muted">
+              {statusFilter === "all" ? "Guests with approved bookings for today will appear here" : "Try another status card to view more bookings"}
+            </p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -175,7 +206,7 @@ export default function OwnerCheckInOut() {
                 </tr>
               </thead>
               <tbody>
-                {todayBookings.map((booking) => {
+                {paginatedItems.map((booking) => {
                   const statusBadge = getStatusBadge(booking.status);
                   const canCheckIn = ["approved", "confirmed"].includes(booking.status);
                   const canCheckOut = booking.status === "checked_in";
@@ -238,6 +269,15 @@ export default function OwnerCheckInOut() {
           </div>
         )}
       </div>
+
+      <Pagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        totalCount={totalCount}
+        pageSize={PAGE_SIZE}
+        onPageChange={goToPage}
+        itemLabel="bookings"
+      />
 
       <ConfirmModal
         open={!!confirmAction}

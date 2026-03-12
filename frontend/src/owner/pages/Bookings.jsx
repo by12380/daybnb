@@ -1,9 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Modal } from "antd";
+import { DatePicker, Modal } from "antd";
+import dayjs from "dayjs";
 import { useDispatch, useSelector } from "react-redux";
 import { formatPrice } from "../../guest/utils/format.js";
 import Button from "../../guest/components/ui/Button.jsx";
+import Pagination from "../../guest/components/ui/Pagination.jsx";
 import { INPUT_STYLES } from "../../guest/components/ui/FormInput.jsx";
+import useClientPagination from "../../hooks/useClientPagination.js";
 import {
   fetchOwnerBookings,
   approveOwnerBooking,
@@ -31,6 +34,8 @@ function getBookingStatusInfo(booking) {
   if (isPast) return { color: "bg-surface/60 text-muted", text: "Completed" };
   return { color: "bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400", text: "Upcoming" };
 }
+
+const PAGE_SIZE = 10;
 
 const ApproveModal = React.memo(({ open, booking, onClose, onConfirm }) => {
   const dispatch = useDispatch();
@@ -108,6 +113,7 @@ export default function OwnerBookings() {
 
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [dateFilter, setDateFilter] = useState("");
   const [approvingBooking, setApprovingBooking] = useState(null);
   const [rejectingBooking, setRejectingBooking] = useState(null);
 
@@ -123,6 +129,7 @@ export default function OwnerBookings() {
       if (statusFilter === "rejected" && booking.status !== "rejected") return false;
       if (statusFilter === "upcoming" && (booking.booking_date < today || booking.status === "rejected")) return false;
       if (statusFilter === "completed" && (booking.booking_date >= today || booking.status === "rejected" || booking.status === "pending")) return false;
+      if (dateFilter && booking.booking_date !== dateFilter) return false;
       if (searchTerm) {
         const search = searchTerm.toLowerCase();
         const matchesRoom = booking.room?.title?.toLowerCase().includes(search);
@@ -132,10 +139,22 @@ export default function OwnerBookings() {
       }
       return true;
     });
-  }, [bookings, searchTerm, statusFilter]);
+  }, [bookings, searchTerm, statusFilter, dateFilter]);
 
   const pendingCount = useMemo(() => (bookings || []).filter((b) => b.status === "pending").length, [bookings]);
+  const {
+    currentPage,
+    paginatedItems,
+    totalPages,
+    totalCount,
+    goToPage,
+    resetPagination,
+  } = useClientPagination(filteredBookings, PAGE_SIZE);
   const refreshData = useCallback(() => { dispatch(fetchOwnerBookings({ limit: 200 })); }, [dispatch]);
+
+  useEffect(() => {
+    resetPagination();
+  }, [searchTerm, statusFilter, dateFilter, resetPagination]);
 
   if (loading && (!bookings || bookings.length === 0)) {
     return (
@@ -170,6 +189,17 @@ export default function OwnerBookings() {
           <option value="upcoming">Upcoming</option>
           <option value="completed">Completed</option>
         </select>
+        <DatePicker
+          className={INPUT_STYLES}
+          placeholder="Filter by date"
+          value={dateFilter ? dayjs(dateFilter) : null}
+          onChange={(_, dateString) => setDateFilter(dateString || "")}
+        />
+        {dateFilter && (
+          <Button variant="outline" onClick={() => setDateFilter("")}>
+            Clear Date
+          </Button>
+        )}
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-border bg-panel shadow-sm">
@@ -192,7 +222,7 @@ export default function OwnerBookings() {
                 </tr>
               </thead>
               <tbody>
-                {filteredBookings.map((booking) => {
+                {paginatedItems.map((booking) => {
                   const statusInfo = getBookingStatusInfo(booking);
                   const isPending = booking.status === "pending";
                   return (
@@ -235,6 +265,15 @@ export default function OwnerBookings() {
           </div>
         )}
       </div>
+
+      <Pagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        totalCount={totalCount}
+        pageSize={PAGE_SIZE}
+        onPageChange={goToPage}
+        itemLabel="bookings"
+      />
 
       <ApproveModal open={!!approvingBooking} booking={approvingBooking} onClose={() => setApprovingBooking(null)} onConfirm={() => { setApprovingBooking(null); refreshData(); }} />
       <RejectModal open={!!rejectingBooking} booking={rejectingBooking} onClose={() => setRejectingBooking(null)} onConfirm={() => { setRejectingBooking(null); refreshData(); }} />
