@@ -26,7 +26,7 @@ const TABS = [
   { key: "cancelled", label: "Cancelled by Guest", color: "gray" },
 ];
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 5;
 
 function getTabStatusBadge(tab, booking) {
   switch (tab) {

@@ -52,7 +52,7 @@ function getPaymentStatusInfo(booking) {
   return { color: "bg-orange-50 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400", text: "Pending", icon: "pending" };
 }
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 5;
 
 const ViewBookingModal = React.memo(({ open, booking, room, userProfile, onClose }) => {
   if (!booking) return null;

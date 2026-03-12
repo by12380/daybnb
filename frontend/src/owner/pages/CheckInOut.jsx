@@ -139,10 +139,10 @@ export default function OwnerCheckInOut() {
     resetPagination();
   }, [statusFilter, todayBookings, resetPagination]);
 
-  const cardClassName = (cardKey, baseClassName) => {
+  const cardClassName = (cardKey, baseClassName, activeClassName) => {
     const isActive = statusFilter === cardKey;
     return `${baseClassName} cursor-pointer transition ${
-      isActive ? "ring-2 ring-brand-500 ring-offset-2 ring-offset-panel dark:ring-offset-panel" : "hover:-translate-y-0.5 hover:shadow-md"
+      isActive ? `${activeClassName} border-2 shadow-md` : "hover:-translate-y-0.5 hover:shadow-md"
     }`;
   };
 
@@ -167,15 +167,15 @@ export default function OwnerCheckInOut() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <button type="button" onClick={() => setStatusFilter("all")} className={cardClassName("all", "rounded-2xl border border-border bg-panel p-5 text-left shadow-sm")}>
+        <button type="button" onClick={() => setStatusFilter("all")} className={cardClassName("all", "rounded-2xl border border-border bg-panel p-5 text-left shadow-sm", "border-border")}>
           <p className="text-sm font-medium text-muted">Total Today</p>
           <p className="mt-1 text-3xl font-bold text-ink dark:text-dark-ink">{(todayBookings || []).length}</p>
         </button>
-        <button type="button" onClick={() => setStatusFilter("awaiting")} className={cardClassName("awaiting", "rounded-2xl border border-amber-200 bg-amber-50 p-5 text-left shadow-sm dark:border-amber-800 dark:bg-amber-900/20")}>
+        <button type="button" onClick={() => setStatusFilter("awaiting")} className={cardClassName("awaiting", "rounded-2xl border border-amber-200 bg-amber-50 p-5 text-left shadow-sm dark:border-amber-800 dark:bg-amber-900/20", "border-amber-300 dark:border-amber-700")}>
           <p className="text-sm font-medium text-amber-700 dark:text-amber-400">Awaiting Check-In</p>
           <p className="mt-1 text-3xl font-bold text-amber-700 dark:text-amber-400">{awaitingCount}</p>
         </button>
-        <button type="button" onClick={() => setStatusFilter("checked_in")} className={cardClassName("checked_in", "rounded-2xl border border-green-200 bg-green-50 p-5 text-left shadow-sm dark:border-green-800 dark:bg-green-900/20")}>
+        <button type="button" onClick={() => setStatusFilter("checked_in")} className={cardClassName("checked_in", "rounded-2xl border border-green-200 bg-green-50 p-5 text-left shadow-sm dark:border-green-800 dark:bg-green-900/20", "border-green-300 dark:border-green-700")}>
           <p className="text-sm font-medium text-green-700 dark:text-green-400">Checked In</p>
           <p className="mt-1 text-3xl font-bold text-green-700 dark:text-green-400">{checkedInCount}</p>
         </button>
