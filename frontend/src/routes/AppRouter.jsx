@@ -27,6 +27,7 @@ import AdminOwners from "../admin/pages/Owners.jsx";
 import AdminOffers from "../admin/pages/Offers.jsx";
 import AdminHeroBanners from "../admin/pages/HeroBanners.jsx";
 import AdminHeroBannerEditor from "../admin/pages/HeroBannerEditor.jsx";
+import AdminRoomEditor from "../admin/pages/RoomEditor.jsx";
 import AdminAlgoliaSync from "../admin/pages/AlgoliaSync.jsx";
 import AdminCheckInOut from "../admin/pages/CheckInOut.jsx";
 import AdminBookingHistory from "../admin/pages/BookingHistory.jsx";
@@ -41,6 +42,7 @@ import OwnerChat from "../owner/pages/Chat.jsx";
 import OwnerOffers from "../owner/pages/Offers.jsx";
 import OwnerCheckInOut from "../owner/pages/CheckInOut.jsx";
 import OwnerBookingHistory from "../owner/pages/BookingHistory.jsx";
+import OwnerRoomEditor from "../owner/pages/RoomEditor.jsx";
 
 // Admin chat
 import AdminChat from "../admin/pages/Chat.jsx";
@@ -79,6 +81,8 @@ export default function AppRouter() {
             <Route path="/admin/bookings" element={<AdminBookings />} />
             <Route path="/admin/users" element={<AdminUsers />} />
             <Route path="/admin/rooms" element={<AdminRooms />} />
+            <Route path="/admin/rooms/new" element={<AdminRoomEditor />} />
+            <Route path="/admin/rooms/:roomId/edit" element={<AdminRoomEditor />} />
             <Route path="/admin/messages" element={<AdminMessages />} />
             <Route path="/admin/chat" element={<AdminChat />} />
             <Route path="/admin/owners" element={<AdminOwners />} />
@@ -97,6 +101,8 @@ export default function AppRouter() {
           <Route element={<OwnerLayout />}>
             <Route path="/owner" element={<OwnerDashboard />} />
             <Route path="/owner/rooms" element={<OwnerRooms />} />
+            <Route path="/owner/rooms/new" element={<OwnerRoomEditor />} />
+            <Route path="/owner/rooms/:roomId/edit" element={<OwnerRoomEditor />} />
             <Route path="/owner/bookings" element={<OwnerBookings />} />
             <Route path="/owner/customers" element={<OwnerCustomers />} />
             <Route path="/owner/chat" element={<OwnerChat />} />

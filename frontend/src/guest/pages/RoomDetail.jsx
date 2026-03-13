@@ -136,6 +136,7 @@ const RoomDetail = React.memo(() => {
   const { roomOffer } = useSelector((s) => s.offers);
 
   const [lightboxIndex, setLightboxIndex] = useState(null);
+  const [activeGalleryIndex, setActiveGalleryIndex] = useState(0);
   const [showAllAmenities, setShowAllAmenities] = useState(false);
   const [reviewRating, setReviewRating] = useState(0);
   const [reviewNote, setReviewNote] = useState("");
@@ -161,6 +162,10 @@ const RoomDetail = React.memo(() => {
     if (room?.image && !imgs.includes(room.image)) imgs.unshift(room.image);
     return imgs.length ? imgs : [FALLBACK_IMAGE];
   }, [room?.image, room?.images]);
+
+  useEffect(() => {
+    setActiveGalleryIndex(0);
+  }, [roomId, galleryImages.length]);
 
   const ratingSummary = useMemo(() => {
     const count = (reviews || []).length;
@@ -188,6 +193,7 @@ const RoomDetail = React.memo(() => {
   }, [roomOffer, pricePerDay]);
 
   const cancellation = CANCELLATION_LABELS[room?.cancellation_policy] || CANCELLATION_LABELS.flexible;
+  const currentGalleryImage = galleryImages[Math.min(activeGalleryIndex, galleryImages.length - 1)] || FALLBACK_IMAGE;
 
   const onSubmitReview = useCallback(
     async (e) => {
@@ -267,45 +273,85 @@ const RoomDetail = React.memo(() => {
 
       <div className="space-y-8">
         <section className="overflow-hidden rounded-3xl">
-          {galleryImages.length === 1 ? (
-            <button className="block w-full" onClick={() => setLightboxIndex(0)}>
-              <img src={galleryImages[0]} alt={room.title} className="h-[420px] w-full object-cover transition hover:brightness-95" />
+          <div className="relative overflow-hidden rounded-3xl bg-black">
+            <button className="block w-full" onClick={() => setLightboxIndex(activeGalleryIndex)}>
+              <img
+                src={currentGalleryImage}
+                alt={room.title}
+                className="h-[420px] w-full object-cover transition hover:brightness-95"
+              />
             </button>
-          ) : galleryImages.length <= 3 ? (
-            <div className="grid h-[420px] grid-cols-2 gap-1">
-              <button className="relative overflow-hidden" onClick={() => setLightboxIndex(0)}>
-                <img src={galleryImages[0]} alt={room.title} className="h-full w-full object-cover transition hover:brightness-95" />
-              </button>
-              <div className="grid grid-rows-2 gap-1">
-                {galleryImages.slice(1, 3).map((img, i) => (
-                  <button key={i} className="relative overflow-hidden" onClick={() => setLightboxIndex(i + 1)}>
-                    <img src={img} alt="" className="h-full w-full object-cover transition hover:brightness-95" />
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div className="grid h-[420px] grid-cols-4 grid-rows-2 gap-1">
-              <button className="col-span-2 row-span-2 relative overflow-hidden" onClick={() => setLightboxIndex(0)}>
-                <img src={galleryImages[0]} alt={room.title} className="h-full w-full object-cover transition hover:brightness-95" />
-              </button>
-              {galleryImages.slice(1, 5).map((img, i) => (
-                <button key={i} className="relative overflow-hidden" onClick={() => setLightboxIndex(i + 1)}>
-                  <img src={img} alt="" className="h-full w-full object-cover transition hover:brightness-95" />
-                  {i === 3 && galleryImages.length > 5 && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/40 text-white">
-                      <span className="text-lg font-semibold">+{galleryImages.length - 5} more</span>
-                    </div>
-                  )}
+
+            {galleryImages.length > 1 && (
+              <>
+                <button
+                  onClick={() => setActiveGalleryIndex((current) => (current - 1 + galleryImages.length) % galleryImages.length)}
+                  className="absolute left-4 top-1/2 z-10 -translate-y-1/2 rounded-full bg-black/45 p-3 text-white backdrop-blur transition hover:bg-black/60"
+                >
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
                 </button>
-              ))}
+                <button
+                  onClick={() => setActiveGalleryIndex((current) => (current + 1) % galleryImages.length)}
+                  className="absolute right-4 top-1/2 z-10 -translate-y-1/2 rounded-full bg-black/45 p-3 text-white backdrop-blur transition hover:bg-black/60"
+                >
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </>
+            )}
+
+            <div className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-between p-4">
+              <span className="rounded-full bg-black/45 px-3 py-1 text-xs font-semibold text-white backdrop-blur">
+                {activeGalleryIndex + 1} / {galleryImages.length}
+              </span>
+              {galleryImages.length > 1 && (
+                <span className="rounded-full bg-black/45 px-3 py-1 text-xs font-semibold text-white backdrop-blur">
+                  All photos visible below
+                </span>
+              )}
             </div>
-          )}
-          {galleryImages.length > 1 && (
-            <div className="flex justify-end -mt-14 mr-4 relative z-10">
-              <button onClick={() => setLightboxIndex(0)} className="rounded-xl border border-white/30 bg-white/90 px-4 py-2 text-sm font-semibold text-ink shadow-lg backdrop-blur transition hover:bg-white dark:bg-dark-panel/90 dark:text-dark-ink dark:hover:bg-dark-panel">
+
+            <div className="absolute bottom-4 right-4 z-10">
+              <button
+                onClick={() => setLightboxIndex(activeGalleryIndex)}
+                className="rounded-xl border border-white/30 bg-white/90 px-4 py-2 text-sm font-semibold text-ink shadow-lg backdrop-blur transition hover:bg-white dark:bg-dark-panel/90 dark:text-dark-ink dark:hover:bg-dark-panel"
+              >
                 Show all photos
               </button>
+            </div>
+          </div>
+
+          {galleryImages.length > 1 && (
+            <div className="mt-3 flex gap-3 overflow-x-auto pb-2">
+              {galleryImages.map((img, index) => {
+                const isActive = index === activeGalleryIndex;
+
+                return (
+                  <button
+                    key={`${img}-${index}`}
+                    onClick={() => setActiveGalleryIndex(index)}
+                    className={`group relative h-20 w-28 shrink-0 overflow-hidden rounded-2xl border transition ${
+                      isActive
+                        ? "border-brand-500 ring-2 ring-brand-300 dark:border-brand-400 dark:ring-brand-700"
+                        : "border-border hover:border-brand-200 dark:border-dark-border dark:hover:border-brand-700"
+                    }`}
+                  >
+                    <img
+                      src={img}
+                      alt=""
+                      className={`h-full w-full object-cover transition ${
+                        isActive ? "brightness-100" : "brightness-90 group-hover:brightness-100"
+                      }`}
+                    />
+                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/50 to-transparent px-2 py-1 text-left text-[11px] font-medium text-white">
+                      Photo {index + 1}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           )}
         </section>
