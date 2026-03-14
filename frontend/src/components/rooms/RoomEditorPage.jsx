@@ -106,6 +106,17 @@ function TriStateToggle({ label, value, onChange }) {
   );
 }
 
+function ReadOnlyTextField({ label, value, placeholder = "Not set" }) {
+  return (
+    <div className="flex flex-col gap-2">
+      <span className="text-sm font-medium text-muted dark:text-dark-muted">{label}</span>
+      <div className="rounded-xl border border-border bg-surface/40 px-3 py-2 text-sm text-ink dark:border-dark-border dark:bg-dark-surface/30 dark:text-dark-ink">
+        {value || <span className="text-muted dark:text-dark-muted">{placeholder}</span>}
+      </div>
+    </div>
+  );
+}
+
 function normalizeRoomForForm(room) {
   return {
     title: room?.title || "",
@@ -161,11 +172,12 @@ function buildPayload(form) {
   };
 }
 
-export default function RoomEditorPage({ panel = "admin" }) {
+export default function RoomEditorPage({ panel = "admin", mode = "edit" }) {
   const config = PANEL_CONFIG[panel] || PANEL_CONFIG.admin;
   const { roomId } = useParams();
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const isViewMode = mode === "view";
 
   const isNew = !roomId || roomId === "new";
   const [form, setForm] = useState(() => normalizeRoomForForm(null));
@@ -314,10 +326,16 @@ export default function RoomEditorPage({ panel = "admin" }) {
               {config.eyebrow}
             </p>
             <h1 className="mt-2 text-3xl font-bold tracking-tight text-ink dark:text-dark-ink">
-              {isNew ? "Create room listing" : `Edit ${form.title || "room listing"}`}
+              {isViewMode
+                ? `View ${form.title || "room listing"}`
+                : isNew
+                  ? "Create room listing"
+                  : `Edit ${form.title || "room listing"}`}
             </h1>
             <p className="mt-3 text-sm leading-6 text-muted dark:text-dark-muted">
-              {config.emptyMessage}
+              {isViewMode
+                ? "Review the full listing in a dedicated page while keeping the preview pinned on the right."
+                : config.emptyMessage}
             </p>
             {!isNew && roomMeta?.id && (
               <p className="mt-3 text-xs font-medium text-muted dark:text-dark-muted">
@@ -328,11 +346,17 @@ export default function RoomEditorPage({ panel = "admin" }) {
 
           <div className="flex flex-wrap items-center gap-3">
             <Button variant="outline" onClick={() => navigate(config.listPath)}>
-              Cancel
+              {isViewMode ? "Back to rooms" : "Cancel"}
             </Button>
-            <Button onClick={handleSave} disabled={saving}>
-              {saving ? "Saving..." : isNew ? config.createLabel : config.saveLabel}
-            </Button>
+            {isViewMode ? (
+              <Button onClick={() => navigate(`${config.listPath}/${roomId}/edit`)}>
+                Edit room
+              </Button>
+            ) : (
+              <Button onClick={handleSave} disabled={saving}>
+                {saving ? "Saving..." : isNew ? config.createLabel : config.saveLabel}
+              </Button>
+            )}
           </div>
         </div>
       </div>
@@ -344,18 +368,26 @@ export default function RoomEditorPage({ panel = "admin" }) {
               Basic info
             </SectionTitle>
             <div className="grid gap-4">
-              <FormInput
-                label="Room title *"
-                value={form.title}
-                onChange={(event) => updateField("title", event.target.value)}
-                placeholder="e.g., Seaside Premium Suite"
-              />
-              <FormInput
-                label="Location *"
-                value={form.location}
-                onChange={(event) => updateField("location", event.target.value)}
-                placeholder="e.g., Los Angeles"
-              />
+              {isViewMode ? (
+                <ReadOnlyTextField label="Room title" value={form.title} placeholder="Untitled room" />
+              ) : (
+                <FormInput
+                  label="Room title *"
+                  value={form.title}
+                  onChange={(event) => updateField("title", event.target.value)}
+                  placeholder="e.g., Seaside Premium Suite"
+                />
+              )}
+              {isViewMode ? (
+                <ReadOnlyTextField label="Location" value={form.location} />
+              ) : (
+                <FormInput
+                  label="Location *"
+                  value={form.location}
+                  onChange={(event) => updateField("location", event.target.value)}
+                  placeholder="e.g., Los Angeles"
+                />
+              )}
               <div className="grid gap-4 md:grid-cols-2">
                 <label className="flex flex-col gap-2">
                   <span className="text-sm font-medium text-muted dark:text-dark-muted">Room type</span>
@@ -363,6 +395,7 @@ export default function RoomEditorPage({ panel = "admin" }) {
                     value={form.type}
                     onChange={(event) => updateField("type", event.target.value)}
                     className={INPUT_STYLES}
+                    disabled={isViewMode}
                   >
                     {ROOM_TYPES.map((item) => (
                       <option key={item.value} value={item.value}>
@@ -378,6 +411,7 @@ export default function RoomEditorPage({ panel = "admin" }) {
                   max={20}
                   value={form.guests}
                   onChange={(event) => updateField("guests", event.target.value)}
+                  disabled={isViewMode}
                 />
               </div>
               <FormInput
@@ -387,6 +421,7 @@ export default function RoomEditorPage({ panel = "admin" }) {
                 step={0.01}
                 value={form.pricePerDay}
                 onChange={(event) => updateField("pricePerDay", event.target.value)}
+                disabled={isViewMode}
               />
               <label className="flex flex-col gap-2">
                 <span className="text-sm font-medium text-muted dark:text-dark-muted">Description</span>
@@ -395,14 +430,19 @@ export default function RoomEditorPage({ panel = "admin" }) {
                   value={form.description}
                   onChange={(event) => updateField("description", event.target.value)}
                   placeholder="Describe the space, nearby highlights, and what makes it memorable."
+                  readOnly={isViewMode}
                 />
               </label>
-              <FormInput
-                label="Tags (comma-separated)"
-                value={form.tags}
-                onChange={(event) => updateField("tags", event.target.value)}
-                placeholder="e.g., Ocean view, Wi-Fi, Workspace"
-              />
+              {isViewMode ? (
+                <ReadOnlyTextField label="Tags" value={form.tags} placeholder="No tags added" />
+              ) : (
+                <FormInput
+                  label="Tags (comma-separated)"
+                  value={form.tags}
+                  onChange={(event) => updateField("tags", event.target.value)}
+                  placeholder="e.g., Ocean view, Wi-Fi, Workspace"
+                />
+              )}
             </div>
           </SectionCard>
 
@@ -416,18 +456,21 @@ export default function RoomEditorPage({ panel = "admin" }) {
                 value={form.image}
                 onChange={(event) => updateField("image", event.target.value)}
                 placeholder="https://example.com/cover.jpg"
+                disabled={isViewMode}
               />
 
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <p className="text-sm font-medium text-muted dark:text-dark-muted">Gallery images</p>
-                  <button
-                    type="button"
-                    onClick={() => updateField("images", [...form.images, ""])}
-                    className="rounded-full border border-brand-200 bg-brand-50 px-3 py-1.5 text-xs font-medium text-brand-700 transition hover:bg-brand-100 dark:border-brand-700 dark:bg-brand-900/30 dark:text-brand-300 dark:hover:bg-brand-900/50"
-                  >
-                    Add image
-                  </button>
+                  {!isViewMode && (
+                    <button
+                      type="button"
+                      onClick={() => updateField("images", [...form.images, ""])}
+                      className="rounded-full border border-brand-200 bg-brand-50 px-3 py-1.5 text-xs font-medium text-brand-700 transition hover:bg-brand-100 dark:border-brand-700 dark:bg-brand-900/30 dark:text-brand-300 dark:hover:bg-brand-900/50"
+                    >
+                      Add image
+                    </button>
+                  )}
                 </div>
 
                 {form.images.length === 0 && (
@@ -456,6 +499,7 @@ export default function RoomEditorPage({ panel = "admin" }) {
                               )
                             }
                             placeholder={`Image URL ${index + 1}`}
+                            disabled={isViewMode}
                           />
                           {url.trim() && (
                             <img
@@ -468,20 +512,22 @@ export default function RoomEditorPage({ panel = "admin" }) {
                             />
                           )}
                         </div>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            updateField(
-                              "images",
-                              form.images.filter((_, currentIndex) => currentIndex !== index)
-                            )
-                          }
-                          className="rounded-full border border-border p-2 text-muted transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 dark:border-dark-border dark:text-dark-muted dark:hover:border-red-700 dark:hover:bg-red-900/30 dark:hover:text-red-300"
-                        >
-                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
+                        {!isViewMode && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              updateField(
+                                "images",
+                                form.images.filter((_, currentIndex) => currentIndex !== index)
+                              )
+                            }
+                            className="rounded-full border border-border p-2 text-muted transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 dark:border-dark-border dark:text-dark-muted dark:hover:border-red-700 dark:hover:bg-red-900/30 dark:hover:text-red-300"
+                          >
+                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -501,6 +547,7 @@ export default function RoomEditorPage({ panel = "admin" }) {
                   value={form.propertyType}
                   onChange={(event) => updateField("propertyType", event.target.value)}
                   className={INPUT_STYLES}
+                  disabled={isViewMode}
                 >
                   {PROPERTY_TYPES.map((item) => (
                     <option key={item.value} value={item.value}>
@@ -515,6 +562,7 @@ export default function RoomEditorPage({ panel = "admin" }) {
                   value={form.placeType}
                   onChange={(event) => updateField("placeType", event.target.value)}
                   className={INPUT_STYLES}
+                  disabled={isViewMode}
                 >
                   {PLACE_TYPE_OPTIONS.map((item) => (
                     <option key={item.value} value={item.value}>
@@ -532,6 +580,7 @@ export default function RoomEditorPage({ panel = "admin" }) {
                 max={20}
                 value={form.bedrooms}
                 onChange={(event) => updateField("bedrooms", event.target.value)}
+                disabled={isViewMode}
               />
               <FormInput
                 label="Beds"
@@ -540,6 +589,7 @@ export default function RoomEditorPage({ panel = "admin" }) {
                 max={30}
                 value={form.beds}
                 onChange={(event) => updateField("beds", event.target.value)}
+                disabled={isViewMode}
               />
               <FormInput
                 label="Bathrooms"
@@ -548,6 +598,7 @@ export default function RoomEditorPage({ panel = "admin" }) {
                 max={20}
                 value={form.bathrooms}
                 onChange={(event) => updateField("bathrooms", event.target.value)}
+                disabled={isViewMode}
               />
             </div>
           </SectionCard>
@@ -557,11 +608,11 @@ export default function RoomEditorPage({ panel = "admin" }) {
               Guest experience
             </SectionTitle>
             <div className="space-y-3">
-              <TriStateToggle label="Instant book" value={form.instantBook} onChange={(value) => updateField("instantBook", value)} />
-              <TriStateToggle label="Self check-in" value={form.selfCheckin} onChange={(value) => updateField("selfCheckin", value)} />
-              <TriStateToggle label="Allows pets" value={form.allowsPets} onChange={(value) => updateField("allowsPets", value)} />
-              <TriStateToggle label="Guest favorite" value={form.isGuestFavorite} onChange={(value) => updateField("isGuestFavorite", value)} />
-              <TriStateToggle label="Luxe" value={form.isLuxe} onChange={(value) => updateField("isLuxe", value)} />
+              <TriStateToggle label="Instant book" value={form.instantBook} onChange={isViewMode ? () => {} : (value) => updateField("instantBook", value)} />
+              <TriStateToggle label="Self check-in" value={form.selfCheckin} onChange={isViewMode ? () => {} : (value) => updateField("selfCheckin", value)} />
+              <TriStateToggle label="Allows pets" value={form.allowsPets} onChange={isViewMode ? () => {} : (value) => updateField("allowsPets", value)} />
+              <TriStateToggle label="Guest favorite" value={form.isGuestFavorite} onChange={isViewMode ? () => {} : (value) => updateField("isGuestFavorite", value)} />
+              <TriStateToggle label="Luxe" value={form.isLuxe} onChange={isViewMode ? () => {} : (value) => updateField("isLuxe", value)} />
             </div>
           </SectionCard>
 
@@ -581,7 +632,7 @@ export default function RoomEditorPage({ panel = "admin" }) {
                         key={item.value}
                         label={item.label}
                         active={form.amenities.includes(item.value)}
-                        onClick={() => toggleAmenity(item.value)}
+                        onClick={isViewMode ? () => {} : () => toggleAmenity(item.value)}
                       />
                     ))}
                   </div>
@@ -598,7 +649,7 @@ export default function RoomEditorPage({ panel = "admin" }) {
                       key={item.value}
                       label={item.label}
                       active={form.safetyFeatures.includes(item.value)}
-                      onClick={() => toggleSafety(item.value)}
+                      onClick={isViewMode ? () => {} : () => toggleSafety(item.value)}
                     />
                   ))}
                 </div>
@@ -606,20 +657,22 @@ export default function RoomEditorPage({ panel = "admin" }) {
             </div>
           </SectionCard>
 
-          {saveError && (
+          {!isViewMode && saveError && (
             <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300">
               {saveError}
             </div>
           )}
 
-          <div className="flex flex-wrap justify-end gap-3">
-            <Button variant="outline" onClick={() => navigate(config.listPath)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSave} disabled={saving}>
-              {saving ? "Saving..." : isNew ? config.createLabel : config.saveLabel}
-            </Button>
-          </div>
+          {!isViewMode && (
+            <div className="flex flex-wrap justify-end gap-3">
+              <Button variant="outline" onClick={() => navigate(config.listPath)}>
+                Cancel
+              </Button>
+              <Button onClick={handleSave} disabled={saving}>
+                {saving ? "Saving..." : isNew ? config.createLabel : config.saveLabel}
+              </Button>
+            </div>
+          )}
         </div>
 
         <aside className="space-y-6">

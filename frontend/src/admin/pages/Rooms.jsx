@@ -11,122 +11,6 @@ import { fetchBookings } from "../../redux/slices/bookingSlice.js";
 import api from "../../redux/api.js";
 import { ROOM_TYPES } from "../../guest/utils/constants.js";
 
-const ViewRoomModal = React.memo(({ open, room, bookingsCount, onClose }) => {
-  if (!room) return null;
-
-  const allImages = [room.image, ...(room.images || [])].filter(Boolean);
-
-  return (
-    <Modal
-      title="Room Details"
-      open={open}
-      onCancel={onClose}
-      footer={<Button variant="outline" onClick={onClose}>Close</Button>}
-      destroyOnClose
-      width={640}
-    >
-      <div className="space-y-6 pt-4">
-        {allImages.length > 0 && (
-          <div>
-            <img src={allImages[0]} alt={room.title} className="h-56 w-full rounded-2xl object-cover" />
-            {allImages.length > 1 && (
-              <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
-                {allImages.slice(1).map((img, index) => (
-                  <img
-                    key={`${img}-${index}`}
-                    src={img}
-                    alt=""
-                    className="h-20 w-28 shrink-0 rounded-xl border border-border object-cover"
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        <div>
-          <h3 className="text-xl font-semibold text-ink dark:text-dark-ink">{room.title}</h3>
-          <p className="mt-1 text-sm text-muted dark:text-dark-muted">{room.location}</p>
-          {room.description && (
-            <p className="mt-3 text-sm leading-relaxed text-muted dark:text-dark-muted">{room.description}</p>
-          )}
-        </div>
-
-        <div className="grid grid-cols-3 gap-3">
-          <div className="rounded-2xl border border-border bg-surface/60 p-4 text-center dark:border-dark-border dark:bg-dark-surface/40">
-            <p className="text-2xl font-bold text-ink dark:text-dark-ink">{room.guests || 0}</p>
-            <p className="text-xs text-muted dark:text-dark-muted">Max guests</p>
-          </div>
-          <div className="rounded-2xl border border-border bg-surface/60 p-4 text-center dark:border-dark-border dark:bg-dark-surface/40">
-            <p className="text-2xl font-bold text-ink dark:text-dark-ink">{bookingsCount}</p>
-            <p className="text-xs text-muted dark:text-dark-muted">Total bookings</p>
-          </div>
-          <div className="rounded-2xl border border-brand-100 bg-brand-50 p-4 text-center dark:border-brand-800 dark:bg-brand-900/20">
-            <p className="text-2xl font-bold text-brand-700 dark:text-brand-300">
-              {formatPrice(room.price_per_day || 0)}
-            </p>
-            <p className="text-xs text-muted dark:text-dark-muted">Per day</p>
-          </div>
-        </div>
-
-        <div className="space-y-3 rounded-2xl border border-border bg-surface/60 p-4 dark:border-dark-border dark:bg-dark-surface/40">
-          <h4 className="font-medium text-ink dark:text-dark-ink">Room information</h4>
-          <div className="grid gap-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-muted dark:text-dark-muted">Type</span>
-              <span className="capitalize text-ink dark:text-dark-ink">{room.type || "N/A"}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted dark:text-dark-muted">Property</span>
-              <span className="capitalize text-ink dark:text-dark-ink">{room.property_type || "N/A"}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted dark:text-dark-muted">Place</span>
-              <span className="capitalize text-ink dark:text-dark-ink">
-                {(room.place_type || "").replace(/_/g, " ") || "N/A"}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted dark:text-dark-muted">Beds / baths</span>
-              <span className="text-ink dark:text-dark-ink">
-                {room.beds ?? 1} beds, {room.bathrooms ?? 1} bath
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted dark:text-dark-muted">Instant book</span>
-              <span className="text-ink dark:text-dark-ink">{room.instant_book ? "Yes" : "No"}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted dark:text-dark-muted">Pets</span>
-              <span className="text-ink dark:text-dark-ink">{room.allows_pets ? "Yes" : "No"}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted dark:text-dark-muted">Room ID</span>
-              <span className="font-mono text-xs text-ink dark:text-dark-ink">{room.id}</span>
-            </div>
-          </div>
-        </div>
-
-        {room.amenities?.length > 0 && (
-          <div>
-            <h4 className="mb-2 font-medium text-ink dark:text-dark-ink">Amenities</h4>
-            <div className="flex flex-wrap gap-2">
-              {room.amenities.map((amenity) => (
-                <span
-                  key={amenity}
-                  className="rounded-full bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700 dark:bg-brand-900/30 dark:text-brand-300"
-                >
-                  {amenity.replace(/_/g, " ")}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    </Modal>
-  );
-});
-
 const DeleteRoomModal = React.memo(({ open, room, onClose, onConfirm }) => {
   const dispatch = useDispatch();
   const [deleting, setDeleting] = useState(false);
@@ -204,7 +88,6 @@ export default function AdminRooms() {
   const [typeFilter, setTypeFilter] = useState("all");
   const [ownerFilter, setOwnerFilter] = useState("admin");
   const [owners, setOwners] = useState([]);
-  const [viewingRoom, setViewingRoom] = useState(null);
   const [deletingRoom, setDeletingRoom] = useState(null);
 
   useEffect(() => {
@@ -402,7 +285,7 @@ export default function AdminRooms() {
 
                   <div className="mt-4 flex gap-2 border-t border-border pt-4 dark:border-dark-border">
                     <button
-                      onClick={() => setViewingRoom(room)}
+                      onClick={() => navigate(`/admin/rooms/${room.id}`)}
                       className="flex-1 rounded-full border border-border px-3 py-2 text-sm font-medium text-muted transition hover:border-brand-200 hover:bg-brand-50 hover:text-brand-600 dark:border-dark-border dark:text-dark-muted dark:hover:border-brand-700 dark:hover:bg-brand-900/20 dark:hover:text-brand-300"
                     >
                       View
@@ -428,13 +311,6 @@ export default function AdminRooms() {
           })}
         </div>
       )}
-
-      <ViewRoomModal
-        open={!!viewingRoom}
-        room={viewingRoom}
-        bookingsCount={viewingRoom ? roomBookingsCount[viewingRoom.id] || 0 : 0}
-        onClose={() => setViewingRoom(null)}
-      />
       <DeleteRoomModal
         open={!!deletingRoom}
         room={deletingRoom}

@@ -28,6 +28,7 @@ import AdminOffers from "../admin/pages/Offers.jsx";
 import AdminHeroBanners from "../admin/pages/HeroBanners.jsx";
 import AdminHeroBannerEditor from "../admin/pages/HeroBannerEditor.jsx";
 import AdminRoomEditor from "../admin/pages/RoomEditor.jsx";
+import AdminRoomView from "../admin/pages/RoomView.jsx";
 import AdminAlgoliaSync from "../admin/pages/AlgoliaSync.jsx";
 import AdminCheckInOut from "../admin/pages/CheckInOut.jsx";
 import AdminBookingHistory from "../admin/pages/BookingHistory.jsx";
@@ -82,6 +83,7 @@ export default function AppRouter() {
             <Route path="/admin/users" element={<AdminUsers />} />
             <Route path="/admin/rooms" element={<AdminRooms />} />
             <Route path="/admin/rooms/new" element={<AdminRoomEditor />} />
+            <Route path="/admin/rooms/:roomId" element={<AdminRoomView />} />
             <Route path="/admin/rooms/:roomId/edit" element={<AdminRoomEditor />} />
             <Route path="/admin/messages" element={<AdminMessages />} />
             <Route path="/admin/chat" element={<AdminChat />} />
