@@ -25,6 +25,7 @@
     "react-redux": "^9.2.0",
     "react-router-dom": "^6.27.0",
     "react-slick": "^0.31.0",
+    "recharts": "^3.8.0",
     "redux-thunk": "^3.1.0",
     "slick-carousel": "^1.8.1",
     "socket.io-client": "^4.8.3"

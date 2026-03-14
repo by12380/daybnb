@@ -145,6 +145,7 @@ Typical protected route: `requireAuth → attachRole → [requireRole(...)] → 
 | DELETE | `/owners/:ownerId` | Delete owner |
 | PUT | `/users/:userId/role` | Change user role |
 | GET | `/dashboard-stats` | Dashboard statistics |
+| GET | `/analytics?period=` | Comprehensive analytics (revenue, funnel, time-series, top rooms/owners, payment breakdown). Period: `7d`, `30d`, `6m`, `all` |
 | GET | `/offers` | All offers |
 | POST | `/offers` | Create offer |
 | PUT | `/offers/:id` | Update offer |

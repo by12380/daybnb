@@ -39,6 +39,9 @@ router.put(
 // ── Dashboard Stats ──────────────────────────────────
 router.get("/dashboard-stats", ...adminMiddleware, adminController.getDashboardStats);
 
+// ── Analytics ────────────────────────────────────────
+router.get("/analytics", ...adminMiddleware, adminController.getAnalytics);
+
 // ── Offers / Discounts ──────────────────────────────
 router.get("/offers", ...adminMiddleware, offerController.getAllAdmin);
 router.post("/offers", ...adminMiddleware, offerController.createAdmin);
