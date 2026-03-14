@@ -25,6 +25,7 @@ import AdminRooms from "../admin/pages/Rooms.jsx";
 import AdminMessages from "../admin/pages/Messages.jsx";
 import AdminOwners from "../admin/pages/Owners.jsx";
 import AdminOffers from "../admin/pages/Offers.jsx";
+import AdminOfferEditor from "../admin/pages/OfferEditor.jsx";
 import AdminHeroBanners from "../admin/pages/HeroBanners.jsx";
 import AdminHeroBannerEditor from "../admin/pages/HeroBannerEditor.jsx";
 import AdminRoomEditor from "../admin/pages/RoomEditor.jsx";
@@ -89,6 +90,8 @@ export default function AppRouter() {
             <Route path="/admin/chat" element={<AdminChat />} />
             <Route path="/admin/owners" element={<AdminOwners />} />
             <Route path="/admin/offers" element={<AdminOffers />} />
+            <Route path="/admin/offers/new" element={<AdminOfferEditor />} />
+            <Route path="/admin/offers/:offerId/edit" element={<AdminOfferEditor />} />
             <Route path="/admin/hero-banners" element={<AdminHeroBanners />} />
             <Route path="/admin/hero-banners/new" element={<AdminHeroBannerEditor />} />
             <Route path="/admin/hero-banners/:bannerId/edit" element={<AdminHeroBannerEditor />} />

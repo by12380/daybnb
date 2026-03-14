@@ -1,164 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Modal, DatePicker } from "antd";
+import { useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import { useDispatch, useSelector } from "react-redux";
 import Button from "../../guest/components/ui/Button.jsx";
-import FormInput, { INPUT_STYLES } from "../../guest/components/ui/FormInput.jsx";
+import { INPUT_STYLES } from "../../guest/components/ui/FormInput.jsx";
+import OfferBannerCanvas from "../../components/OfferBannerCanvas.jsx";
 import {
   fetchAdminOffers,
-  createAdminOffer,
   updateAdminOffer,
   deleteAdminOffer,
 } from "../../redux/slices/offerSlice.js";
-import { fetchRooms } from "../../redux/slices/roomSlice.js";
-import api from "../../redux/api.js";
-
-const DISCOUNT_TYPES = [
-  { value: "percentage", label: "Percentage (%)" },
-  { value: "fixed", label: "Fixed Amount ($)" },
-];
-
-const OfferFormModal = React.memo(({ open, offer, onClose, onSave, isNew, rooms, owners }) => {
-  const dispatch = useDispatch();
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [tagLabel, setTagLabel] = useState("");
-  const [discountType, setDiscountType] = useState("percentage");
-  const [discountValue, setDiscountValue] = useState(10);
-  const [bannerImage, setBannerImage] = useState("");
-  const [showBanner, setShowBanner] = useState(false);
-  const [roomId, setRoomId] = useState("");
-  const [ownerId, setOwnerId] = useState("");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    if (open) {
-      if (offer && !isNew) {
-        setTitle(offer.title || "");
-        setDescription(offer.description || "");
-        setTagLabel(offer.tag_label || "");
-        setDiscountType(offer.discount_type || "percentage");
-        setDiscountValue(offer.discount_value ?? 10);
-        setBannerImage(offer.banner_image || "");
-        setShowBanner(offer.show_banner || false);
-        setRoomId(offer.room_id || "");
-        setOwnerId(offer.owner_id || "");
-        setStartDate(offer.start_date || "");
-        setEndDate(offer.end_date || "");
-      } else {
-        setTitle(""); setDescription(""); setTagLabel(""); setDiscountType("percentage");
-        setDiscountValue(10); setBannerImage(""); setShowBanner(false);
-        setRoomId(""); setOwnerId(""); setStartDate(""); setEndDate("");
-      }
-      setError("");
-    }
-  }, [offer, open, isNew]);
-
-  const handleSave = useCallback(async () => {
-    setError("");
-    if (!title.trim()) { setError("Title is required."); return; }
-    if (!endDate) { setError("End date is required."); return; }
-    setSaving(true);
-
-    const payload = {
-      title: title.trim(),
-      description: description.trim() || null,
-      tag_label: tagLabel.trim() || null,
-      discount_type: discountType,
-      discount_value: Number(discountValue) || 0,
-      banner_image: bannerImage.trim() || null,
-      show_banner: showBanner,
-      room_id: roomId || null,
-      owner_id: ownerId || null,
-      start_date: startDate || undefined,
-      end_date: endDate,
-    };
-
-    try {
-      if (isNew) {
-        await dispatch(createAdminOffer(payload)).unwrap();
-      } else {
-        await dispatch(updateAdminOffer({ id: offer.id, ...payload })).unwrap();
-      }
-      onSave();
-    } catch (err) {
-      setError(err || `Failed to ${isNew ? "create" : "update"} offer.`);
-    } finally {
-      setSaving(false);
-    }
-  }, [dispatch, title, description, tagLabel, discountType, discountValue, bannerImage, showBanner, roomId, ownerId, startDate, endDate, isNew, offer?.id, onSave]);
-
-  return (
-    <Modal title={isNew ? "Create Offer" : "Edit Offer"} open={open} onCancel={onClose} footer={null} destroyOnClose width={640}>
-      <div className="max-h-[70vh] space-y-4 overflow-y-auto pt-4 pr-1">
-        <FormInput label="Offer Title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g., Summer Sale 20% Off" />
-        <FormInput label="Description (optional)" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Brief description of the offer" />
-        <FormInput label="Tag / Badge Label (optional)" value={tagLabel} onChange={(e) => setTagLabel(e.target.value)} placeholder="e.g., Diwali Special, Black Friday" />
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <label className="flex flex-col gap-2">
-            <span className="text-sm font-medium text-muted">Discount Type</span>
-            <select value={discountType} onChange={(e) => setDiscountType(e.target.value)} className={INPUT_STYLES}>
-              {DISCOUNT_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-            </select>
-          </label>
-          <FormInput label={discountType === "percentage" ? "Discount (%)" : "Discount ($)"} type="number" min={0} step={discountType === "percentage" ? 1 : 0.01} max={discountType === "percentage" ? 100 : undefined} value={discountValue} onChange={(e) => setDiscountValue(e.target.value)} />
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <label className="flex flex-col gap-2">
-            <span className="text-sm font-medium text-muted">Start Date</span>
-            <DatePicker className={INPUT_STYLES} value={startDate ? dayjs(startDate) : null} onChange={(_, ds) => setStartDate(ds || "")} />
-          </label>
-          <label className="flex flex-col gap-2">
-            <span className="text-sm font-medium text-muted">End Date</span>
-            <DatePicker className={INPUT_STYLES} value={endDate ? dayjs(endDate) : null} onChange={(_, ds) => setEndDate(ds || "")} disabledDate={(c) => startDate && c && c < dayjs(startDate)} />
-          </label>
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <label className="flex flex-col gap-2">
-            <span className="text-sm font-medium text-muted">Apply to Room (optional)</span>
-            <select value={roomId} onChange={(e) => setRoomId(e.target.value)} className={INPUT_STYLES}>
-              <option value="">All / None</option>
-              {(rooms || []).map((r) => <option key={r.id} value={r.id}>{r.title} — {r.location}</option>)}
-            </select>
-          </label>
-          <label className="flex flex-col gap-2">
-            <span className="text-sm font-medium text-muted">Apply to Owner (optional)</span>
-            <select value={ownerId} onChange={(e) => setOwnerId(e.target.value)} className={INPUT_STYLES}>
-              <option value="">None (site-wide or room-specific)</option>
-              {(owners || []).map((o) => <option key={o.id} value={o.id}>{o.full_name || o.email || "Unknown"}</option>)}
-            </select>
-          </label>
-        </div>
-
-        <div className="rounded-xl border border-border bg-surface/40 p-4 space-y-3">
-          <p className="text-sm font-semibold text-ink">Campaign Banner (Landing Page)</p>
-          <FormInput label="Banner Image URL" value={bannerImage} onChange={(e) => setBannerImage(e.target.value)} placeholder="https://example.com/campaign-banner.jpg" />
-          {bannerImage && (
-            <div className="overflow-hidden rounded-xl border border-border">
-              <img src={bannerImage} alt="Banner Preview" className="h-32 w-full object-cover" onError={(e) => { e.target.style.display = "none"; }} />
-            </div>
-          )}
-          <label className="flex items-center gap-2">
-            <input type="checkbox" checked={showBanner} onChange={(e) => setShowBanner(e.target.checked)} className="h-4 w-4 rounded border-border text-brand-600 focus:ring-brand-500" />
-            <span className="text-sm text-muted">Show as campaign banner on landing page</span>
-          </label>
-        </div>
-
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <div className="flex justify-end gap-3 pt-2">
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleSave} disabled={saving}>{saving ? "Saving..." : isNew ? "Create Offer" : "Save Changes"}</Button>
-        </div>
-      </div>
-    </Modal>
-  );
-});
 
 function statusLabel(offer) {
   const today = dayjs().format("YYYY-MM-DD");
@@ -170,19 +21,12 @@ function statusLabel(offer) {
 
 export default function AdminOffers() {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const { offers, loading } = useSelector((state) => state.offers);
-  const { rooms } = useSelector((state) => state.rooms);
-  const [owners, setOwners] = useState([]);
-  const [editingOffer, setEditingOffer] = useState(null);
-  const [isCreating, setIsCreating] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
     dispatch(fetchAdminOffers());
-    dispatch(fetchRooms({ limit: 500 }));
-    api.get("/admin/owners", { params: { limit: 200 } })
-      .then(({ data }) => setOwners(data.owners || []))
-      .catch(() => {});
   }, [dispatch]);
 
   const filteredOffers = useMemo(() => {
@@ -194,12 +38,6 @@ export default function AdminOffers() {
       o.description?.toLowerCase().includes(s)
     );
   }, [offers, searchTerm]);
-
-  const handleSave = useCallback(() => {
-    setEditingOffer(null);
-    setIsCreating(false);
-    dispatch(fetchAdminOffers());
-  }, [dispatch]);
 
   const handleDelete = useCallback(async (id) => {
     if (!window.confirm("Delete this offer?")) return;
@@ -229,7 +67,7 @@ export default function AdminOffers() {
           <h1 className="text-2xl font-bold text-ink">Offers & Discounts</h1>
           <p className="mt-1 text-sm text-muted">Create and manage promotional offers ({filteredOffers.length} total)</p>
         </div>
-        <Button onClick={() => setIsCreating(true)}>
+        <Button onClick={() => navigate("/admin/offers/new")}>
           <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
           Create Offer
         </Button>
@@ -244,24 +82,34 @@ export default function AdminOffers() {
           <svg className="mx-auto h-12 w-12 text-muted/40" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>
           <p className="mt-4 text-sm font-medium text-ink">No offers yet</p>
           <p className="mt-1 text-sm text-muted">Create your first promotional offer to attract more bookings.</p>
-          <div className="mt-4"><Button onClick={() => setIsCreating(true)}>Create Offer</Button></div>
+          <div className="mt-4"><Button onClick={() => navigate("/admin/offers/new")}>Create Offer</Button></div>
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-5 xl:grid-cols-2">
           {filteredOffers.map((offer) => {
             const status = statusLabel(offer);
             return (
-              <div key={offer.id} className="overflow-hidden rounded-2xl border border-border bg-panel shadow-sm transition-shadow hover:shadow-md">
-                {offer.banner_image && (
-                  <img src={offer.banner_image} alt={offer.title} className="h-36 w-full object-cover" />
+              <div key={offer.id} className="overflow-hidden rounded-3xl border border-border bg-panel shadow-sm transition-shadow hover:shadow-md">
+                {/* Banner preview when show_banner is true */}
+                {offer.show_banner && (
+                  <div className="p-4">
+                    <OfferBannerCanvas
+                      offer={offer}
+                      preview
+                      className="min-h-[200px] sm:min-h-[240px]"
+                    />
+                  </div>
                 )}
-                <div className="p-5 space-y-3">
+
+                <div className={`p-5 space-y-3 ${offer.show_banner ? "border-t border-border" : ""}`}>
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <h3 className="font-semibold text-ink truncate">{offer.title}</h3>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="text-lg font-semibold text-ink">{offer.title}</h3>
+                        <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${status.color}`}>{status.text}</span>
+                      </div>
                       {offer.description && <p className="mt-0.5 text-xs text-muted line-clamp-2">{offer.description}</p>}
                     </div>
-                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${status.color}`}>{status.text}</span>
                   </div>
 
                   <div className="flex items-center gap-3 text-sm">
@@ -273,6 +121,11 @@ export default function AdminOffers() {
                         {offer.tag_label}
                       </span>
                     )}
+                    {offer.show_banner && (
+                      <span className="rounded-full border border-purple-200 bg-purple-50 px-2 py-0.5 text-xs font-medium text-purple-700 dark:border-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
+                        Campaign Banner
+                      </span>
+                    )}
                   </div>
 
                   <div className="text-xs text-muted space-y-1">
@@ -280,15 +133,25 @@ export default function AdminOffers() {
                     {offer.room_id && <p>Room-specific</p>}
                     {offer.owner_id && !offer.room_id && <p>Owner-wide</p>}
                     {!offer.room_id && !offer.owner_id && <p>Site-wide</p>}
-                    {offer.show_banner && <p className="font-medium text-brand-600">Campaign banner active</p>}
                   </div>
 
-                  <div className="flex gap-2 border-t border-border pt-3">
-                    <button onClick={() => setEditingOffer(offer)} className="flex-1 rounded-lg border border-border px-3 py-2 text-sm font-medium text-muted transition-colors hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600">Edit</button>
-                    <button onClick={() => handleToggleActive(offer)} className="flex-1 rounded-lg border border-border px-3 py-2 text-sm font-medium text-muted transition-colors hover:border-amber-200 hover:bg-amber-50 hover:text-amber-600">
+                  <div className="flex flex-wrap gap-2 border-t border-border pt-3">
+                    <button
+                      onClick={() => navigate(`/admin/offers/${offer.id}/edit`)}
+                      className="flex-1 rounded-lg border border-border px-3 py-2 text-sm font-medium text-muted transition-colors hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleToggleActive(offer)}
+                      className="flex-1 rounded-lg border border-border px-3 py-2 text-sm font-medium text-muted transition-colors hover:border-amber-200 hover:bg-amber-50 hover:text-amber-600"
+                    >
                       {offer.is_active ? "Deactivate" : "Activate"}
                     </button>
-                    <button onClick={() => handleDelete(offer.id)} className="rounded-lg border border-border px-3 py-2 text-sm font-medium text-muted transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600">
+                    <button
+                      onClick={() => handleDelete(offer.id)}
+                      className="rounded-lg border border-border px-3 py-2 text-sm font-medium text-muted transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600"
+                    >
                       <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                     </button>
                   </div>
@@ -298,16 +161,6 @@ export default function AdminOffers() {
           })}
         </div>
       )}
-
-      <OfferFormModal
-        open={!!editingOffer || isCreating}
-        offer={editingOffer}
-        isNew={isCreating}
-        onClose={() => { setEditingOffer(null); setIsCreating(false); }}
-        onSave={handleSave}
-        rooms={rooms}
-        owners={owners}
-      />
     </div>
   );
 }

@@ -174,6 +174,15 @@ export default function AdminOwners() {
 
   useEffect(() => { fetchOwners(); }, [fetchOwners]);
 
+  // Restore impersonated owner info from backend when session is recovered
+  useEffect(() => {
+    if (impersonating && !impersonatedOwner) {
+      api.get(`/admin/owners/${impersonating}`)
+        .then(({ data }) => setImpersonatedOwner(data.owner || null))
+        .catch(() => {});
+    }
+  }, [impersonating, impersonatedOwner]);
+
   const handleStartImpersonation = useCallback(async (owner) => {
     setActionLoading(true);
     setError("");

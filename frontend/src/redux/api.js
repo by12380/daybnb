@@ -11,11 +11,25 @@ const api = axios.create({
 });
 
 // ─── Impersonation state ─────────────────────────────────────
-// Stored in memory so it resets on page refresh (intentional safety).
-let _impersonatingOwnerId = null;
+// Persisted in sessionStorage so it survives client-side navigations
+// and soft refreshes within the same browser tab, but clears when the
+// tab is closed.
+const _IMPERSONATE_KEY = "daybnb_impersonate_owner";
+
+let _impersonatingOwnerId = (() => {
+  try { return sessionStorage.getItem(_IMPERSONATE_KEY) || null; }
+  catch { return null; }
+})();
 
 export function setImpersonation(ownerId) {
   _impersonatingOwnerId = ownerId || null;
+  try {
+    if (_impersonatingOwnerId) {
+      sessionStorage.setItem(_IMPERSONATE_KEY, _impersonatingOwnerId);
+    } else {
+      sessionStorage.removeItem(_IMPERSONATE_KEY);
+    }
+  } catch { /* private browsing */ }
 }
 
 export function getImpersonation() {
@@ -24,6 +38,8 @@ export function getImpersonation() {
 
 export function clearImpersonation() {
   _impersonatingOwnerId = null;
+  try { sessionStorage.removeItem(_IMPERSONATE_KEY); }
+  catch { /* private browsing */ }
 }
 
 // Request interceptor – attach Supabase access token to every request

@@ -57,6 +57,13 @@ exports.createAdmin = asyncHandler(async (req, res) => {
     banner_image, show_banner,
     room_id, owner_id,
     start_date, end_date,
+    banner_background_type, banner_background_color,
+    banner_gradient_from, banner_gradient_to, banner_gradient_direction,
+    banner_background_opacity, banner_text_alignment,
+    banner_box_x_desktop, banner_box_y_desktop,
+    banner_box_x_tablet, banner_box_y_tablet,
+    banner_box_x_mobile, banner_box_y_mobile,
+    banner_box_width_desktop, banner_box_width_tablet, banner_box_width_mobile,
   } = req.body;
 
   if (!title) throw ApiError.badRequest("Title is required");
@@ -76,6 +83,22 @@ exports.createAdmin = asyncHandler(async (req, res) => {
     start_date: start_date || todayISO(),
     end_date,
     is_active: true,
+    banner_background_type: banner_background_type || "image",
+    banner_background_color: banner_background_color?.trim() || null,
+    banner_gradient_from: banner_gradient_from?.trim() || null,
+    banner_gradient_to: banner_gradient_to?.trim() || null,
+    banner_gradient_direction: banner_gradient_direction || "to-r",
+    banner_background_opacity: banner_background_opacity != null ? Number(banner_background_opacity) : 1,
+    banner_text_alignment: banner_text_alignment || "left",
+    banner_box_x_desktop: banner_box_x_desktop != null ? Number(banner_box_x_desktop) : 6,
+    banner_box_y_desktop: banner_box_y_desktop != null ? Number(banner_box_y_desktop) : 16,
+    banner_box_x_tablet: banner_box_x_tablet != null ? Number(banner_box_x_tablet) : 5,
+    banner_box_y_tablet: banner_box_y_tablet != null ? Number(banner_box_y_tablet) : 10,
+    banner_box_x_mobile: banner_box_x_mobile != null ? Number(banner_box_x_mobile) : 4,
+    banner_box_y_mobile: banner_box_y_mobile != null ? Number(banner_box_y_mobile) : 6,
+    banner_box_width_desktop: banner_box_width_desktop != null ? Number(banner_box_width_desktop) : 44,
+    banner_box_width_tablet: banner_box_width_tablet != null ? Number(banner_box_width_tablet) : 58,
+    banner_box_width_mobile: banner_box_width_mobile != null ? Number(banner_box_width_mobile) : 90,
   };
 
   const { data, error } = await supabaseAdmin
@@ -102,6 +125,13 @@ exports.updateAdmin = asyncHandler(async (req, res) => {
     room_id, owner_id,
     start_date, end_date,
     is_active,
+    banner_background_type, banner_background_color,
+    banner_gradient_from, banner_gradient_to, banner_gradient_direction,
+    banner_background_opacity, banner_text_alignment,
+    banner_box_x_desktop, banner_box_y_desktop,
+    banner_box_x_tablet, banner_box_y_tablet,
+    banner_box_x_mobile, banner_box_y_mobile,
+    banner_box_width_desktop, banner_box_width_tablet, banner_box_width_mobile,
   } = req.body;
 
   const updates = {};
@@ -117,6 +147,22 @@ exports.updateAdmin = asyncHandler(async (req, res) => {
   if (start_date !== undefined) updates.start_date = start_date;
   if (end_date !== undefined) updates.end_date = end_date;
   if (is_active !== undefined) updates.is_active = !!is_active;
+  if (banner_background_type !== undefined) updates.banner_background_type = banner_background_type;
+  if (banner_background_color !== undefined) updates.banner_background_color = banner_background_color?.trim() || null;
+  if (banner_gradient_from !== undefined) updates.banner_gradient_from = banner_gradient_from?.trim() || null;
+  if (banner_gradient_to !== undefined) updates.banner_gradient_to = banner_gradient_to?.trim() || null;
+  if (banner_gradient_direction !== undefined) updates.banner_gradient_direction = banner_gradient_direction;
+  if (banner_background_opacity !== undefined) updates.banner_background_opacity = Number(banner_background_opacity);
+  if (banner_text_alignment !== undefined) updates.banner_text_alignment = banner_text_alignment;
+  if (banner_box_x_desktop !== undefined) updates.banner_box_x_desktop = Number(banner_box_x_desktop);
+  if (banner_box_y_desktop !== undefined) updates.banner_box_y_desktop = Number(banner_box_y_desktop);
+  if (banner_box_x_tablet !== undefined) updates.banner_box_x_tablet = Number(banner_box_x_tablet);
+  if (banner_box_y_tablet !== undefined) updates.banner_box_y_tablet = Number(banner_box_y_tablet);
+  if (banner_box_x_mobile !== undefined) updates.banner_box_x_mobile = Number(banner_box_x_mobile);
+  if (banner_box_y_mobile !== undefined) updates.banner_box_y_mobile = Number(banner_box_y_mobile);
+  if (banner_box_width_desktop !== undefined) updates.banner_box_width_desktop = Number(banner_box_width_desktop);
+  if (banner_box_width_tablet !== undefined) updates.banner_box_width_tablet = Number(banner_box_width_tablet);
+  if (banner_box_width_mobile !== undefined) updates.banner_box_width_mobile = Number(banner_box_width_mobile);
 
   const { data, error } = await supabaseAdmin
     .from("offers")

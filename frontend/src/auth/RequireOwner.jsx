@@ -8,6 +8,8 @@ export default function RequireOwner() {
   const { isOwner, isAdmin, loading, profile, error, refetch } = useProfile();
   const location = useLocation();
 
+  const impersonationActive = !!getImpersonation();
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-surface">
@@ -44,12 +46,28 @@ export default function RequireOwner() {
     );
   }
 
-  // Allow access if user is an owner, OR if user is admin impersonating an owner
-  const isImpersonating = isAdmin && !!getImpersonation();
+  // Allow access if:
+  // 1. User is an owner, OR
+  // 2. User is an admin with an active impersonation session
+  const isImpersonating = isAdmin && impersonationActive;
 
-  if (!isOwner && !isImpersonating) {
-    return <Navigate to="/" replace />;
+  if (isOwner || isImpersonating) {
+    return <Outlet />;
   }
 
-  return <Outlet />;
+  // If impersonation is active but the profile hasn't resolved the admin
+  // role yet (e.g. profile is null), keep showing the spinner rather than
+  // redirecting — the profile fetch may still be in flight.
+  if (impersonationActive && session && !profile) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-surface">
+        <div className="text-center">
+          <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-brand-200 border-t-brand-600" />
+          <p className="mt-4 text-sm text-muted">Verifying impersonation...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return <Navigate to="/" replace />;
 }
