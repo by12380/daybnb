@@ -37,6 +37,7 @@ router.put(
 );
 
 // ── Dashboard Stats ──────────────────────────────────
+router.get("/analytics", ...adminMiddleware, adminController.getAnalytics);
 router.get("/dashboard-stats", ...adminMiddleware, adminController.getDashboardStats);
 
 // ── Offers / Discounts ──────────────────────────────
