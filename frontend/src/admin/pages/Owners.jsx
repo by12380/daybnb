@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Modal } from "antd";
 import { useNavigate } from "react-router-dom";
+import AdminPageHeader from "../components/AdminPageHeader.jsx";
 import Button from "../../guest/components/ui/Button.jsx";
 import FormInput, { INPUT_STYLES } from "../../guest/components/ui/FormInput.jsx";
 import api, { setImpersonation, clearImpersonation, getImpersonation } from "../../redux/api.js";
@@ -283,12 +284,10 @@ export default function AdminOwners() {
         </div>
       )}
 
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-ink">Owners</h1>
-          <p className="mt-1 text-sm text-muted">Manage property owner accounts ({total} total)</p>
-        </div>
-      </div>
+      <AdminPageHeader
+        title="Owners"
+        subtitle={`Manage property owner accounts (${total} total)`}
+      />
 
       <div className="flex-1">
         <input

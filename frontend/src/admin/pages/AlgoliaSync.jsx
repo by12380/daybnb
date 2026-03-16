@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from "react";
+import AdminPageHeader from "../components/AdminPageHeader.jsx";
 import api from "../../redux/api.js";
 import {
   configureAlgoliaBookingsIndex,
@@ -144,12 +145,10 @@ export default function AlgoliaSync() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-ink dark:text-dark-ink">Algolia Sync</h1>
-        <p className="mt-1 text-sm text-muted dark:text-dark-muted">
-          Manage search index configuration and data synchronization.
-        </p>
-      </div>
+      <AdminPageHeader
+        title="Algolia Sync"
+        subtitle="Manage search index configuration and data synchronization."
+      />
 
       {/* Expected fields reference */}
       <div className="rounded-2xl border border-border bg-panel p-5 dark:border-dark-border dark:bg-dark-panel">

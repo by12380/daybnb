@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
+import AdminPageHeader from "../components/AdminPageHeader.jsx";
 import Button from "../../guest/components/ui/Button.jsx";
 import HeroBannerCanvas from "../../components/HeroBannerCanvas.jsx";
 import {
@@ -70,30 +71,28 @@ export default function AdminHeroBanners() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-ink">Hero Banners</h1>
-          <p className="mt-1 text-sm text-muted">
-            Manage the landing page slider with responsive text placement and live preview.
-          </p>
-        </div>
-        <Button onClick={() => navigate("/admin/hero-banners/new")}>
-          <svg
-            className="mr-2 h-4 w-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-            />
-          </svg>
-          Create Banner
-        </Button>
-      </div>
+      <AdminPageHeader
+        title="Hero Banners"
+        subtitle="Manage the landing page slider with responsive text placement and live preview."
+        actions={(
+          <Button onClick={() => navigate("/admin/hero-banners/new")}>
+            <svg
+              className="mr-2 h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+              />
+            </svg>
+            Create Banner
+          </Button>
+        )}
+      />
 
       {sortedBanners.length === 0 ? (
         <div className="rounded-2xl border border-border bg-panel py-12 text-center shadow-sm">

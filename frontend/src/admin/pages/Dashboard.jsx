@@ -15,6 +15,7 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts";
+import AdminPageHeader from "../components/AdminPageHeader.jsx";
 import { formatPrice } from "../../guest/utils/format.js";
 import { useTheme } from "../../theme/ThemeProvider.jsx";
 import api from "../../redux/api.js";
@@ -433,27 +434,29 @@ export default function AdminDashboard() {
   return (
     <div className="space-y-6">
       {/* Header + Period Selector */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-ink">Dashboard</h1>
-          <p className="mt-1 text-sm text-muted">
+      <AdminPageHeader
+        title="Dashboard"
+        subtitle={
+          <>
             {today.bookings > 0 ? `${today.bookings} booking${today.bookings > 1 ? "s" : ""} today` : "No bookings today"}
             {today.check_ins > 0 && ` · ${today.check_ins} check-in${today.check_ins > 1 ? "s" : ""}`}
             {today.check_outs > 0 && ` · ${today.check_outs} check-out${today.check_outs > 1 ? "s" : ""}`}
-          </p>
-        </div>
-        <div className="flex rounded-xl border border-border bg-surface/60 p-1">
-          {PERIODS.map((p) => (
-            <button
-              key={p.key}
-              onClick={() => setPeriod(p.key)}
-              className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${period === p.key ? "bg-panel text-ink shadow-sm" : "text-muted hover:text-ink"}`}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
-      </div>
+          </>
+        }
+        actions={(
+          <div className="flex rounded-xl border border-border bg-surface/60 p-1">
+            {PERIODS.map((p) => (
+              <button
+                key={p.key}
+                onClick={() => setPeriod(p.key)}
+                className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${period === p.key ? "bg-panel text-ink shadow-sm" : "text-muted hover:text-ink"}`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+        )}
+      />
 
       {/* Section A: Stat Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

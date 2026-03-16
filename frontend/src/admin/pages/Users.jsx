@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Modal } from "antd";
 import { useDispatch, useSelector } from "react-redux";
+import AdminPageHeader from "../components/AdminPageHeader.jsx";
 import { formatPrice } from "../../guest/utils/format.js";
 import Button from "../../guest/components/ui/Button.jsx";
 import FormInput, { INPUT_STYLES } from "../../guest/components/ui/FormInput.jsx";
@@ -196,7 +197,10 @@ export default function AdminUsers() {
 
   return (
     <div className="space-y-6">
-      <div><h1 className="text-2xl font-bold text-ink">Customers</h1><p className="mt-1 text-sm text-muted">Manage customer profiles ({filteredUsers.length} shown)</p></div>
+      <AdminPageHeader
+        title="Customers"
+        subtitle={`Manage customer profiles (${filteredUsers.length} shown)`}
+      />
 
       {/* Owner Picker */}
       <div className="flex items-center gap-2">

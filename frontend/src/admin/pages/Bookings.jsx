@@ -8,6 +8,7 @@ import Button from "../../guest/components/ui/Button.jsx";
 import Pagination from "../../guest/components/ui/Pagination.jsx";
 import FormInput, { INPUT_STYLES } from "../../guest/components/ui/FormInput.jsx";
 import useClientPagination from "../../hooks/useClientPagination.js";
+import AdminPageHeader from "../components/AdminPageHeader.jsx";
 import {
   fetchBookings,
   updateBooking,
@@ -360,14 +361,19 @@ export default function AdminBookings() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-ink dark:text-dark-ink">Bookings</h1>
-          <p className="mt-1 text-sm text-muted">Manage all reservations ({filteredBookings.length} shown)
-            {pendingCount > 0 && <span className="ml-2 inline-flex items-center rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-800">{pendingCount} pending approval</span>}
-          </p>
-        </div>
-      </div>
+      <AdminPageHeader
+        title="Bookings"
+        subtitle={(
+          <>
+            Manage all reservations ({filteredBookings.length} shown)
+            {pendingCount > 0 && (
+              <span className="ml-2 inline-flex items-center rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-800">
+                {pendingCount} pending approval
+              </span>
+            )}
+          </>
+        )}
+      />
 
       {/* Owner Picker */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center">

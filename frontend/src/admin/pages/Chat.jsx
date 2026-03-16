@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import AdminPageHeader from "../components/AdminPageHeader.jsx";
 import { useAuth } from "../../auth/useAuth.js";
 import { useSocket } from "../../lib/SocketProvider.jsx";
 import {
@@ -138,19 +139,19 @@ export default function AdminChat() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-ink dark:text-dark-ink">Customer Chat</h1>
-          <p className="mt-1 text-sm text-muted">
+      <AdminPageHeader
+        title="Customer Chat"
+        subtitle={(
+          <>
             {conversations.length} conversations
             {totalUnread > 0 && (
               <span className="ml-2 inline-flex items-center rounded-full bg-brand-100 px-2 py-0.5 text-xs font-medium text-brand-700">
                 {totalUnread} unread
               </span>
             )}
-          </p>
-        </div>
-      </div>
+          </>
+        )}
+      />
 
       <div className="flex h-[calc(100vh-220px)] min-h-[400px] overflow-hidden rounded-2xl border border-border bg-panel shadow-sm">
         {/* Sidebar */}

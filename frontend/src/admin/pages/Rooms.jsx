@@ -3,6 +3,7 @@ import { Modal } from "antd";
 import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { useAuth } from "../../auth/useAuth.js";
+import AdminPageHeader from "../components/AdminPageHeader.jsx";
 import { formatPrice } from "../../guest/utils/format.js";
 import Button from "../../guest/components/ui/Button.jsx";
 import { INPUT_STYLES } from "../../guest/components/ui/FormInput.jsx";
@@ -147,22 +148,18 @@ export default function AdminRooms() {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-[28px] border border-border bg-gradient-to-br from-panel via-panel to-brand-50/60 p-6 shadow-sm dark:border-dark-border dark:from-dark-panel dark:via-dark-panel dark:to-brand-900/10">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight text-ink dark:text-dark-ink">Rooms</h1>
-            <p className="mt-2 text-sm text-muted dark:text-dark-muted">
-              Manage listings with a full-page editor for richer room details and gallery management.
-            </p>
-          </div>
+      <AdminPageHeader
+        title="Rooms"
+        subtitle="Manage listings with a full-page editor for richer room details and gallery management."
+        actions={(
           <Button onClick={() => navigate("/admin/rooms/new")}>
             <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v12m6-6H6" />
             </svg>
             Add Room
           </Button>
-        </div>
-      </div>
+        )}
+      />
 
       <div className="grid gap-4 xl:grid-cols-[240px_minmax(0,1fr)_200px]">
         <div>

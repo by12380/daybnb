@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Modal } from "antd";
 import { useDispatch, useSelector } from "react-redux";
+import AdminPageHeader from "../components/AdminPageHeader.jsx";
 import Button from "../../guest/components/ui/Button.jsx";
 import { INPUT_STYLES } from "../../guest/components/ui/FormInput.jsx";
 import {
@@ -115,13 +116,20 @@ export default function AdminMessages() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-ink dark:text-dark-ink">Contact Messages</h1>
-          <p className="mt-1 text-sm text-muted">{(messages || []).length} total messages{unreadCount > 0 && <span className="ml-2 inline-flex items-center rounded-full bg-brand-100 px-2 py-0.5 text-xs font-medium text-brand-700">{unreadCount} unread</span>}</p>
-        </div>
-        <div className="flex items-center gap-2">{unreadCount > 0 && <Button variant="outline" onClick={handleMarkAllRead}>Mark All as Read</Button>}</div>
-      </div>
+      <AdminPageHeader
+        title="Contact Messages"
+        subtitle={(
+          <>
+            {(messages || []).length} total messages
+            {unreadCount > 0 && (
+              <span className="ml-2 inline-flex items-center rounded-full bg-brand-100 px-2 py-0.5 text-xs font-medium text-brand-700">
+                {unreadCount} unread
+              </span>
+            )}
+          </>
+        )}
+        actions={unreadCount > 0 ? <Button variant="outline" onClick={handleMarkAllRead}>Mark All as Read</Button> : null}
+      />
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
         <input type="text" placeholder="Search messages..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className={`${INPUT_STYLES} w-full sm:w-64`} />

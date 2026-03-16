@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { DatePicker } from "antd";
 import dayjs from "dayjs";
 import { useDispatch, useSelector } from "react-redux";
+import AdminPageHeader from "../components/AdminPageHeader.jsx";
 import { formatPrice } from "../../guest/utils/format.js";
 import Button from "../../guest/components/ui/Button.jsx";
 import Pagination from "../../guest/components/ui/Pagination.jsx";
@@ -91,10 +92,10 @@ export default function AdminBookingHistory() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-ink dark:text-dark-ink">Booking History</h1>
-        <p className="mt-1 text-sm text-muted">Review past booking outcomes and statuses</p>
-      </div>
+      <AdminPageHeader
+        title="Booking History"
+        subtitle="Review past booking outcomes and statuses"
+      />
 
       <div className="flex flex-wrap gap-2 border-b border-border pb-1">
         {TABS.map((tab) => (
