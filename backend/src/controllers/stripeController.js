@@ -3,6 +3,7 @@ const { supabaseAdmin } = require("../config/supabase");
 const asyncHandler = require("../utils/asyncHandler");
 const ApiError = require("../utils/ApiError");
 const { syncBookingChange } = require("../utils/algoliaSync");
+const { _notifyBookingCreated } = require("./bookingController");
 
 /**
  * POST /api/stripe/create-checkout-session
@@ -35,7 +36,6 @@ exports.createCheckoutSession = asyncHandler(async (req, res) => {
 
   const origin = req.headers.origin || process.env.CLIENT_URL || "http://localhost:5173";
 
-  // Build description
   let description = `Booking for ${bookingDate || "selected date"}`;
   if (startTime && endTime) {
     description += ` from ${startTime} to ${endTime}`;
@@ -60,7 +60,7 @@ exports.createCheckoutSession = asyncHandler(async (req, res) => {
             name: roomTitle,
             description,
           },
-          unit_amount: Math.round(totalPrice * 100), // Stripe expects cents
+          unit_amount: Math.round(totalPrice * 100),
         },
         quantity: 1,
       },
@@ -87,6 +87,52 @@ exports.createCheckoutSession = asyncHandler(async (req, res) => {
 });
 
 /**
+ * Mark a booking as paid and send the "booking_created" notification.
+ * Returns the updated booking, or null if already paid / not found.
+ * Guarantees the notification is sent exactly once: only when
+ * payment_status actually transitions from non-paid → paid.
+ */
+async function _markBookingPaid(bookingId, session) {
+  if (!bookingId || !supabaseAdmin) return null;
+
+  const { data: existing } = await supabaseAdmin
+    .from("bookings")
+    .select("id, payment_status, payment_method")
+    .eq("id", bookingId)
+    .maybeSingle();
+
+  if (!existing || existing.payment_status === "paid") return existing;
+
+  const { data: updatedBooking } = await supabaseAdmin
+    .from("bookings")
+    .update({
+      payment_status: "paid",
+      stripe_session_id: session.id,
+      stripe_payment_intent_id: session.payment_intent,
+      paid_at: new Date().toISOString(),
+    })
+    .eq("id", bookingId)
+    .eq("payment_status", existing.payment_status)
+    .select()
+    .single();
+
+  if (!updatedBooking) return null;
+
+  syncBookingChange("BOOKING_UPDATE", updatedBooking);
+  console.log(`Booking ${bookingId} marked as paid`);
+
+  if (updatedBooking.payment_method === "online") {
+    try {
+      await _notifyBookingCreated(updatedBooking);
+    } catch (err) {
+      console.error("Failed to send booking notification:", err);
+    }
+  }
+
+  return updatedBooking;
+}
+
+/**
  * POST /api/stripe/verify-session
  * Verify a completed checkout session with Stripe and update the booking.
  * Called by the PaymentSuccess page so we don't rely solely on webhooks.
@@ -109,33 +155,7 @@ exports.verifySession = asyncHandler(async (req, res) => {
   const resolvedBookingId =
     bookingId || session.metadata?.booking_id || session.client_reference_id;
 
-  if (resolvedBookingId && supabaseAdmin) {
-    const { data: existing } = await supabaseAdmin
-      .from("bookings")
-      .select("payment_status")
-      .eq("id", resolvedBookingId)
-      .single();
-
-    if (existing && existing.payment_status !== "paid") {
-      const { data: updatedBooking } = await supabaseAdmin
-        .from("bookings")
-        .update({
-          payment_status: "paid",
-          stripe_session_id: session.id,
-          stripe_payment_intent_id: session.payment_intent,
-          paid_at: new Date().toISOString(),
-        })
-        .eq("id", resolvedBookingId)
-        .select()
-        .single();
-
-      if (updatedBooking) {
-        syncBookingChange("BOOKING_UPDATE", updatedBooking);
-      }
-
-      console.log(`Booking ${resolvedBookingId} verified and marked as paid`);
-    }
-  }
+  await _markBookingPaid(resolvedBookingId, session);
 
   res.json({
     verified: true,
@@ -174,31 +194,7 @@ exports.handleWebhook = async (req, res) => {
       case "checkout.session.completed": {
         const session = event.data.object;
         const bookingId = session.metadata?.booking_id;
-
-        if (bookingId && supabaseAdmin) {
-          const { data: updatedBooking, error } = await supabaseAdmin
-            .from("bookings")
-            .update({
-              payment_status: "paid",
-              stripe_session_id: session.id,
-              stripe_payment_intent_id: session.payment_intent,
-              paid_at: new Date().toISOString(),
-            })
-            .eq("id", bookingId)
-            .select()
-            .single();
-
-          if (error) {
-            console.error("Error updating booking:", error);
-            return res.status(500).json({ error: error.message });
-          }
-
-          if (updatedBooking) {
-            syncBookingChange("BOOKING_UPDATE", updatedBooking);
-          }
-
-          console.log(`Booking ${bookingId} marked as paid`);
-        }
+        await _markBookingPaid(bookingId, session);
         break;
       }
 

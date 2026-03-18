@@ -29,17 +29,19 @@ serve(async (req) => {
       discountApplied,
       durationHours,
       pricePerHour,
+      pricePerDay,
       bookingDate,
       startTime,
       endTime,
       userEmail,
       userId,
+      userFullName,
+      userPhone,
     } = await req.json();
 
-    // Validate required fields
-    if (!bookingId || !totalPrice || !roomTitle) {
+    if (!totalPrice || !roomTitle || !roomId) {
       return new Response(
-        JSON.stringify({ error: "Missing required fields" }),
+        JSON.stringify({ error: "Missing required fields: totalPrice, roomTitle, roomId" }),
         {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -47,21 +49,24 @@ serve(async (req) => {
       );
     }
 
-    // Get the origin for redirect URLs
     const origin = req.headers.get("origin") || "http://localhost:5173";
 
-    // Build description with discount info if applicable
-    let description = `Booking for ${bookingDate} from ${startTime} to ${endTime} (${durationHours} hours)`;
+    let description = `Booking for ${bookingDate || "selected date"}`;
+    if (startTime && endTime) {
+      description += ` from ${startTime} to ${endTime}`;
+    }
+    if (durationHours) {
+      description += ` (${durationHours} hours)`;
+    }
     if (discountApplied && discountAmount > 0) {
       description += ` - ${discountApplied === "welcome_offer" ? "Welcome Offer" : discountApplied} discount applied`;
     }
 
-    // Create Stripe Checkout Session
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
       mode: "payment",
       customer_email: userEmail,
-      client_reference_id: bookingId,
+      client_reference_id: bookingId || userId,
       line_items: [
         {
           price_data: {
@@ -70,26 +75,31 @@ serve(async (req) => {
               name: roomTitle,
               description,
             },
-            unit_amount: Math.round(totalPrice * 100), // Stripe expects cents
+            unit_amount: Math.round(totalPrice * 100),
           },
           quantity: 1,
         },
       ],
       metadata: {
-        booking_id: bookingId,
+        booking_id: bookingId || "",
         room_id: roomId,
         user_id: userId,
-        booking_date: bookingDate,
-        start_time: startTime,
-        end_time: endTime,
-        duration_hours: String(durationHours),
-        price_per_hour: String(pricePerHour),
+        user_email: userEmail || "",
+        user_full_name: userFullName || "",
+        user_phone: userPhone || "",
+        booking_date: bookingDate || "",
+        start_time: startTime || "",
+        end_time: endTime || "",
+        duration_hours: durationHours ? String(durationHours) : "",
+        price_per_hour: pricePerHour ? String(pricePerHour) : "",
+        price_per_day: pricePerDay ? String(pricePerDay) : "",
+        total_price: String(totalPrice),
         original_price: originalPrice ? String(originalPrice) : "",
         discount_amount: discountAmount ? String(discountAmount) : "",
         discount_applied: discountApplied || "",
       },
-      success_url: `${origin}/payment-success?session_id={CHECKOUT_SESSION_ID}&booking_id=${bookingId}`,
-      cancel_url: `${origin}/payment-cancel?booking_id=${bookingId}`,
+      success_url: `${origin}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${origin}/payment-cancel`,
     });
 
     return new Response(
@@ -102,7 +112,7 @@ serve(async (req) => {
   } catch (error) {
     console.error("Error creating checkout session:", error);
     return new Response(
-      JSON.stringify({ error: error.message || "Failed to create checkout session" }),
+      JSON.stringify({ error: (error as Error).message || "Failed to create checkout session" }),
       {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
