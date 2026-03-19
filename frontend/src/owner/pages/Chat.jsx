@@ -2,6 +2,9 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useAuth } from "../../auth/useAuth.js";
 import { useSocket } from "../../lib/SocketProvider.jsx";
+import ChatComposer from "../../components/chat/ChatComposer.jsx";
+import ChatMessageBubble from "../../components/chat/ChatMessageBubble.jsx";
+import { getChatMessagePreview } from "../../components/chat/chatHelpers.js";
 import {
   fetchPanelConversations,
   fetchMessages,
@@ -50,6 +53,7 @@ export default function OwnerChat() {
 
   const [searchTerm, setSearchTerm] = useState("");
   const [inputValue, setInputValue] = useState("");
+  const [attachment, setAttachment] = useState(null);
   const [sending, setSending] = useState(false);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
@@ -93,19 +97,28 @@ export default function OwnerChat() {
     }
   }, [activeConversationId]);
 
+  useEffect(() => {
+    setAttachment(null);
+  }, [activeConversationId]);
+
   const handleSend = useCallback(async () => {
-    if (!inputValue.trim() || sending || !activeConversationId) return;
+    if ((!inputValue.trim() && !attachment) || sending || !activeConversationId) return;
     setSending(true);
     try {
       await dispatch(
-        sendMessage({ conversationId: activeConversationId, content: inputValue.trim() })
+        sendMessage({
+          conversationId: activeConversationId,
+          content: inputValue,
+          attachment,
+        })
       ).unwrap();
       setInputValue("");
+      setAttachment(null);
     } catch {
       // handled
     }
     setSending(false);
-  }, [activeConversationId, dispatch, inputValue, sending]);
+  }, [activeConversationId, attachment, dispatch, inputValue, sending]);
 
   const handleKeyDown = (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -181,7 +194,7 @@ export default function OwnerChat() {
                     </div>
                     <div className="flex items-center justify-between">
                       <p className="truncate text-xs text-muted">
-                        {conv.last_message?.content || "No messages yet"}
+                        {getChatMessagePreview(conv.last_message)}
                       </p>
                       {conv.unread_count > 0 && (
                         <span className="ml-2 flex h-5 min-w-[20px] shrink-0 items-center justify-center rounded-full bg-emerald-600 px-1.5 text-[10px] font-bold text-white">
@@ -232,27 +245,13 @@ export default function OwnerChat() {
                     {currentMessages.map((msg) => {
                       const isMine = msg.sender_id === user?.id;
                       return (
-                        <div
+                        <ChatMessageBubble
                           key={msg.id}
-                          className={`flex ${isMine ? "justify-end" : "justify-start"}`}
-                        >
-                          <div
-                            className={`max-w-[65%] rounded-2xl px-4 py-2.5 ${
-                              isMine
-                                ? "rounded-br-md bg-emerald-600 text-white"
-                                : "rounded-bl-md bg-surface text-ink dark:bg-dark-navy dark:text-dark-ink"
-                            }`}
-                          >
-                            <p className="whitespace-pre-wrap break-words text-sm">{msg.content}</p>
-                            <p
-                              className={`mt-1 text-right text-[10px] ${
-                                isMine ? "text-white/60" : "text-muted"
-                              }`}
-                            >
-                              {getTimeAgo(msg.created_at)}
-                            </p>
-                          </div>
-                        </div>
+                          message={msg}
+                          isMine={isMine}
+                          timeLabel={getTimeAgo(msg.created_at)}
+                          tone="emerald"
+                        />
                       );
                     })}
                     <div ref={messagesEndRef} />
@@ -262,26 +261,18 @@ export default function OwnerChat() {
 
               {/* Input */}
               <div className="border-t border-border px-6 py-4">
-                <div className="flex items-end gap-3">
-                  <textarea
-                    ref={inputRef}
-                    rows={1}
-                    value={inputValue}
-                    onChange={(e) => setInputValue(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    placeholder="Type your reply..."
-                    className="max-h-24 flex-1 resize-none rounded-xl border border-border bg-surface/60 px-4 py-2.5 text-sm text-ink outline-none transition-colors placeholder:text-muted focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 dark:border-dark-border dark:bg-dark-navy/60 dark:text-dark-ink"
-                  />
-                  <button
-                    onClick={handleSend}
-                    disabled={!inputValue.trim() || sending}
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white transition-colors hover:bg-emerald-700 disabled:opacity-40"
-                  >
-                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
-                    </svg>
-                  </button>
-                </div>
+                <ChatComposer
+                  value={inputValue}
+                  onChange={setInputValue}
+                  attachment={attachment}
+                  onAttachmentChange={setAttachment}
+                  onSend={handleSend}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Type your reply..."
+                  inputRef={inputRef}
+                  sending={sending}
+                  tone="emerald"
+                />
               </div>
             </>
           ) : (

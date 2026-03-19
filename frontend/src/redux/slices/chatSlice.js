@@ -55,13 +55,32 @@ export const fetchMessages = createAsyncThunk(
 
 export const sendMessage = createAsyncThunk(
   "chat/sendMessage",
-  async ({ conversationId, content }, { rejectWithValue }) => {
+  async ({ conversationId, content, attachment }, { rejectWithValue }) => {
     try {
-      const { data } = await api.post(
-        `/chat/conversations/${conversationId}/messages`,
-        { content }
-      );
-      return data.message;
+      let response;
+
+      if (attachment) {
+        const formData = new FormData();
+        if (typeof content === "string") {
+          formData.append("content", content);
+        }
+        formData.append("attachment", attachment);
+        response = await api.post(
+          `/chat/conversations/${conversationId}/messages`,
+          formData,
+          {
+            headers: {
+              "Content-Type": "multipart/form-data",
+            },
+          }
+        );
+      } else {
+        response = await api.post(`/chat/conversations/${conversationId}/messages`, {
+          content,
+        });
+      }
+
+      return response.data.message;
     } catch (err) {
       return rejectWithValue(err.message);
     }
@@ -134,6 +153,10 @@ const chatSlice = createSlice({
           sender_id: message.sender_id,
           created_at: message.created_at,
           is_read: message.is_read,
+          attachment_name: message.attachment_name,
+          attachment_url: message.attachment_url,
+          attachment_mime_type: message.attachment_mime_type,
+          attachment_size: message.attachment_size,
         };
         conv.last_message_at = message.created_at;
         // If this conversation is not the active one, increment unread
@@ -227,6 +250,10 @@ const chatSlice = createSlice({
             sender_id: msg.sender_id,
             created_at: msg.created_at,
             is_read: false,
+            attachment_name: msg.attachment_name,
+            attachment_url: msg.attachment_url,
+            attachment_mime_type: msg.attachment_mime_type,
+            attachment_size: msg.attachment_size,
           };
           conv.last_message_at = msg.created_at;
         }

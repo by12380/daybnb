@@ -109,7 +109,11 @@ frontend/src/
 ├── components/
 │   ├── HeroBannerCanvas.jsx  # Shared hero banner renderer (used by landing slider + admin editor)
 │   ├── Navbar.jsx
-│   └── LanguageSelector.jsx
+│   ├── LanguageSelector.jsx
+│   └── chat/
+│       ├── ChatComposer.jsx      # Shared message composer with emoji picker + file attachment support
+│       ├── ChatMessageBubble.jsx # Shared message bubble renderer for text + uploaded files
+│       └── chatHelpers.js        # Shared attachment preview/size helpers
 ├── layouts/
 │   └── MainLayout.jsx        # generic layout with Outlet
 ├── pages/
@@ -242,6 +246,13 @@ frontend/src/
 - Connected via `SocketProvider` when user has a session
 - Events listened: `notification:new`, `chat:message`, `chat:typing`
 - Events emitted: `chat:join`, `chat:leave`, `chat:typing`, `impersonate:start`, `impersonate:stop`
+
+## Chat UI
+
+- Guest, owner, and admin chat surfaces share `components/chat/ChatComposer.jsx` for text entry.
+- Composer adds emoji insertion via `emoji-picker-react` and optional file attachments up to 10 MB.
+- `chatSlice.sendMessage` still posts through the existing REST endpoint; attachments switch the request to `multipart/form-data`.
+- `components/chat/ChatMessageBubble.jsx` renders uploaded files inline as image previews or downloadable attachment cards.
 
 ## Search (Algolia)
 

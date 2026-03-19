@@ -232,7 +232,7 @@ Typical protected route: `requireAuth → attachRole → [requireRole(...)] → 
 | GET | `/contacts` | requireAuth | Chat contacts (admins + room owners) |
 | GET | `/conversations` | requireAuth | User's conversations |
 | GET | `/conversations/:id/messages` | requireAuth | Messages in conversation |
-| POST | `/conversations/:id/messages` | requireAuth | Send message (emits via socket) |
+| POST | `/conversations/:id/messages` | requireAuth | Send message via JSON or multipart form data with optional `attachment`; persists first, then emits via socket |
 | POST | `/conversations/start/:recipientId` | requireAuth | Get or create conversation |
 | PATCH | `/conversations/:id/read` | requireAuth | Mark messages read |
 | GET | `/panel/conversations` | Admin/Owner | All conversations for panel |
@@ -263,12 +263,19 @@ Typical protected route: `requireAuth → attachRole → [requireRole(...)] → 
 | `chat:join` | client→server | Join conversation room |
 | `chat:leave` | client→server | Leave conversation room |
 | `chat:typing` | client→server→others | Typing indicator |
-| `chat:message` | server→client | New chat message |
+| `chat:message` | server→client | New chat message, including optional attachment metadata |
 | `notification:new` | server→client | New notification |
 
 ### Emit Helpers (used by controllers)
 - `emitNotificationToUser(userId, notification)` — emits to `user:<userId>`
 - `emitNotificationToRole(role, notification)` — emits to `role:<role>`
+
+## Chat Attachments
+
+- Route-level upload parsing uses `multer.memoryStorage()` in `routes/chat.js`.
+- `chatController.sendMessage` accepts either plain text messages or multipart requests with a single `attachment`.
+- Uploaded files are stored in Supabase Storage bucket `chat-attachments` by default (`CHAT_ATTACHMENTS_BUCKET` can override it).
+- The realtime flow is unchanged: messages are inserted first and only then broadcast through the existing `chat:message` socket event.
 
 ## Error Handling
 

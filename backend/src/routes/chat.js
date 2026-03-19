@@ -1,9 +1,29 @@
 const { Router } = require("express");
+const multer = require("multer");
 const chatController = require("../controllers/chatController");
 const { requireAuth } = require("../middleware/auth");
 const { attachRole, requireRole, ROLES } = require("../middleware/rbac");
+const ApiError = require("../utils/ApiError");
 
 const router = Router();
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024,
+  },
+});
+
+function optionalChatAttachmentUpload(req, res, next) {
+  upload.single("attachment")(req, res, (err) => {
+    if (!err) return next();
+
+    if (err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE") {
+      return next(ApiError.badRequest("Attachment must be 10 MB or smaller"));
+    }
+
+    return next(err);
+  });
+}
 
 // Disable ETag caching for all chat routes (always fresh data)
 router.use((_req, res, next) => {
@@ -18,7 +38,11 @@ router.use(requireAuth, attachRole);
 router.get("/contacts", chatController.getChatContacts);
 router.get("/conversations", chatController.getMyConversations);
 router.get("/conversations/:conversationId/messages", chatController.getMessages);
-router.post("/conversations/:conversationId/messages", chatController.sendMessage);
+router.post(
+  "/conversations/:conversationId/messages",
+  optionalChatAttachmentUpload,
+  chatController.sendMessage
+);
 router.post("/conversations/start/:recipientId", chatController.getOrCreateConversation);
 router.patch("/conversations/:conversationId/read", chatController.markAsRead);
 

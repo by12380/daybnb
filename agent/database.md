@@ -163,9 +163,22 @@ Individual chat messages.
 | id | UUID (PK) | |
 | conversation_id | UUID | References chat_conversations.id |
 | sender_id | UUID | References profiles.id |
-| content | TEXT | Message text |
+| content | TEXT | Message text, nullable when message is attachment-only |
+| attachment_url | TEXT | Public Supabase Storage URL for uploaded file |
+| attachment_name | TEXT | Original file name (sanitized) |
+| attachment_mime_type | TEXT | MIME type used for rendering/preview |
+| attachment_size | BIGINT | File size in bytes |
 | is_read | BOOLEAN | Default false |
 | created_at | TIMESTAMPTZ | |
+
+Constraint: each row must have either non-empty `content` or `attachment_url`.
+
+### `storage.buckets` / `storage.objects`
+Chat uploads use a public bucket named `chat-attachments`.
+
+- Purpose: store chat image/file attachments uploaded through the backend.
+- Size limit: 10 MB per file.
+- Allowed types: images, PDF, Word, Excel, CSV, TXT, ZIP/RAR, generic octet-stream fallback.
 
 ### `offers`
 Discount/promotion offers (separate table from room inline offers).
@@ -300,3 +313,4 @@ Files in `supabase/` directory (not all are timestamped migrations):
 | `migrations/20260218_add_room_filter_columns.sql` | Add filter columns to rooms |
 | `migrations/20260223_add_room_detail_columns.sql` | Add detail columns to rooms |
 | `migrations/20260310_add_checkin_checkout_statuses.sql` | Add checked_in_at/checked_out_at columns to bookings |
+| `migrations/20260318_add_chat_message_attachments.sql` | Add chat attachment metadata columns, content/attachment check, and `chat-attachments` storage bucket |

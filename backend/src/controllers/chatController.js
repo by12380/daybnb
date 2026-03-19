@@ -1,6 +1,97 @@
+const path = require("path");
+const { randomUUID } = require("crypto");
 const { supabaseAdmin } = require("../config/supabase");
 const asyncHandler = require("../utils/asyncHandler");
 const ApiError = require("../utils/ApiError");
+
+const CHAT_ATTACHMENTS_BUCKET =
+  process.env.CHAT_ATTACHMENTS_BUCKET || "chat-attachments";
+const MAX_CHAT_ATTACHMENT_SIZE_BYTES = 10 * 1024 * 1024;
+const ALLOWED_ATTACHMENT_MIME_TYPES = new Set([
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "text/plain",
+  "text/csv",
+  "application/zip",
+  "application/x-zip-compressed",
+  "application/vnd.rar",
+  "application/x-rar-compressed",
+  "application/octet-stream",
+]);
+
+function normalizeMessageContent(value) {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed || null;
+}
+
+function sanitizeAttachmentName(fileName = "attachment") {
+  return path
+    .basename(fileName)
+    .replace(/[^a-zA-Z0-9._-]/g, "_")
+    .replace(/_+/g, "_");
+}
+
+function isAllowedAttachment(file) {
+  if (!file?.mimetype) return false;
+  return (
+    file.mimetype.startsWith("image/") ||
+    ALLOWED_ATTACHMENT_MIME_TYPES.has(file.mimetype)
+  );
+}
+
+async function uploadAttachment({ conversationId, senderId, file }) {
+  if (!supabaseAdmin) {
+    throw ApiError.internal("Supabase storage is not configured");
+  }
+
+  if (!file?.buffer) {
+    throw ApiError.badRequest("Attachment file is required");
+  }
+
+  if (file.size > MAX_CHAT_ATTACHMENT_SIZE_BYTES) {
+    throw ApiError.badRequest("Attachment must be 10 MB or smaller");
+  }
+
+  if (!isAllowedAttachment(file)) {
+    throw ApiError.badRequest("This attachment type is not supported");
+  }
+
+  const safeName = sanitizeAttachmentName(file.originalname);
+  const objectPath = `${conversationId}/${senderId}/${Date.now()}-${randomUUID()}-${safeName}`;
+
+  const { error: uploadError } = await supabaseAdmin.storage
+    .from(CHAT_ATTACHMENTS_BUCKET)
+    .upload(objectPath, file.buffer, {
+      contentType: file.mimetype || "application/octet-stream",
+      upsert: false,
+    });
+
+  if (uploadError) {
+    console.error("[Chat] uploadAttachment error:", uploadError.message);
+    throw ApiError.internal("Failed to upload chat attachment");
+  }
+
+  const {
+    data: { publicUrl },
+  } = supabaseAdmin.storage.from(CHAT_ATTACHMENTS_BUCKET).getPublicUrl(objectPath);
+
+  return {
+    attachment_path: objectPath,
+    attachment_url: publicUrl,
+    attachment_name: file.originalname || safeName,
+    attachment_mime_type: file.mimetype || "application/octet-stream",
+    attachment_size: file.size || 0,
+  };
+}
+
+async function removeAttachment(attachmentPath) {
+  if (!supabaseAdmin || !attachmentPath) return;
+  await supabaseAdmin.storage.from(CHAT_ATTACHMENTS_BUCKET).remove([attachmentPath]);
+}
 
 /**
  * Find existing conversation between two users (checks both orderings).
@@ -88,7 +179,9 @@ const getMyConversations = asyncHandler(async (req, res) => {
       // Get last message
       const { data: lastMsg } = await supabaseAdmin
         .from("chat_messages")
-        .select("content, sender_id, created_at, is_read")
+        .select(
+          "content, sender_id, created_at, is_read, attachment_name, attachment_url, attachment_mime_type, attachment_size"
+        )
         .eq("conversation_id", conv.id)
         .order("created_at", { ascending: false })
         .limit(1)
@@ -173,10 +266,11 @@ const getMessages = asyncHandler(async (req, res) => {
 const sendMessage = asyncHandler(async (req, res) => {
   const myId = req.user.id;
   const { conversationId } = req.params;
-  const { content } = req.body;
+  const content = normalizeMessageContent(req.body?.content);
+  const attachmentFile = req.file;
 
-  if (!content || !content.trim()) {
-    throw ApiError.badRequest("Message content is required");
+  if (!content && !attachmentFile) {
+    throw ApiError.badRequest("Message text or attachment is required");
   }
 
   // Verify user is a participant
@@ -196,18 +290,36 @@ const sendMessage = asyncHandler(async (req, res) => {
     throw ApiError.forbidden("Not a participant in this conversation");
   }
 
-  // Insert the message
+  let uploadedAttachment = null;
+  if (attachmentFile) {
+    uploadedAttachment = await uploadAttachment({
+      conversationId,
+      senderId: myId,
+      file: attachmentFile,
+    });
+  }
+
+  const messagePayload = {
+    conversation_id: conversationId,
+    sender_id: myId,
+    content,
+  };
+
+  if (uploadedAttachment) {
+    messagePayload.attachment_url = uploadedAttachment.attachment_url;
+    messagePayload.attachment_name = uploadedAttachment.attachment_name;
+    messagePayload.attachment_mime_type = uploadedAttachment.attachment_mime_type;
+    messagePayload.attachment_size = uploadedAttachment.attachment_size;
+  }
+
   const { data: message, error } = await supabaseAdmin
     .from("chat_messages")
-    .insert({
-      conversation_id: conversationId,
-      sender_id: myId,
-      content: content.trim(),
-    })
+    .insert(messagePayload)
     .select()
     .single();
 
   if (error) {
+    await removeAttachment(uploadedAttachment?.attachment_path);
     console.error("[Chat] sendMessage error:", error.message, error.code, error.details);
     throw ApiError.internal(error.message);
   }
@@ -334,7 +446,9 @@ const getAllConversations = asyncHandler(async (req, res) => {
 
       const { data: lastMsg } = await supabaseAdmin
         .from("chat_messages")
-        .select("content, sender_id, created_at, is_read")
+        .select(
+          "content, sender_id, created_at, is_read, attachment_name, attachment_url, attachment_mime_type, attachment_size"
+        )
         .eq("conversation_id", conv.id)
         .order("created_at", { ascending: false })
         .limit(1)

@@ -46,6 +46,7 @@ Daybnb is a daytime room/space booking platform (like Airbnb but for day-use). T
 - `SUPABASE_URL` — Supabase project URL
 - `SUPABASE_ANON_KEY` — Supabase anon key
 - `SUPABASE_SERVICE_ROLE_KEY` — Supabase service role key (bypasses RLS)
+- `CHAT_ATTACHMENTS_BUCKET` — optional Supabase Storage bucket for chat uploads (defaults to `chat-attachments`)
 - `STRIPE_SECRET_KEY` — Stripe secret key
 - `STRIPE_WEBHOOK_SECRET` — Stripe webhook signing secret
 - `ALGOLIA_APP_ID` — Algolia application ID (for server-side sync)
@@ -113,7 +114,7 @@ All backend API routes are prefixed with `/api`. Route index: `backend/src/route
 | Hero Banners | Admin-managed landing page slider with per-device (desktop/tablet/mobile) text box positioning, drag-to-reposition in editor, background types (image/solid/gradient), live preview. Stored in `hero_banners` table. If no active banners exist, a default static hero is rendered. |
 | Room Detail Page | Public page at `/room/:roomId` showing full room details, amenities, reviews, offer pricing, and booking CTA. |
 | Offers & Campaigns | Discount system with room-specific, owner-level, and site-wide scopes. Includes campaign banners and welcome offer banners on the landing page. |
-| Chat | Real-time two-party chat via Socket.IO + REST API. Available to customers, owners, and admins. |
+| Chat | Real-time two-party chat via Socket.IO + REST API, now with emoji picker support and optional file/image uploads. Available to customers, owners, and admins. |
 | Check-In/Out | Admin and owner can check in/out guests for today's bookings. Status flow: confirmed → checked_in → checked_out. |
 | Booking History | 4-tab history page (No-show, Completed, Rejected, Cancelled by Guest) in both admin and owner panels. No-show auto-detected for past bookings never checked in or never reviewed. Cancellation is soft-delete (status="cancelled"). |
 | Algolia Search | Client-side `react-instantsearch` with geo-search support. Server-side sync from Supabase to Algolia via admin trigger or auto-interval. |
