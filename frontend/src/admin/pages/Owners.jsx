@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Modal } from "antd";
 import { useNavigate } from "react-router-dom";
-import AdminPageHeader from "../components/AdminPageHeader.jsx";
-import Button from "../../guest/components/ui/Button.jsx";
+import PageHeader from "../../components/ui/PageHeader.jsx";
+import Button from "../../components/ui/Button.jsx";
 import FormInput, { INPUT_STYLES } from "../../guest/components/ui/FormInput.jsx";
 import api, { setImpersonation, clearImpersonation, getImpersonation } from "../../redux/api.js";
 
@@ -284,7 +284,7 @@ export default function AdminOwners() {
         </div>
       )}
 
-      <AdminPageHeader
+      <PageHeader
         title="Owners"
         subtitle={`Manage property owner accounts (${total} total)`}
       />

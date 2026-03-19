@@ -3,7 +3,8 @@ import { DatePicker } from "antd";
 import dayjs from "dayjs";
 import { useDispatch, useSelector } from "react-redux";
 import { formatPrice } from "../../guest/utils/format.js";
-import Button from "../../guest/components/ui/Button.jsx";
+import Button from "../../components/ui/Button.jsx";
+import PageHeader from "../../components/ui/PageHeader.jsx";
 import Pagination from "../../guest/components/ui/Pagination.jsx";
 import { INPUT_STYLES } from "../../guest/components/ui/FormInput.jsx";
 import useClientPagination from "../../hooks/useClientPagination.js";
@@ -87,10 +88,10 @@ export default function OwnerBookingHistory() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-ink dark:text-dark-ink">Booking History</h1>
-        <p className="mt-1 text-sm text-muted">Review past booking outcomes on your properties</p>
-      </div>
+      <PageHeader
+        title="Booking History"
+        subtitle="Review past booking outcomes on your properties"
+      />
 
       <div className="flex flex-wrap gap-2 border-b border-border pb-1">
         {TABS.map((tab) => (

@@ -3,9 +3,9 @@ import { Modal } from "antd";
 import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { useAuth } from "../../auth/useAuth.js";
-import AdminPageHeader from "../components/AdminPageHeader.jsx";
+import PageHeader from "../../components/ui/PageHeader.jsx";
 import { formatPrice } from "../../guest/utils/format.js";
-import Button from "../../guest/components/ui/Button.jsx";
+import Button from "../../components/ui/Button.jsx";
 import { INPUT_STYLES } from "../../guest/components/ui/FormInput.jsx";
 import { fetchRooms, deleteRoom } from "../../redux/slices/roomSlice.js";
 import { fetchBookings } from "../../redux/slices/bookingSlice.js";
@@ -148,7 +148,7 @@ export default function AdminRooms() {
 
   return (
     <div className="space-y-6">
-      <AdminPageHeader
+      <PageHeader
         title="Rooms"
         subtitle="Manage listings with a full-page editor for richer room details and gallery management."
         actions={(

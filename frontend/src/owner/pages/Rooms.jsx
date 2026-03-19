@@ -3,7 +3,8 @@ import { Modal } from "antd";
 import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { formatPrice } from "../../guest/utils/format.js";
-import Button from "../../guest/components/ui/Button.jsx";
+import Button from "../../components/ui/Button.jsx";
+import PageHeader from "../../components/ui/PageHeader.jsx";
 import { INPUT_STYLES } from "../../guest/components/ui/FormInput.jsx";
 import {
   fetchOwnerRooms,
@@ -113,22 +114,18 @@ export default function OwnerRooms() {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-[28px] border border-border bg-gradient-to-br from-panel via-panel to-emerald-50/70 p-6 shadow-sm dark:border-dark-border dark:from-dark-panel dark:via-dark-panel dark:to-emerald-900/10">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight text-ink dark:text-dark-ink">My Rooms</h1>
-            <p className="mt-2 text-sm text-muted dark:text-dark-muted">
-              Edit your listings in a full page view with more space for media, amenities, and guest-facing details.
-            </p>
-          </div>
+      <PageHeader
+        title="My Rooms"
+        subtitle="Edit your listings in a full page view with more space for media, amenities, and guest-facing details."
+        actions={
           <Button onClick={() => navigate("/owner/rooms/new")}>
             <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v12m6-6H6" />
             </svg>
             Add Room
           </Button>
-        </div>
-      </div>
+        }
+      />
 
       <div className="max-w-md">
         <label className="mb-2 block text-sm font-medium text-muted dark:text-dark-muted">Search</label>

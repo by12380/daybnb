@@ -15,7 +15,7 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts";
-import AdminPageHeader from "../components/AdminPageHeader.jsx";
+import PageHeader from "../../components/ui/PageHeader.jsx";
 import { formatPrice } from "../../guest/utils/format.js";
 import { useTheme } from "../../theme/ThemeProvider.jsx";
 import api from "../../redux/api.js";
@@ -434,7 +434,7 @@ export default function AdminDashboard() {
   return (
     <div className="space-y-6">
       {/* Header + Period Selector */}
-      <AdminPageHeader
+      <PageHeader
         title="Dashboard"
         subtitle={
           <>

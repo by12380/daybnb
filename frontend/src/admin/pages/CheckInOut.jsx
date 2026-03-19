@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { Modal } from "antd";
 import { useDispatch, useSelector } from "react-redux";
-import AdminPageHeader from "../components/AdminPageHeader.jsx";
+import PageHeader from "../../components/ui/PageHeader.jsx";
 import { formatPrice } from "../../guest/utils/format.js";
-import Button from "../../guest/components/ui/Button.jsx";
+import Button from "../../components/ui/Button.jsx";
 import Pagination from "../../guest/components/ui/Pagination.jsx";
 import useClientPagination from "../../hooks/useClientPagination.js";
 import {
@@ -160,7 +160,7 @@ export default function AdminCheckInOut() {
 
   return (
     <div className="space-y-6">
-      <AdminPageHeader
+      <PageHeader
         title="Check-In / Check-Out"
         subtitle="Manage today's guest arrivals and departures"
       />

@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Modal } from "antd";
 import { useDispatch, useSelector } from "react-redux";
-import AdminPageHeader from "../components/AdminPageHeader.jsx";
-import Button from "../../guest/components/ui/Button.jsx";
+import PageHeader from "../../components/ui/PageHeader.jsx";
+import Button from "../../components/ui/Button.jsx";
 import { INPUT_STYLES } from "../../guest/components/ui/FormInput.jsx";
 import {
   fetchMessages,
@@ -116,7 +116,7 @@ export default function AdminMessages() {
 
   return (
     <div className="space-y-6">
-      <AdminPageHeader
+      <PageHeader
         title="Contact Messages"
         subtitle={(
           <>

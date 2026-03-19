@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Modal } from "antd";
 import { useDispatch, useSelector } from "react-redux";
-import AdminPageHeader from "../components/AdminPageHeader.jsx";
+import PageHeader from "../../components/ui/PageHeader.jsx";
 import { formatPrice } from "../../guest/utils/format.js";
-import Button from "../../guest/components/ui/Button.jsx";
+import Button from "../../components/ui/Button.jsx";
 import FormInput, { INPUT_STYLES } from "../../guest/components/ui/FormInput.jsx";
 import { fetchUsers, updateUser, deleteUser } from "../../redux/slices/userSlice.js";
 import { fetchBookings } from "../../redux/slices/bookingSlice.js";
@@ -197,7 +197,7 @@ export default function AdminUsers() {
 
   return (
     <div className="space-y-6">
-      <AdminPageHeader
+      <PageHeader
         title="Customers"
         subtitle={`Manage customer profiles (${filteredUsers.length} shown)`}
       />

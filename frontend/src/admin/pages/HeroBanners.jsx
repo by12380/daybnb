@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import AdminPageHeader from "../components/AdminPageHeader.jsx";
-import Button from "../../guest/components/ui/Button.jsx";
+import PageHeader from "../../components/ui/PageHeader.jsx";
+import Button from "../../components/ui/Button.jsx";
 import HeroBannerCanvas from "../../components/HeroBannerCanvas.jsx";
 import {
   deleteAdminHeroBanner,
@@ -71,7 +71,7 @@ export default function AdminHeroBanners() {
 
   return (
     <div className="space-y-6">
-      <AdminPageHeader
+      <PageHeader
         title="Hero Banners"
         subtitle="Manage the landing page slider with responsive text placement and live preview."
         actions={(

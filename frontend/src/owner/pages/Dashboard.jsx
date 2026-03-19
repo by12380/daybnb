@@ -1,6 +1,7 @@
 import React, { useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
+import PageHeader from "../../components/ui/PageHeader.jsx";
 import { fetchOwnerStats } from "../../redux/slices/ownerSlice.js";
 
 const StatCard = React.memo(({ title, value, subtitle, icon, color = "emerald" }) => {
@@ -46,10 +47,10 @@ export default function OwnerDashboard() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-ink">Dashboard</h1>
-        <p className="mt-1 text-sm text-muted">Welcome back! Here's an overview of your properties.</p>
-      </div>
+      <PageHeader
+        title="Dashboard"
+        subtitle="Welcome back! Here's an overview of your properties."
+      />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard

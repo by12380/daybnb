@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useAuth } from "../../auth/useAuth.js";
+import PageHeader from "../../components/ui/PageHeader.jsx";
 import { useSocket } from "../../lib/SocketProvider.jsx";
 import ChatComposer from "../../components/chat/ChatComposer.jsx";
 import ChatMessageBubble from "../../components/chat/ChatMessageBubble.jsx";
@@ -138,10 +139,10 @@ export default function OwnerChat() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-ink dark:text-dark-ink">Chat</h1>
-        <p className="mt-1 text-sm text-muted">Respond to customer messages</p>
-      </div>
+      <PageHeader
+        title="Chat"
+        subtitle="Respond to customer messages"
+      />
 
       <div className="flex h-[calc(100vh-220px)] min-h-[400px] overflow-hidden rounded-2xl border border-border bg-panel shadow-sm">
         {/* Sidebar - Conversation list */}

@@ -3,7 +3,8 @@ import { DatePicker, Modal } from "antd";
 import dayjs from "dayjs";
 import { useDispatch, useSelector } from "react-redux";
 import { formatPrice } from "../../guest/utils/format.js";
-import Button from "../../guest/components/ui/Button.jsx";
+import Button from "../../components/ui/Button.jsx";
+import PageHeader from "../../components/ui/PageHeader.jsx";
 import Pagination from "../../guest/components/ui/Pagination.jsx";
 import { INPUT_STYLES } from "../../guest/components/ui/FormInput.jsx";
 import useClientPagination from "../../hooks/useClientPagination.js";
@@ -169,13 +170,15 @@ export default function OwnerBookings() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-ink">Bookings</h1>
-        <p className="mt-1 text-sm text-muted">
-          Manage reservations on your properties ({(bookings || []).length} total)
-          {pendingCount > 0 && <span className="ml-2 inline-flex items-center rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">{pendingCount} pending</span>}
-        </p>
-      </div>
+      <PageHeader
+        title="Bookings"
+        subtitle={
+          <>
+            Manage reservations on your properties ({(bookings || []).length} total)
+            {pendingCount > 0 && <span className="ml-2 inline-flex items-center rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">{pendingCount} pending</span>}
+          </>
+        }
+      />
 
       <div className="flex flex-col gap-4 sm:flex-row">
         <div className="flex-1">

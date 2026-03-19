@@ -2,7 +2,8 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Modal, DatePicker } from "antd";
 import dayjs from "dayjs";
 import { useDispatch, useSelector } from "react-redux";
-import Button from "../../guest/components/ui/Button.jsx";
+import Button from "../../components/ui/Button.jsx";
+import PageHeader from "../../components/ui/PageHeader.jsx";
 import FormInput, { INPUT_STYLES } from "../../guest/components/ui/FormInput.jsx";
 import {
   fetchOwnerOffers,
@@ -186,16 +187,16 @@ export default function OwnerOffers() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-ink">My Offers</h1>
-          <p className="mt-1 text-sm text-muted">Create discount offers for your rooms ({filteredOffers.length} total)</p>
-        </div>
-        <Button onClick={() => setIsCreating(true)}>
-          <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
-          Create Offer
-        </Button>
-      </div>
+      <PageHeader
+        title="My Offers"
+        subtitle={`Create discount offers for your rooms (${filteredOffers.length} total)`}
+        actions={
+          <Button onClick={() => setIsCreating(true)}>
+            <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+            Create Offer
+          </Button>
+        }
+      />
 
       <div className="flex-1">
         <input type="text" placeholder="Search offers..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className={`${INPUT_STYLES} w-full max-w-md`} />

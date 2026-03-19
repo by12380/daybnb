@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import AdminPageHeader from "../components/AdminPageHeader.jsx";
+import PageHeader from "../../components/ui/PageHeader.jsx";
 import { useAuth } from "../../auth/useAuth.js";
 import { useSocket } from "../../lib/SocketProvider.jsx";
 import ChatComposer from "../../components/chat/ChatComposer.jsx";
@@ -152,7 +152,7 @@ export default function AdminChat() {
 
   return (
     <div className="space-y-6">
-      <AdminPageHeader
+      <PageHeader
         title="Customer Chat"
         subtitle={(
           <>

@@ -2,8 +2,8 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import { useDispatch, useSelector } from "react-redux";
-import AdminPageHeader from "../components/AdminPageHeader.jsx";
-import Button from "../../guest/components/ui/Button.jsx";
+import PageHeader from "../../components/ui/PageHeader.jsx";
+import Button from "../../components/ui/Button.jsx";
 import { INPUT_STYLES } from "../../guest/components/ui/FormInput.jsx";
 import OfferBannerCanvas from "../../components/OfferBannerCanvas.jsx";
 import {
@@ -63,7 +63,7 @@ export default function AdminOffers() {
 
   return (
     <div className="space-y-6">
-      <AdminPageHeader
+      <PageHeader
         title="Offers & Discounts"
         subtitle={`Create and manage promotional offers (${filteredOffers.length} total)`}
         actions={(

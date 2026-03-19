@@ -10,7 +10,7 @@ import {
   createOwnerRoom,
   updateOwnerRoom,
 } from "../../redux/slices/ownerSlice.js";
-import Button from "../../guest/components/ui/Button.jsx";
+import Button from "../ui/Button.jsx";
 import FormInput, { INPUT_STYLES } from "../../guest/components/ui/FormInput.jsx";
 import { formatPrice } from "../../guest/utils/format.js";
 import {

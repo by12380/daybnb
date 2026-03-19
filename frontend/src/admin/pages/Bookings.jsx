@@ -4,11 +4,11 @@ import dayjs from "dayjs";
 import { useDispatch, useSelector } from "react-redux";
 import { useAuth } from "../../auth/useAuth.js";
 import { formatPrice } from "../../guest/utils/format.js";
-import Button from "../../guest/components/ui/Button.jsx";
+import Button from "../../components/ui/Button.jsx";
 import Pagination from "../../guest/components/ui/Pagination.jsx";
 import FormInput, { INPUT_STYLES } from "../../guest/components/ui/FormInput.jsx";
 import useClientPagination from "../../hooks/useClientPagination.js";
-import AdminPageHeader from "../components/AdminPageHeader.jsx";
+import PageHeader from "../../components/ui/PageHeader.jsx";
 import {
   fetchBookings,
   updateBooking,
@@ -361,7 +361,7 @@ export default function AdminBookings() {
 
   return (
     <div className="space-y-6">
-      <AdminPageHeader
+      <PageHeader
         title="Bookings"
         subtitle={(
           <>

@@ -2,7 +2,8 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Modal } from "antd";
 import { useDispatch, useSelector } from "react-redux";
 import { formatPrice } from "../../guest/utils/format.js";
-import Button from "../../guest/components/ui/Button.jsx";
+import Button from "../../components/ui/Button.jsx";
+import PageHeader from "../../components/ui/PageHeader.jsx";
 import { INPUT_STYLES } from "../../guest/components/ui/FormInput.jsx";
 import {
   fetchOwnerCustomers,
@@ -141,10 +142,10 @@ export default function OwnerCustomers() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-ink">Customers</h1>
-        <p className="mt-1 text-sm text-muted">Guests who have booked your properties ({(customers || []).length} total)</p>
-      </div>
+      <PageHeader
+        title="Customers"
+        subtitle={`Guests who have booked your properties (${(customers || []).length} total)`}
+      />
 
       <div className="flex-1">
         <input type="text" placeholder="Search by name, email, or phone..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className={`${INPUT_STYLES} w-full max-w-md`} />

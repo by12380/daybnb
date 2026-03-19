@@ -2,7 +2,8 @@ import React, { useCallback, useEffect, useState } from "react";
 import { Modal } from "antd";
 import { useDispatch, useSelector } from "react-redux";
 import { formatPrice } from "../../guest/utils/format.js";
-import Button from "../../guest/components/ui/Button.jsx";
+import Button from "../../components/ui/Button.jsx";
+import PageHeader from "../../components/ui/PageHeader.jsx";
 import Pagination from "../../guest/components/ui/Pagination.jsx";
 import useClientPagination from "../../hooks/useClientPagination.js";
 import {
@@ -159,12 +160,10 @@ export default function OwnerCheckInOut() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-ink dark:text-dark-ink">Check-In / Check-Out</h1>
-        <p className="mt-1 text-sm text-muted">
-          Manage today's guest arrivals and departures
-        </p>
-      </div>
+      <PageHeader
+        title="Check-In / Check-Out"
+        subtitle="Manage today's guest arrivals and departures"
+      />
 
       <div className="grid gap-4 sm:grid-cols-3">
         <button type="button" onClick={() => setStatusFilter("all")} className={cardClassName("all", "rounded-2xl border border-border bg-panel p-5 text-left shadow-sm", "border-border")}>
