@@ -41,6 +41,7 @@ backend/
     │   ├── admin.js          # Includes hero banner admin CRUD + Algolia sync endpoints
     │   ├── owner.js
     │   ├── chat.js
+    │   ├── aiChat.js         # AI chatbot routes (chat, stream, prompts)
     │   ├── offers.js
     │   └── heroBanners.js    # Public hero banner route (GET /)
     ├── controllers/
@@ -56,6 +57,7 @@ backend/
     │   ├── adminController.js
     │   ├── ownerController.js
     │   ├── chatController.js
+    │   ├── aiChatController.js  # OpenAI-powered AI chatbot (context-aware, streaming)
     │   ├── offerController.js
     │   └── heroBannerController.js  # Hero banner CRUD (admin) + public getActive
     └── socket/
@@ -237,6 +239,27 @@ Typical protected route: `requireAuth → attachRole → [requireRole(...)] → 
 | PATCH | `/conversations/:id/read` | requireAuth | Mark messages read |
 | GET | `/panel/conversations` | Admin/Owner | All conversations for panel |
 
+### AI Chat (`/api/ai`)
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `/chat` | optionalAuth | Send messages to AI chatbot, returns full response JSON (`{ reply, model, usage }`) |
+| POST | `/chat/stream` | optionalAuth | Send messages to AI chatbot with SSE streaming response (Server-Sent Events) |
+| GET | `/prompts` | None | Get suggested quick prompts for the AI chatbot |
+
+**Context building**: Each request fetches up to 10 recent rooms, the authenticated user's last 10 bookings, and currently active offers from Supabase. This context is injected into the system prompt so the AI can answer questions about specific rooms, user bookings, and available discounts.
+
+**Session tracking**: If `sessionId` is provided in the request body, an `ai_chat_sessions` row is upserted to track usage analytics. Messages themselves are stored in the client's localStorage.
+
+**Request body** (POST `/chat` and `/chat/stream`):
+- `messages` (required) — array of `{ role: "user"|"assistant", text: string }`
+- `sessionId` (optional) — client-generated conversation ID for session tracking
+- `guestEmail` (optional) — email from EmailGate for unauthenticated users
+
+**Streaming format** (POST `/chat/stream`):
+- Content-Type: `text/event-stream`
+- Each chunk: `data: {"content":"..."}\n\n`
+- Final event: `data: [DONE]\n\n`
+
 ### Stripe (`/api/stripe`)
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
@@ -276,6 +299,34 @@ Typical protected route: `requireAuth → attachRole → [requireRole(...)] → 
 - `chatController.sendMessage` accepts either plain text messages or multipart requests with a single `attachment`.
 - Uploaded files are stored in Supabase Storage bucket `chat-attachments` by default (`CHAT_ATTACHMENTS_BUCKET` can override it).
 - The realtime flow is unchanged: messages are inserted first and only then broadcast through the existing `chat:message` socket event.
+
+## AI Chat Controller (`aiChatController.js`)
+
+OpenAI-powered AI assistant that provides context-aware responses about the Daybnb platform.
+
+### Architecture
+- Uses `openai` Node.js SDK with configurable model (`AI_CHAT_MODEL` env var, default: `gpt-4o-mini`)
+- Builds a rich system prompt with platform policies + dynamic context from Supabase
+- Supports both synchronous (`chat`) and streaming (`chatStream`) response modes
+- Uses `optionalAuth` middleware — works for both authenticated users and email-gated guests
+
+### Context Fetching (per request)
+| Function | Data | Limit |
+|----------|------|-------|
+| `fetchRoomContext()` | Room details (title, location, price, amenities, etc.) | 10 most recent rooms |
+| `fetchBookingContext(userId)` | User's bookings with room names and statuses | 10 most recent bookings (auth users only) |
+| `fetchActiveOffers()` | Currently active discount offers | 5 offers |
+
+### Session Tracking
+- Upserts `ai_chat_sessions` row on each request (if `sessionId` provided)
+- Tracks: user_id, guest_email, message_count, last_active_at
+- Non-blocking in streaming mode (fire-and-forget)
+
+### Configuration
+| Env Var | Default | Description |
+|---------|---------|-------------|
+| `OPENAI_API_KEY` | (required) | OpenAI API key |
+| `AI_CHAT_MODEL` | `gpt-4o-mini` | Model identifier |
 
 ## Error Handling
 

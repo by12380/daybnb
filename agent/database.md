@@ -180,6 +180,22 @@ Chat uploads use a public bucket named `chat-attachments`.
 - Size limit: 10 MB per file.
 - Allowed types: images, PDF, Word, Excel, CSV, TXT, ZIP/RAR, generic octet-stream fallback.
 
+### `ai_chat_sessions`
+Tracks AI chatbot session metadata for analytics. Messages live in client localStorage.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | TEXT (PK) | Client-generated session/conversation ID |
+| user_id | UUID | References auth.users.id (NULL for guest email users) |
+| guest_email | TEXT | Email provided by unauthenticated guests via EmailGate |
+| message_count | INT | Total messages in the conversation (user + assistant) |
+| last_active_at | TIMESTAMPTZ | Updated on each AI chat request |
+| created_at | TIMESTAMPTZ | Default `now()` |
+
+**Indexes**: `idx_ai_chat_sessions_user` (user_id WHERE NOT NULL), `idx_ai_chat_sessions_active` (last_active_at DESC), `idx_ai_chat_sessions_email` (guest_email WHERE NOT NULL).
+
+**RLS**: Enabled, no public policies. Backend uses `supabaseAdmin` (service role) for all access.
+
 ### `offers`
 Discount/promotion offers (separate table from room inline offers).
 
@@ -314,3 +330,4 @@ Files in `supabase/` directory (not all are timestamped migrations):
 | `migrations/20260223_add_room_detail_columns.sql` | Add detail columns to rooms |
 | `migrations/20260310_add_checkin_checkout_statuses.sql` | Add checked_in_at/checked_out_at columns to bookings |
 | `migrations/20260318_add_chat_message_attachments.sql` | Add chat attachment metadata columns, content/attachment check, and `chat-attachments` storage bucket |
+| `migrations/20260319_create_ai_chat_sessions.sql` | Create `ai_chat_sessions` table for AI chatbot session tracking |

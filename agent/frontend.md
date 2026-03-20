@@ -151,7 +151,8 @@ frontend/src/
 │   │   ├── RoomCard.jsx
 │   │   ├── AvailabilityCalendar.jsx
 │   │   ├── ChatWidget.jsx
-│   │   ├── CampaignBanner.jsx
+    │   │   ├── AIChatBot/           # AI chatbot widget (index.jsx, EmailGate.jsx, ConversationHistory.jsx)
+    │   │   ├── CampaignBanner.jsx
 │   │   ├── WelcomeOfferBanner.jsx
 │   │   ├── NotificationDropdown.jsx
 │   │   ├── ui/               # Stars, FormInput, Button (re-export), Badge, Card, Pagination
@@ -263,6 +264,39 @@ frontend/src/
 - Composer adds emoji insertion via `emoji-picker-react` and optional file attachments up to 10 MB.
 - `chatSlice.sendMessage` still posts through the existing REST endpoint; attachments switch the request to `multipart/form-data`.
 - `components/chat/ChatMessageBubble.jsx` renders uploaded files inline as image previews or downloadable attachment cards.
+
+## AI Chatbot (`guest/components/AIChatBot/`)
+
+OpenAI-powered AI assistant widget rendered on all guest pages via `GuestLayout`.
+
+### Files
+| File | Purpose |
+|------|---------|
+| `index.jsx` | Main widget — chat UI, streaming API integration, conversation management |
+| `EmailGate.jsx` | Email collection form for unauthenticated guests |
+| `ConversationHistory.jsx` | Conversation list with date grouping, delete, and selection |
+
+### Architecture
+- **Real AI responses** via `POST /api/ai/chat/stream` (SSE streaming) with fallback to `POST /api/ai/chat` (non-streaming)
+- **Auth**: Uses `optionalAuth` — works for logged-in users (sends JWT) and email-gated guests
+- **Storage**: Conversations persist in `localStorage` (`daybnb_ai_chat` key). Session metadata tracked server-side in `ai_chat_sessions` table.
+- **Streaming**: Uses `fetch` + `ReadableStream` to parse SSE chunks and update the assistant message in real-time as tokens arrive
+- **Quick prompts**: Fetched from `GET /api/ai/prompts` on mount, with hardcoded defaults as fallback
+- **Abort support**: In-flight streaming requests are abortable via `AbortController` (cleaned up on unmount)
+
+### Data Flow
+1. User sends message → `handleSend()` adds user message to conversation, calls `fetchAIResponse()`
+2. `fetchAIResponse()` sends full conversation history to `/api/ai/chat/stream`
+3. SSE chunks stream in → assistant message text is progressively updated in state
+4. On error → falls back to non-streaming `/api/ai/chat` endpoint
+5. Conversations auto-save to localStorage on every state change
+
+### Context Awareness
+The backend enriches each AI request with:
+- Up to 10 rooms from the database (titles, prices, amenities, etc.)
+- The authenticated user's last 10 bookings (dates, statuses, room names)
+- Currently active offers/discounts
+This allows the AI to answer specific questions like "What rooms are available?" or "What's the status of my booking?"
 
 ## Search (Algolia)
 

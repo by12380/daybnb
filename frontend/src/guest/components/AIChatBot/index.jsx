@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "../../../auth/useAuth.js";
+import api from "../../../redux/api.js";
 import {
   CHAT_ATTACHMENT_ACCEPT,
   formatAttachmentSize,
@@ -11,6 +12,8 @@ import EmailGate from "./EmailGate.jsx";
 import ConversationHistory from "./ConversationHistory.jsx";
 
 const AI_BOT_NAME = "Daybnb AI";
+const AI_API_BASE =
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
 
 function generateId() {
   return `msg_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
@@ -22,23 +25,12 @@ function getTimeLabel(date) {
   return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 }
 
-const QUICK_PROMPTS = [
+const DEFAULT_QUICK_PROMPTS = [
   { label: "How to book?", text: "How do I book a room on Daybnb?" },
   { label: "Cancellation policy", text: "What is the cancellation policy?" },
   { label: "Payment methods", text: "What payment methods do you accept?" },
   { label: "Check-in process", text: "How does the check-in process work?" },
 ];
-
-const BOT_RESPONSES = [
-  "I'd be happy to help you with that! Let me look into the details for you.",
-  "Great question! Here's what I can tell you about that...",
-  "Thanks for asking! I'll provide you with the most up-to-date information.",
-  "I understand your concern. Let me walk you through the process.",
-];
-
-function getSimulatedResponse() {
-  return BOT_RESPONSES[Math.floor(Math.random() * BOT_RESPONSES.length)];
-}
 
 function SparklesIcon({ className = "h-5 w-5" }) {
   return (
@@ -306,8 +298,19 @@ export default function AIChatBot() {
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const fileInputRef = useRef(null);
+  const abortControllerRef = useRef(null);
 
+  const [quickPrompts, setQuickPrompts] = useState(DEFAULT_QUICK_PROMPTS);
   const isAuthenticated = Boolean(user) || Boolean(guestEmail);
+
+  useEffect(() => {
+    api
+      .get("/ai/prompts")
+      .then((res) => {
+        if (res.data?.prompts?.length) setQuickPrompts(res.data.prompts);
+      })
+      .catch(() => {});
+  }, []);
 
   const activeConversation = useMemo(
     () => conversations.find((c) => c.id === activeConvId) || null,
@@ -315,6 +318,14 @@ export default function AIChatBot() {
   );
 
   const messages = activeConversation?.messages || [];
+
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
 
   useEffect(() => {
     saveConversations(conversations);
@@ -384,22 +395,167 @@ export default function AIChatBot() {
     [activeConvId]
   );
 
-  const simulateBotResponse = useCallback(
-    (userText) => {
+  const fetchAIResponse = useCallback(
+    async (allMessages) => {
       setIsTyping(true);
-      const delay = 1000 + Math.random() * 1500;
-      setTimeout(() => {
-        const botMsg = {
-          id: generateId(),
-          role: "assistant",
-          text: getSimulatedResponse(),
-          timestamp: new Date().toISOString(),
+
+      const botMsgId = generateId();
+      const botMsg = {
+        id: botMsgId,
+        role: "assistant",
+        text: "",
+        timestamp: new Date().toISOString(),
+      };
+      addMessage(botMsg);
+
+      try {
+        abortControllerRef.current = new AbortController();
+
+        const payload = {
+          messages: allMessages.map((m) => ({
+            role: m.role,
+            text: m.text || "",
+          })),
+          sessionId: activeConvId,
+          guestEmail: guestEmail || undefined,
         };
-        addMessage(botMsg);
+
+        const headers = {};
+        const { supabase } = await import("../../../lib/supabaseClient.js");
+        if (supabase) {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.access_token) {
+            headers["Authorization"] = `Bearer ${session.access_token}`;
+          }
+        }
+
+        const response = await fetch(`${AI_API_BASE}/ai/chat/stream`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...headers },
+          body: JSON.stringify(payload),
+          signal: abortControllerRef.current.signal,
+        });
+
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.message || "Failed to get AI response");
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let accumulated = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value, { stream: true });
+          const lines = chunk.split("\n");
+
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue;
+            const data = line.slice(6).trim();
+            if (data === "[DONE]") break;
+
+            try {
+              const parsed = JSON.parse(data);
+              if (parsed.error) {
+                accumulated = parsed.error;
+                setConversations((prev) =>
+                  prev.map((c) => {
+                    if (c.id !== activeConvId) return c;
+                    return {
+                      ...c,
+                      messages: c.messages.map((m) =>
+                        m.id === botMsgId ? { ...m, text: accumulated } : m
+                      ),
+                    };
+                  })
+                );
+                break;
+              }
+              if (parsed.content) {
+                accumulated += parsed.content;
+                setConversations((prev) =>
+                  prev.map((c) => {
+                    if (c.id !== activeConvId) return c;
+                    return {
+                      ...c,
+                      messages: c.messages.map((m) =>
+                        m.id === botMsgId ? { ...m, text: accumulated } : m
+                      ),
+                    };
+                  })
+                );
+              }
+            } catch {
+              // skip malformed chunks
+            }
+          }
+        }
+
+        if (!accumulated) {
+          const fallbackRes = await api.post("/ai/chat", payload);
+          const fallbackText = fallbackRes.data?.reply || "Sorry, I couldn't generate a response. Please try again.";
+          setConversations((prev) =>
+            prev.map((c) => {
+              if (c.id !== activeConvId) return c;
+              return {
+                ...c,
+                messages: c.messages.map((m) =>
+                  m.id === botMsgId ? { ...m, text: fallbackText } : m
+                ),
+              };
+            })
+          );
+        }
+      } catch (err) {
+        if (err.name === "AbortError") return;
+        console.error("[AIChatBot] Error:", err);
+
+        try {
+          const payload = {
+            messages: allMessages.map((m) => ({
+              role: m.role,
+              text: m.text || "",
+            })),
+            sessionId: activeConvId,
+            guestEmail: guestEmail || undefined,
+          };
+          const fallbackRes = await api.post("/ai/chat", payload);
+          const fallbackText = fallbackRes.data?.reply || "Sorry, something went wrong. Please try again.";
+          setConversations((prev) =>
+            prev.map((c) => {
+              if (c.id !== activeConvId) return c;
+              return {
+                ...c,
+                messages: c.messages.map((m) =>
+                  m.id === botMsgId ? { ...m, text: fallbackText } : m
+                ),
+              };
+            })
+          );
+        } catch {
+          setConversations((prev) =>
+            prev.map((c) => {
+              if (c.id !== activeConvId) return c;
+              return {
+                ...c,
+                messages: c.messages.map((m) =>
+                  m.id === botMsgId
+                    ? { ...m, text: "Sorry, I'm having trouble connecting right now. Please try again in a moment." }
+                    : m
+                ),
+              };
+            })
+          );
+        }
+      } finally {
         setIsTyping(false);
-      }, delay);
+        abortControllerRef.current = null;
+      }
     },
-    [addMessage]
+    [addMessage, activeConvId, guestEmail]
   );
 
   const handleSend = useCallback(() => {
@@ -431,8 +587,10 @@ export default function AIChatBot() {
     setFileError("");
     if (fileInputRef.current) fileInputRef.current.value = "";
 
-    simulateBotResponse(userMsg.text);
-  }, [inputValue, attachment, addMessage, simulateBotResponse]);
+    const updatedConv = conversations.find((c) => c.id === activeConvId);
+    const allMessages = [...(updatedConv?.messages || []), userMsg];
+    fetchAIResponse(allMessages);
+  }, [inputValue, attachment, addMessage, fetchAIResponse, conversations, activeConvId]);
 
   const handleKeyDown = (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -594,7 +752,7 @@ export default function AIChatBot() {
                         Ask me anything about rooms, bookings, payments, or procedures.
                       </p>
                       <div className="grid w-full grid-cols-2 gap-2">
-                        {QUICK_PROMPTS.map((prompt) => (
+                        {quickPrompts.map((prompt) => (
                           <button
                             key={prompt.label}
                             onClick={() => handleQuickPrompt(prompt)}
