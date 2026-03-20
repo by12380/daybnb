@@ -177,6 +177,20 @@ export const fetchOwnerStats = createAsyncThunk(
   }
 );
 
+// ─── Analytics (rich dashboard) ──────────────────────────────
+
+export const fetchOwnerAnalytics = createAsyncThunk(
+  "owner/fetchAnalytics",
+  async (params = {}, { rejectWithValue }) => {
+    try {
+      const { data } = await api.get("/owner/analytics", { params });
+      return data;
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
 // ─── Slice ───────────────────────────────────────────────────
 
 const initialState = {
@@ -192,6 +206,9 @@ const initialState = {
   customersTotal: 0,
   customerBookings: [],
   stats: null,
+  analytics: null,
+  analyticsLoading: false,
+  analyticsError: null,
   loading: false,
   todayLoading: false,
   historyLoading: false,
@@ -315,6 +332,12 @@ const ownerSlice = createSlice({
       .addCase(fetchOwnerStats.pending, (state) => { state.loading = true; state.error = null; })
       .addCase(fetchOwnerStats.fulfilled, (state, action) => { state.loading = false; state.stats = action.payload.stats; })
       .addCase(fetchOwnerStats.rejected, (state, action) => { state.loading = false; state.error = action.payload; });
+
+    // Analytics
+    builder
+      .addCase(fetchOwnerAnalytics.pending, (state) => { state.analyticsLoading = true; state.analyticsError = null; })
+      .addCase(fetchOwnerAnalytics.fulfilled, (state, action) => { state.analyticsLoading = false; state.analytics = action.payload; })
+      .addCase(fetchOwnerAnalytics.rejected, (state, action) => { state.analyticsLoading = false; state.analyticsError = action.payload; });
   },
 });
 

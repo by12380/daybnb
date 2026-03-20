@@ -107,9 +107,16 @@ frontend/src/
 │   ├── useWelcomeOffer.js    # first-visit welcome offer logic
 │   └── useCampaignBanner.js  # campaign banner display logic
 ├── components/
-│   ├── HeroBannerCanvas.jsx  # Shared hero banner renderer (used by landing slider + admin editor)
+│   ├── ui/
+│   │   ├── Button.jsx           # Shared button: variants (solid/outline/ghost/danger), sizes (sm/md/lg), disabled state
+│   │   └── PageHeader.jsx       # Shared page header (title, subtitle, actions) — used by admin + owner pages
+│   ├── HeroBannerCanvas.jsx     # Shared hero banner renderer (used by landing slider + admin editor)
+│   ├── OfferBannerCanvas.jsx
+│   ├── NotificationToast.jsx
 │   ├── Navbar.jsx
 │   ├── LanguageSelector.jsx
+│   ├── rooms/
+│   │   └── RoomEditorPage.jsx   # Shared room editor (used by admin + owner room create/edit)
 │   └── chat/
 │       ├── ChatComposer.jsx      # Shared message composer with emoji picker + file attachment support
 │       ├── ChatMessageBubble.jsx # Shared message bubble renderer for text + uploaded files
@@ -147,7 +154,7 @@ frontend/src/
 │   │   ├── CampaignBanner.jsx
 │   │   ├── WelcomeOfferBanner.jsx
 │   │   ├── NotificationDropdown.jsx
-│   │   ├── ui/               # Stars, FormInput, Button, Badge, Card, Pagination
+│   │   ├── ui/               # Stars, FormInput, Button (re-export), Badge, Card, Pagination
 │   │   ├── layout/           # GuestLayout, Navbar, Footer
 │   │   └── search/           # SearchResults, SearchFilters, GeoSearch, GeoSearchBox, index.js
 │   ├── hooks/
@@ -165,7 +172,7 @@ frontend/src/
 │   └── data/
 │       └── rooms.js          # static room data / fallback
 ├── admin/                    # Admin panel module
-│   ├── pages/
+│   ├── pages/                # All pages use shared PageHeader from components/ui/PageHeader.jsx
 │   │   ├── Dashboard.jsx
 │   │   ├── Bookings.jsx
 │   │   ├── Users.jsx
@@ -174,19 +181,22 @@ frontend/src/
 │   │   ├── Chat.jsx
 │   │   ├── Owners.jsx
 │   │   ├── Offers.jsx
+│   │   ├── OfferEditor.jsx        # Create/edit offer
 │   │   ├── HeroBanners.jsx        # List/manage hero banners (toggle active, delete)
 │   │   ├── HeroBannerEditor.jsx   # Create/edit hero banner with live preview, drag-to-position, per-device layout
 │   │   ├── CheckInOut.jsx         # Today's guest check-in/check-out management
 │   │   ├── BookingHistory.jsx     # 4-tab history: No-show, Completed, Rejected, Cancelled by Guest
 │   │   └── AlgoliaSync.jsx
 │   └── components/
+│       ├── AdminPageHeader.jsx      # Re-export of components/ui/PageHeader.jsx (backward compat)
 │       ├── NotificationDropdown.jsx
 │       └── layout/
 │           └── AdminLayout.jsx
 └── owner/                    # Owner panel module
-    ├── pages/
+    ├── pages/                # All pages use shared PageHeader from components/ui/PageHeader.jsx
     │   ├── Dashboard.jsx
     │   ├── Rooms.jsx
+    │   ├── RoomEditor.jsx
     │   ├── Bookings.jsx
     │   ├── CheckInOut.jsx         # Today's guest check-in/check-out management
     │   ├── BookingHistory.jsx     # 4-tab history: No-show, Completed, Rejected, Cancelled by Guest

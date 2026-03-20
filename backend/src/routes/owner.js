@@ -22,6 +22,7 @@ const ownerMiddleware = [
 // ── Owner Profile / Dashboard ────────────────────────
 router.get("/profile", ...ownerMiddleware, ownerController.getMyProfile);
 router.get("/stats", ...ownerMiddleware, ownerController.getStats);
+router.get("/analytics", ...ownerMiddleware, ownerController.getAnalytics);
 
 // ── Rooms ────────────────────────────────────────────
 router.get("/rooms", ...ownerMiddleware, ownerController.getMyRooms);

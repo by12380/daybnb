@@ -802,7 +802,7 @@ exports.getMyProfile = asyncHandler(async (req, res) => {
 
 /**
  * GET /api/owner/stats
- * Dashboard stats for the owner.
+ * Dashboard stats for the owner (legacy — kept for backward compat).
  */
 exports.getStats = asyncHandler(async (req, res) => {
   if (!supabaseAdmin) throw ApiError.internal("Supabase is not configured");
@@ -810,13 +810,11 @@ exports.getStats = asyncHandler(async (req, res) => {
   const ownerId = resolveOwnerId(req);
   if (!ownerId) throw ApiError.forbidden("Owner context required");
 
-  // Count rooms
   const { count: totalRooms } = await supabaseAdmin
     .from("rooms")
     .select("id", { count: "exact", head: true })
     .eq("owner_id", ownerId);
 
-  // Get room IDs for booking queries
   const { data: ownerRooms } = await supabaseAdmin
     .from("rooms")
     .select("id")
@@ -844,7 +842,6 @@ exports.getStats = asyncHandler(async (req, res) => {
 
     pendingBookings = pendingCount || 0;
 
-    // Unique customers
     const { data: bookings } = await supabaseAdmin
       .from("bookings")
       .select("user_id")
@@ -862,6 +859,174 @@ exports.getStats = asyncHandler(async (req, res) => {
       total_bookings: totalBookings,
       pending_bookings: pendingBookings,
       total_customers: totalCustomers,
+    },
+  });
+});
+
+/**
+ * GET /api/owner/analytics?period=7d|30d|6m|all
+ * Rich analytics dashboard data scoped to the owner's rooms.
+ */
+exports.getAnalytics = asyncHandler(async (req, res) => {
+  if (!supabaseAdmin) throw ApiError.internal("Supabase is not configured");
+
+  const ownerId = resolveOwnerId(req);
+  if (!ownerId) throw ApiError.forbidden("Owner context required");
+
+  const period = req.query.period || "6m";
+  const now = new Date();
+  const today = now.toISOString().split("T")[0];
+
+  let periodStart = null;
+  if (period === "7d") {
+    periodStart = new Date(now);
+    periodStart.setDate(periodStart.getDate() - 7);
+  } else if (period === "30d") {
+    periodStart = new Date(now);
+    periodStart.setDate(periodStart.getDate() - 30);
+  } else if (period === "6m") {
+    periodStart = new Date(now);
+    periodStart.setMonth(periodStart.getMonth() - 6);
+  }
+  const periodFilter = periodStart ? periodStart.toISOString().split("T")[0] : null;
+
+  const { data: ownerRooms, error: rErr } = await supabaseAdmin
+    .from("rooms")
+    .select("id, title, image")
+    .eq("owner_id", ownerId);
+  if (rErr) throw ApiError.internal(rErr.message);
+
+  const roomIds = (ownerRooms || []).map((r) => r.id);
+  const roomsMap = {};
+  (ownerRooms || []).forEach((r) => { roomsMap[r.id] = r; });
+
+  if (roomIds.length === 0) {
+    return res.json({
+      revenue: { total: 0, this_month: 0, last_month: 0, growth_percent: 0 },
+      funnel: { total: 0, approved: 0, confirmed: 0, checked_in: 0, checked_out: 0, rejected: 0, cancelled: 0, no_show: 0, pending: 0 },
+      completion_rate: 0,
+      time_series: [],
+      top_rooms: [],
+      today: { bookings: 0, check_ins: 0, check_outs: 0, pending: 0 },
+      totals: { bookings: 0, rooms: 0, customers: 0, pending: 0 },
+    });
+  }
+
+  let bookingsQuery = supabaseAdmin
+    .from("bookings")
+    .select("id, room_id, user_id, booking_date, total_price, status, payment_status, payment_method, checked_in_at, checked_out_at, created_at")
+    .in("room_id", roomIds);
+  if (periodFilter) {
+    bookingsQuery = bookingsQuery.gte("created_at", periodFilter);
+  }
+  const { data: bookings, error: bErr } = await bookingsQuery;
+  if (bErr) throw ApiError.internal(bErr.message);
+
+  const all = bookings || [];
+
+  // ── Revenue ────────────────────────────────────────
+  const thisMonthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+  const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const lastMonthStart = `${lastMonthDate.getFullYear()}-${String(lastMonthDate.getMonth() + 1).padStart(2, "0")}-01`;
+  const lastMonthEnd = thisMonthStart;
+
+  const totalRevenue = all.reduce((s, b) => s + (b.total_price || 0), 0);
+  const revenueThisMonth = all
+    .filter((b) => b.created_at >= thisMonthStart)
+    .reduce((s, b) => s + (b.total_price || 0), 0);
+  const revenueLastMonth = all
+    .filter((b) => b.created_at >= lastMonthStart && b.created_at < lastMonthEnd)
+    .reduce((s, b) => s + (b.total_price || 0), 0);
+  const revenueGrowth = revenueLastMonth > 0
+    ? Math.round(((revenueThisMonth - revenueLastMonth) / revenueLastMonth) * 100)
+    : revenueThisMonth > 0 ? 100 : 0;
+
+  // ── Booking funnel ─────────────────────────────────
+  const funnel = { total: all.length, approved: 0, confirmed: 0, checked_in: 0, checked_out: 0, rejected: 0, cancelled: 0, no_show: 0, pending: 0 };
+  all.forEach((b) => {
+    const s = b.status;
+    if (s === "pending") funnel.pending++;
+    if (s === "approved" || s === "confirmed" || s === "checked_in" || s === "checked_out") funnel.approved++;
+    if (s === "confirmed" || s === "checked_in" || s === "checked_out") funnel.confirmed++;
+    if (s === "checked_in" || s === "checked_out") funnel.checked_in++;
+    if (s === "checked_out") funnel.checked_out++;
+    if (s === "rejected") funnel.rejected++;
+    if (s === "cancelled") funnel.cancelled++;
+    if (s === "no_show") funnel.no_show++;
+    if ((s === "approved" || s === "confirmed") && b.booking_date < today && !b.checked_in_at) {
+      funnel.no_show++;
+    }
+  });
+
+  const nonCancelled = all.filter((b) => b.status !== "cancelled" && b.status !== "rejected").length;
+  const completionRate = nonCancelled > 0 ? Math.round((funnel.checked_out / nonCancelled) * 100) : 0;
+
+  // ── Time-series (monthly) ──────────────────────────
+  const monthlyMap = {};
+  all.forEach((b) => {
+    const month = (b.created_at || b.booking_date || "").slice(0, 7);
+    if (!month) return;
+    if (!monthlyMap[month]) monthlyMap[month] = { month, revenue: 0, bookings: 0 };
+    monthlyMap[month].revenue += b.total_price || 0;
+    monthlyMap[month].bookings++;
+  });
+  const timeSeries = Object.values(monthlyMap).sort((a, b) => a.month.localeCompare(b.month));
+
+  // ── Top rooms by revenue ───────────────────────────
+  const roomRevMap = {};
+  all.forEach((b) => {
+    if (!roomRevMap[b.room_id]) roomRevMap[b.room_id] = { revenue: 0, bookings: 0 };
+    roomRevMap[b.room_id].revenue += b.total_price || 0;
+    roomRevMap[b.room_id].bookings++;
+  });
+  const topRooms = Object.entries(roomRevMap)
+    .map(([roomId, data]) => ({
+      room_id: roomId,
+      title: roomsMap[roomId]?.title || "Unknown Room",
+      image: roomsMap[roomId]?.image || null,
+      revenue: data.revenue,
+      bookings: data.bookings,
+    }))
+    .sort((a, b) => b.revenue - a.revenue)
+    .slice(0, 5);
+
+  // ── Today's snapshot ───────────────────────────────
+  const todayBookings = all.filter((b) => b.booking_date === today).length;
+  const todayCheckIns = all.filter((b) => b.checked_in_at && b.checked_in_at.startsWith(today)).length;
+  const todayCheckOuts = all.filter((b) => b.checked_out_at && b.checked_out_at.startsWith(today)).length;
+  const todayPending = all.filter((b) => b.status === "pending").length;
+
+  // ── Unique customers ───────────────────────────────
+  const uniqueCustomers = new Set(all.map((b) => b.user_id).filter(Boolean));
+
+  // ── Active rooms (rooms with bookings this month) ──
+  const activeRoomIds = new Set(
+    all.filter((b) => b.created_at >= thisMonthStart).map((b) => b.room_id)
+  );
+
+  res.json({
+    revenue: {
+      total: totalRevenue,
+      this_month: revenueThisMonth,
+      last_month: revenueLastMonth,
+      growth_percent: revenueGrowth,
+    },
+    funnel,
+    completion_rate: completionRate,
+    time_series: timeSeries,
+    top_rooms: topRooms,
+    today: {
+      bookings: todayBookings,
+      check_ins: todayCheckIns,
+      check_outs: todayCheckOuts,
+      pending: todayPending,
+    },
+    totals: {
+      bookings: all.length,
+      rooms: roomIds.length,
+      active_rooms: activeRoomIds.size,
+      customers: uniqueCustomers.size,
+      pending: funnel.pending,
     },
   });
 });

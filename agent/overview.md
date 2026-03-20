@@ -106,6 +106,7 @@ All backend API routes are prefixed with `/api`. Route index: `backend/src/route
 - Backend has two Supabase clients: `supabase` (respects RLS) and `supabaseAdmin` (bypasses RLS via service role key).
 - Stripe checkout uses Supabase Edge Functions (`create-checkout-session`, `stripe-webhook`).
 - Backend has a server-side Algolia sync utility (`backend/src/utils/algoliaSync.js`) that uses the Algolia REST API directly (no SDK). Supports full-sync, per-record upsert/delete, index configuration, and optional auto-sync on an interval.
+- Shared UI components live in `frontend/src/components/ui/` (Button, PageHeader). Both admin and owner panels import from this shared location. Legacy re-exports exist at `guest/components/ui/Button.jsx` and `admin/components/AdminPageHeader.jsx` for backward compatibility.
 
 ## Key Features Summary
 
