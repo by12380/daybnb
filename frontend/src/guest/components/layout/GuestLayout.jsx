@@ -2,6 +2,7 @@ import { Outlet } from "react-router-dom";
 import GuestNavbar from "./Navbar.jsx";
 import GuestFooter from "./Footer.jsx";
 import ChatWidget from "../ChatWidget.jsx";
+import AIChatBot from "../AIChatBot/index.jsx";
 
 export default function GuestLayout() {
   return (
@@ -12,6 +13,7 @@ export default function GuestLayout() {
       </main>
       <GuestFooter />
       <ChatWidget />
+      <AIChatBot />
     </div>
   );
 }
