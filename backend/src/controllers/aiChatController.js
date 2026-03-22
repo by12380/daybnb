@@ -7,7 +7,10 @@ const openai = process.env.OPENAI_API_KEY
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   : null;
 
-const AI_MODEL = process.env.AI_CHAT_MODEL || "gpt-4o-mini";
+const OPENAI_MODEL = process.env.AI_CHAT_MODEL || "gpt-4o-mini";
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.0-flash-lite";
+const AI_PROVIDER = (process.env.AI_CHAT_PROVIDER || "auto").toLowerCase();
 const MAX_HISTORY_MESSAGES = 20;
 const MAX_CONTEXT_ROOMS = 10;
 
@@ -32,6 +35,277 @@ Platform policies:
 If the user asks about a specific room, use the room context provided. If they ask about their bookings, use the booking context provided. If no context is available for their question, give general guidance.
 
 Do NOT use markdown headers (# or ##). Use plain text with line breaks. You may use bullet points and bold (**text**) sparingly for clarity.`;
+
+function getConfiguredProviders() {
+  const providers = [];
+
+  if (openai) providers.push("openai");
+  if (GEMINI_API_KEY) providers.push("gemini");
+
+  if (AI_PROVIDER === "gemini") {
+    return ["gemini", "openai"].filter((provider) => providers.includes(provider));
+  }
+
+  if (AI_PROVIDER === "openai") {
+    return ["openai", "gemini"].filter((provider) => providers.includes(provider));
+  }
+
+  return providers;
+}
+
+function getModelForProvider(provider) {
+  return provider === "gemini" ? GEMINI_MODEL : OPENAI_MODEL;
+}
+
+function getAiConfigError() {
+  return "AI chat is not configured. Set OPENAI_API_KEY or GEMINI_API_KEY in backend .env";
+}
+
+function shouldFallbackToNextProvider(err) {
+  const status = Number(err?.status || err?.statusCode || 0);
+  const message = String(
+    err?.message || err?.error?.message || err?.cause?.message || ""
+  ).toLowerCase();
+
+  return (
+    status === 429 ||
+    status >= 500 ||
+    /high demand|rate limit|quota|resource exhausted|overloaded|temporarily unavailable|timeout|timed out|network/i.test(
+      message
+    )
+  );
+}
+
+function getUserFacingAiError(err) {
+  if (err instanceof ApiError) return err;
+
+  return ApiError.internal(
+    shouldFallbackToNextProvider(err)
+      ? "AI service is currently experiencing high demand. Please try again in a moment."
+      : "Failed to generate AI response. Please try again."
+  );
+}
+
+function buildGeminiContents(chatMessages) {
+  return chatMessages
+    .filter((message) => message.role !== "system" && String(message.content || "").trim())
+    .map((message) => ({
+      role: message.role === "assistant" ? "model" : "user",
+      parts: [{ text: String(message.content || "") }],
+    }));
+}
+
+function extractGeminiText(payload) {
+  const parts = payload?.candidates?.[0]?.content?.parts || [];
+  return parts.map((part) => part?.text || "").join("");
+}
+
+async function requestGemini(chatMessages, { stream = false } = {}) {
+  const endpoint = stream
+    ? `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
+        GEMINI_MODEL
+      )}:streamGenerateContent?alt=sse&key=${encodeURIComponent(GEMINI_API_KEY)}`
+    : `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
+        GEMINI_MODEL
+      )}:generateContent?key=${encodeURIComponent(GEMINI_API_KEY)}`;
+
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      systemInstruction: {
+        parts: [{ text: chatMessages[0]?.content || SYSTEM_PROMPT }],
+      },
+      contents: buildGeminiContents(chatMessages),
+      generationConfig: {
+        temperature: 0.7,
+        maxOutputTokens: 1024,
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    const err = new Error(
+      `Gemini request failed (${response.status}): ${errorText || response.statusText}`
+    );
+    err.status = response.status;
+    throw err;
+  }
+
+  return response;
+}
+
+async function generateWithOpenAI(chatMessages) {
+  const completion = await openai.chat.completions.create({
+    model: OPENAI_MODEL,
+    messages: chatMessages,
+    max_tokens: 1024,
+    temperature: 0.7,
+  });
+
+  return {
+    reply: completion.choices?.[0]?.message?.content || "",
+    model: OPENAI_MODEL,
+    provider: "openai",
+    usage: completion.usage || null,
+  };
+}
+
+async function generateWithGemini(chatMessages) {
+  const response = await requestGemini(chatMessages);
+  const payload = await response.json();
+
+  return {
+    reply: extractGeminiText(payload),
+    model: GEMINI_MODEL,
+    provider: "gemini",
+    usage: payload.usageMetadata || null,
+  };
+}
+
+async function generateAiResponse(chatMessages) {
+  const providers = getConfiguredProviders();
+  if (!providers.length) {
+    throw ApiError.internal(getAiConfigError());
+  }
+
+  let lastError = null;
+
+  for (let index = 0; index < providers.length; index += 1) {
+    const provider = providers[index];
+    const hasFallback = index < providers.length - 1;
+
+    try {
+      if (provider === "gemini") {
+        return await generateWithGemini(chatMessages);
+      }
+
+      return await generateWithOpenAI(chatMessages);
+    } catch (err) {
+      lastError = err;
+      console.error(
+        `[AI Chat] ${provider} (${getModelForProvider(provider)}) error:`,
+        err.message || err
+      );
+
+      if (!hasFallback || !shouldFallbackToNextProvider(err)) {
+        throw err;
+      }
+    }
+  }
+
+  throw lastError || ApiError.internal("Failed to generate AI response. Please try again.");
+}
+
+async function streamWithOpenAI(chatMessages, res) {
+  const stream = await openai.chat.completions.create({
+    model: OPENAI_MODEL,
+    messages: chatMessages,
+    max_tokens: 1024,
+    temperature: 0.7,
+    stream: true,
+  });
+
+  for await (const chunk of stream) {
+    const content = chunk.choices?.[0]?.delta?.content;
+    if (content) {
+      res.write(`data: ${JSON.stringify({ content })}\n\n`);
+    }
+  }
+
+  return { model: OPENAI_MODEL, provider: "openai" };
+}
+
+async function streamWithGemini(chatMessages, res) {
+  const response = await requestGemini(chatMessages, { stream: true });
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  for await (const chunk of response.body) {
+    buffer += decoder.decode(chunk, { stream: true });
+
+    const events = buffer.split("\n\n");
+    buffer = events.pop() || "";
+
+    for (const event of events) {
+      const lines = event.split("\n");
+
+      for (const line of lines) {
+        const trimmedLine = line.trim();
+        if (!trimmedLine.startsWith("data:")) continue;
+
+        const jsonText = trimmedLine.slice(5).trim();
+        if (!jsonText || jsonText === "[DONE]") continue;
+
+        const payload = JSON.parse(jsonText);
+        const content = extractGeminiText(payload);
+
+        if (content) {
+          res.write(`data: ${JSON.stringify({ content })}\n\n`);
+        }
+      }
+    }
+  }
+
+  buffer += decoder.decode();
+
+  if (buffer.trim()) {
+    const lines = buffer.split("\n");
+    for (const line of lines) {
+      const trimmedLine = line.trim();
+      if (!trimmedLine.startsWith("data:")) continue;
+
+      const jsonText = trimmedLine.slice(5).trim();
+      if (!jsonText || jsonText === "[DONE]") continue;
+
+      const payload = JSON.parse(jsonText);
+      const content = extractGeminiText(payload);
+
+      if (content) {
+        res.write(`data: ${JSON.stringify({ content })}\n\n`);
+      }
+    }
+  }
+
+  return { model: GEMINI_MODEL, provider: "gemini" };
+}
+
+async function streamAiResponse(chatMessages, res) {
+  const providers = getConfiguredProviders();
+  if (!providers.length) {
+    throw ApiError.internal(getAiConfigError());
+  }
+
+  let lastError = null;
+
+  for (let index = 0; index < providers.length; index += 1) {
+    const provider = providers[index];
+    const hasFallback = index < providers.length - 1;
+
+    try {
+      if (provider === "gemini") {
+        return await streamWithGemini(chatMessages, res);
+      }
+
+      return await streamWithOpenAI(chatMessages, res);
+    } catch (err) {
+      lastError = err;
+      console.error(
+        `[AI Chat] ${provider} (${getModelForProvider(provider)}) stream error:`,
+        err.message || err
+      );
+
+      if (!hasFallback || !shouldFallbackToNextProvider(err)) {
+        throw err;
+      }
+    }
+  }
+
+  throw lastError || ApiError.internal("Failed to generate AI response. Please try again.");
+}
 
 async function fetchRoomContext() {
   if (!supabaseAdmin) return "";
@@ -112,10 +386,8 @@ async function fetchActiveOffers() {
 
 // ── Main chat endpoint ──────────────────────────────────────
 const chat = asyncHandler(async (req, res) => {
-  if (!openai) {
-    throw ApiError.internal(
-      "AI chat is not configured. Set OPENAI_API_KEY in backend .env"
-    );
+  if (!getConfiguredProviders().length) {
+    throw ApiError.internal(getAiConfigError());
   }
 
   const { messages, sessionId, guestEmail } = req.body;
@@ -159,39 +431,17 @@ const chat = asyncHandler(async (req, res) => {
   }
 
   try {
-    const completion = await openai.chat.completions.create({
-      model: AI_MODEL,
-      messages: chatMessages,
-      max_tokens: 1024,
-      temperature: 0.7,
-    });
-
-    const reply = completion.choices?.[0]?.message?.content || "";
-
-    res.json({
-      reply,
-      model: AI_MODEL,
-      usage: completion.usage || null,
-    });
+    const response = await generateAiResponse(chatMessages);
+    res.json(response);
   } catch (err) {
-    console.error("[AI Chat] error:", err.message || err);
-    if (err.status === 429) {
-      throw ApiError.internal(
-        "AI service is currently experiencing high demand. Please try again in a moment."
-      );
-    }
-    throw ApiError.internal(
-      "Failed to generate AI response. Please try again."
-    );
+    throw getUserFacingAiError(err);
   }
 });
 
 // ── Streaming chat endpoint ─────────────────────────────────
 const chatStream = asyncHandler(async (req, res) => {
-  if (!openai) {
-    throw ApiError.internal(
-      "AI chat is not configured. Set OPENAI_API_KEY in backend .env"
-    );
+  if (!getConfiguredProviders().length) {
+    throw ApiError.internal(getAiConfigError());
   }
 
   const { messages, sessionId, guestEmail } = req.body;
@@ -246,28 +496,12 @@ const chatStream = asyncHandler(async (req, res) => {
   res.flushHeaders();
 
   try {
-    const stream = await openai.chat.completions.create({
-      model: AI_MODEL,
-      messages: chatMessages,
-      max_tokens: 1024,
-      temperature: 0.7,
-      stream: true,
-    });
-
-    for await (const chunk of stream) {
-      const content = chunk.choices?.[0]?.delta?.content;
-      if (content) {
-        res.write(`data: ${JSON.stringify({ content })}\n\n`);
-      }
-    }
-
+    await streamAiResponse(chatMessages, res);
     res.write("data: [DONE]\n\n");
   } catch (err) {
-    console.error("[AI Chat] stream error:", err.message || err);
-    const userMessage =
-      err.status === 429
-        ? "I'm currently experiencing high demand. Please try again in a moment."
-        : "Sorry, something went wrong generating a response. Please try again.";
+    const userMessage = shouldFallbackToNextProvider(err)
+      ? "I'm currently experiencing high demand. Please try again in a moment."
+      : "Sorry, something went wrong generating a response. Please try again.";
     res.write(`data: ${JSON.stringify({ error: userMessage })}\n\n`);
     res.write("data: [DONE]\n\n");
   }

@@ -302,10 +302,11 @@ Typical protected route: `requireAuth → attachRole → [requireRole(...)] → 
 
 ## AI Chat Controller (`aiChatController.js`)
 
-OpenAI-powered AI assistant that provides context-aware responses about the Daybnb platform.
+AI assistant that provides context-aware responses about the Daybnb platform.
 
 ### Architecture
-- Uses `openai` Node.js SDK with configurable model (`AI_CHAT_MODEL` env var, default: `gpt-4o-mini`)
+- Supports OpenAI and Google Gemini with automatic fallback on provider throttling
+- Uses OpenAI via the `openai` Node.js SDK and Gemini via the REST API
 - Builds a rich system prompt with platform policies + dynamic context from Supabase
 - Supports both synchronous (`chat`) and streaming (`chatStream`) response modes
 - Uses `optionalAuth` middleware — works for both authenticated users and email-gated guests
@@ -325,8 +326,11 @@ OpenAI-powered AI assistant that provides context-aware responses about the Dayb
 ### Configuration
 | Env Var | Default | Description |
 |---------|---------|-------------|
-| `OPENAI_API_KEY` | (required) | OpenAI API key |
-| `AI_CHAT_MODEL` | `gpt-4o-mini` | Model identifier |
+| `OPENAI_API_KEY` | optional | OpenAI API key |
+| `AI_CHAT_MODEL` | `gpt-4o-mini` | OpenAI model identifier |
+| `GEMINI_API_KEY` | optional | Gemini API key |
+| `GEMINI_MODEL` | `gemini-2.0-flash-lite` | Gemini model identifier |
+| `AI_CHAT_PROVIDER` | `auto` | Provider preference: `auto`, `openai`, or `gemini` |
 
 ## Error Handling
 

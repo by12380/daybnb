@@ -48,8 +48,11 @@ Daybnb is a daytime room/space booking platform (like Airbnb but for day-use). T
 - `SUPABASE_ANON_KEY` — Supabase anon key
 - `SUPABASE_SERVICE_ROLE_KEY` — Supabase service role key (bypasses RLS)
 - `CHAT_ATTACHMENTS_BUCKET` — optional Supabase Storage bucket for chat uploads (defaults to `chat-attachments`)
-- `OPENAI_API_KEY` — OpenAI API key for AI chatbot (required for AI chat feature)
-- `AI_CHAT_MODEL` — OpenAI model to use (default: `gpt-4o-mini`)
+- `OPENAI_API_KEY` — optional OpenAI API key for AI chatbot
+- `AI_CHAT_MODEL` — OpenAI model to use when OpenAI is selected (default: `gpt-4o-mini`)
+- `GEMINI_API_KEY` — optional Google Gemini API key for AI chatbot fallback/free tier
+- `GEMINI_MODEL` — Gemini model to use (default: `gemini-2.0-flash-lite`)
+- `AI_CHAT_PROVIDER` — `auto`, `openai`, or `gemini` (default: `auto`)
 - `STRIPE_SECRET_KEY` — Stripe secret key
 - `STRIPE_WEBHOOK_SECRET` — Stripe webhook signing secret
 - `ALGOLIA_APP_ID` — Algolia application ID (for server-side sync)
