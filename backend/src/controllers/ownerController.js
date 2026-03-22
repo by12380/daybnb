@@ -425,9 +425,24 @@ exports.checkInBooking = asyncHandler(async (req, res) => {
     throw ApiError.badRequest(`Cannot check in a booking with status "${booking.status}". Must be approved or confirmed.`);
   }
 
+  const checkedInAt = new Date().toISOString();
+  const updates = {
+    status: "checked_in",
+    checked_in_at: checkedInAt,
+  };
+
+  if (
+    booking.payment_status === "pay_at_property" ||
+    booking.payment_method === "cash" ||
+    booking.payment_method === "pay_at_property"
+  ) {
+    updates.payment_status = "paid";
+    updates.paid_at = booking.paid_at || checkedInAt;
+  }
+
   const { data, error } = await supabaseAdmin
     .from("bookings")
-    .update({ status: "checked_in", checked_in_at: new Date().toISOString() })
+    .update(updates)
     .eq("id", req.params.id)
     .select()
     .single();
