@@ -2,6 +2,7 @@ const { Router } = require("express");
 const adminController = require("../controllers/adminController");
 const offerController = require("../controllers/offerController");
 const heroBannerController = require("../controllers/heroBannerController");
+const aiFaqController = require("../controllers/aiFaqController");
 const { fullSync, configureIndex, isConfigured } = require("../utils/algoliaSync");
 const { requireAuth } = require("../middleware/auth");
 const { attachRole, requireRole, ROLES } = require("../middleware/rbac");
@@ -53,6 +54,12 @@ router.get("/hero-banners", ...adminMiddleware, heroBannerController.getAllAdmin
 router.post("/hero-banners", ...adminMiddleware, heroBannerController.createAdmin);
 router.put("/hero-banners/:id", ...adminMiddleware, heroBannerController.updateAdmin);
 router.delete("/hero-banners/:id", ...adminMiddleware, heroBannerController.deleteAdmin);
+
+// ── AI FAQs ─────────────────────────────────────────
+router.get("/ai-faqs", ...adminMiddleware, aiFaqController.getAllAdmin);
+router.post("/ai-faqs", ...adminMiddleware, aiFaqController.createAdmin);
+router.put("/ai-faqs/:id", ...adminMiddleware, aiFaqController.updateAdmin);
+router.delete("/ai-faqs/:id", ...adminMiddleware, aiFaqController.deleteAdmin);
 
 // ── Algolia Sync ────────────────────────────────────
 router.post("/algolia/full-sync", ...adminMiddleware, async (_req, res) => {

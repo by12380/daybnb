@@ -28,6 +28,7 @@ import AdminOffers from "../admin/pages/Offers.jsx";
 import AdminOfferEditor from "../admin/pages/OfferEditor.jsx";
 import AdminHeroBanners from "../admin/pages/HeroBanners.jsx";
 import AdminHeroBannerEditor from "../admin/pages/HeroBannerEditor.jsx";
+import AdminAiFaqs from "../admin/pages/AiFaqs.jsx";
 import AdminRoomEditor from "../admin/pages/RoomEditor.jsx";
 import AdminRoomView from "../admin/pages/RoomView.jsx";
 import AdminAlgoliaSync from "../admin/pages/AlgoliaSync.jsx";
@@ -95,6 +96,7 @@ export default function AppRouter() {
             <Route path="/admin/hero-banners" element={<AdminHeroBanners />} />
             <Route path="/admin/hero-banners/new" element={<AdminHeroBannerEditor />} />
             <Route path="/admin/hero-banners/:bannerId/edit" element={<AdminHeroBannerEditor />} />
+            <Route path="/admin/ai-faqs" element={<AdminAiFaqs />} />
             <Route path="/admin/check-in-out" element={<AdminCheckInOut />} />
             <Route path="/admin/booking-history" element={<AdminBookingHistory />} />
             <Route path="/admin/algolia" element={<AdminAlgoliaSync />} />

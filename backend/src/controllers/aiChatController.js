@@ -13,6 +13,14 @@ const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.0-flash-lite";
 const AI_PROVIDER = (process.env.AI_CHAT_PROVIDER || "auto").toLowerCase();
 const MAX_HISTORY_MESSAGES = 20;
 const MAX_CONTEXT_ROOMS = 10;
+const DEFAULT_QUICK_PROMPTS = [
+  { label: "How to book?", text: "How do I book a room on Daybnb?" },
+  { label: "Cancellation policy", text: "What is the cancellation policy?" },
+  { label: "Payment methods", text: "What payment methods do you accept?" },
+  { label: "Check-in process", text: "How does the check-in process work?" },
+  { label: "Available rooms", text: "What rooms are currently available?" },
+  { label: "My bookings", text: "Can you show me my booking details?" },
+];
 
 const SYSTEM_PROMPT = `You are Daybnb AI, a friendly and knowledgeable assistant for the Daybnb platform — a daytime room/space booking service (like Airbnb but for day-use only).
 
@@ -384,6 +392,32 @@ async function fetchActiveOffers() {
   return `\n\nCurrent active offers/discounts:\n${lines.join("\n")}`;
 }
 
+async function fetchActiveFaqContext() {
+  if (!supabaseAdmin) return "";
+
+  const { data: faqs } = await supabaseAdmin
+    .from("ai_faqs")
+    .select("question, answer")
+    .eq("is_active", true)
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: false })
+    .limit(20);
+
+  if (!faqs?.length) return "";
+
+  const lines = faqs.map(
+    (faq) => `Q: ${faq.question}\nA: ${faq.answer}`
+  );
+
+  return `\n\nApproved frequently asked questions and answers:\n${lines.join("\n\n")}`;
+}
+
+function toPromptLabel(question) {
+  const value = String(question || "").trim();
+  if (!value) return "FAQ";
+  return value.length > 36 ? `${value.slice(0, 33).trim()}...` : value;
+}
+
 // ── Main chat endpoint ──────────────────────────────────────
 const chat = asyncHandler(async (req, res) => {
   if (!getConfiguredProviders().length) {
@@ -403,14 +437,15 @@ const chat = asyncHandler(async (req, res) => {
     content: m.text || m.content || "",
   }));
 
-  const [roomContext, bookingContext, offerContext] = await Promise.all([
+  const [roomContext, bookingContext, offerContext, faqContext] = await Promise.all([
     fetchRoomContext(),
     fetchBookingContext(userId),
     fetchActiveOffers(),
+    fetchActiveFaqContext(),
   ]);
 
   const fullSystemPrompt =
-    SYSTEM_PROMPT + roomContext + bookingContext + offerContext;
+    SYSTEM_PROMPT + roomContext + bookingContext + offerContext + faqContext;
 
   const chatMessages = [
     { role: "system", content: fullSystemPrompt },
@@ -457,14 +492,15 @@ const chatStream = asyncHandler(async (req, res) => {
     content: m.text || m.content || "",
   }));
 
-  const [roomContext, bookingContext, offerContext] = await Promise.all([
+  const [roomContext, bookingContext, offerContext, faqContext] = await Promise.all([
     fetchRoomContext(),
     fetchBookingContext(userId),
     fetchActiveOffers(),
+    fetchActiveFaqContext(),
   ]);
 
   const fullSystemPrompt =
-    SYSTEM_PROMPT + roomContext + bookingContext + offerContext;
+    SYSTEM_PROMPT + roomContext + bookingContext + offerContext + faqContext;
 
   const chatMessages = [
     { role: "system", content: fullSystemPrompt },
@@ -511,31 +547,37 @@ const chatStream = asyncHandler(async (req, res) => {
 
 // ── Quick prompts endpoint (returns suggested prompts) ──────
 const getQuickPrompts = asyncHandler(async (req, res) => {
-  const prompts = [
-    { label: "How to book?", text: "How do I book a room on Daybnb?" },
-    {
-      label: "Cancellation policy",
-      text: "What is the cancellation policy?",
-    },
-    {
-      label: "Payment methods",
-      text: "What payment methods do you accept?",
-    },
-    {
-      label: "Check-in process",
-      text: "How does the check-in process work?",
-    },
-    {
-      label: "Available rooms",
-      text: "What rooms are currently available?",
-    },
-    {
-      label: "My bookings",
-      text: "Can you show me my booking details?",
-    },
-  ];
+  if (!supabaseAdmin) {
+    res.json({ prompts: DEFAULT_QUICK_PROMPTS });
+    return;
+  }
 
-  res.json({ prompts });
+  const { data, error } = await supabaseAdmin
+    .from("ai_faqs")
+    .select("question")
+    .eq("is_active", true)
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: false })
+    .limit(6);
+
+  if (error) {
+    console.error("[AI Chat] quick prompts fetch error:", error.message);
+    res.json({ prompts: DEFAULT_QUICK_PROMPTS });
+    return;
+  }
+
+  const prompts = (data || [])
+    .map((item) => {
+      const text = String(item.question || "").trim();
+      if (!text) return null;
+      return {
+        label: toPromptLabel(text),
+        text,
+      };
+    })
+    .filter(Boolean);
+
+  res.json({ prompts: prompts.length ? prompts : DEFAULT_QUICK_PROMPTS });
 });
 
 module.exports = {
