@@ -4,6 +4,7 @@ import { useDispatch, useSelector } from "react-redux";
 import PageHeader from "../../components/ui/PageHeader.jsx";
 import Button from "../../components/ui/Button.jsx";
 import { INPUT_STYLES } from "../../guest/components/ui/FormInput.jsx";
+import SearchField from "../../components/ui/SearchField.jsx";
 import {
   fetchMessages,
   markMessageRead,
@@ -132,7 +133,7 @@ export default function AdminMessages() {
       />
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-        <input type="text" placeholder="Search messages..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className={`${INPUT_STYLES} w-full sm:w-64`} />
+        <SearchField value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Search messages..." className="w-full sm:w-64" />
         <div className="flex gap-2">
           {["all", "unread", "read"].map((status) => (
             <button key={status} onClick={() => setFilterStatus(status)} className={`rounded-full px-4 py-2 text-sm font-medium capitalize transition-colors ${filterStatus === status ? "bg-brand-600 text-white" : "border border-border bg-panel text-muted hover:bg-surface/60"}`}>

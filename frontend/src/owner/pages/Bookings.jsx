@@ -7,6 +7,7 @@ import Button from "../../components/ui/Button.jsx";
 import PageHeader from "../../components/ui/PageHeader.jsx";
 import Pagination from "../../guest/components/ui/Pagination.jsx";
 import { INPUT_STYLES } from "../../guest/components/ui/FormInput.jsx";
+import SearchField from "../../components/ui/SearchField.jsx";
 import useClientPagination from "../../hooks/useClientPagination.js";
 import {
   fetchOwnerBookings,
@@ -181,9 +182,7 @@ export default function OwnerBookings() {
       />
 
       <div className="flex flex-col gap-4 sm:flex-row">
-        <div className="flex-1">
-          <input type="text" placeholder="Search by room, guest name, email..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className={`${INPUT_STYLES} w-full`} />
-        </div>
+        <SearchField value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Search by room, guest name, email..." className="flex-1" />
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={INPUT_STYLES}>
           <option value="all">All Bookings</option>
           <option value="pending">Pending</option>

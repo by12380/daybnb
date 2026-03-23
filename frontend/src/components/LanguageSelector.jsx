@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { LANGUAGES } from "../i18n/index.js";
+import SearchField from "./ui/SearchField.jsx";
 
 export default function LanguageSelector() {
   const { i18n, t } = useTranslation();
@@ -127,24 +128,12 @@ export default function LanguageSelector() {
 
               {/* Search */}
               <div className="px-6 pt-5">
-                <div className="relative">
-                  <svg
-                    className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted dark:text-dark-muted"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-                  </svg>
-                  <input
-                    ref={searchRef}
-                    type="text"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search languages..."
-                    className="w-full rounded-xl border border-border bg-surface/60 py-2.5 pl-10 pr-4 text-sm text-ink outline-none transition placeholder:text-muted/60 focus:border-brand-400 focus:ring-2 focus:ring-brand-200 dark:border-dark-border dark:bg-dark-surface/60 dark:text-dark-ink dark:placeholder:text-dark-muted/60 dark:focus:border-brand-500 dark:focus:ring-brand-800"
-                  />
-                </div>
+                <SearchField
+                  ref={searchRef}
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search languages..."
+                />
               </div>
 
               {/* Language grid */}

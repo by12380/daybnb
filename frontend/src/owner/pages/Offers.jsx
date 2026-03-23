@@ -5,6 +5,7 @@ import { useDispatch, useSelector } from "react-redux";
 import Button from "../../components/ui/Button.jsx";
 import PageHeader from "../../components/ui/PageHeader.jsx";
 import FormInput, { INPUT_STYLES } from "../../guest/components/ui/FormInput.jsx";
+import SearchField from "../../components/ui/SearchField.jsx";
 import {
   fetchOwnerOffers,
   createOwnerOffer,
@@ -198,9 +199,7 @@ export default function OwnerOffers() {
         }
       />
 
-      <div className="flex-1">
-        <input type="text" placeholder="Search offers..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className={`${INPUT_STYLES} w-full max-w-md`} />
-      </div>
+      <SearchField value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Search offers..." className="max-w-md" />
 
       {filteredOffers.length === 0 ? (
         <div className="rounded-2xl border border-border bg-panel py-12 text-center shadow-sm">

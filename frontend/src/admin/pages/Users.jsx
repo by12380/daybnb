@@ -5,6 +5,7 @@ import PageHeader from "../../components/ui/PageHeader.jsx";
 import { formatPrice } from "../../guest/utils/format.js";
 import Button from "../../components/ui/Button.jsx";
 import FormInput, { INPUT_STYLES } from "../../guest/components/ui/FormInput.jsx";
+import SearchField from "../../components/ui/SearchField.jsx";
 import { fetchUsers, updateUser, deleteUser } from "../../redux/slices/userSlice.js";
 import { fetchBookings } from "../../redux/slices/bookingSlice.js";
 import { fetchRooms } from "../../redux/slices/roomSlice.js";
@@ -219,7 +220,7 @@ export default function AdminUsers() {
         </select>
       </div>
 
-      <div className="flex-1"><input type="text" placeholder="Search by name, email, or phone..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className={`${INPUT_STYLES} w-full max-w-md`} /></div>
+      <SearchField value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Search by name, email, or phone..." className="max-w-md" />
 
       {filteredUsers.length === 0 ? (
         <div className="rounded-2xl border border-border bg-panel py-12 text-center shadow-sm"><p className="mt-4 text-sm font-medium text-ink">No customers found</p><p className="mt-1 text-sm text-muted">{searchTerm || ownerFilter !== "all" ? "Try adjusting your filters" : "Customers will appear here when they sign up"}</p></div>

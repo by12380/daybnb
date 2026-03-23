@@ -5,6 +5,7 @@ import { formatPrice } from "../../guest/utils/format.js";
 import Button from "../../components/ui/Button.jsx";
 import PageHeader from "../../components/ui/PageHeader.jsx";
 import { INPUT_STYLES } from "../../guest/components/ui/FormInput.jsx";
+import SearchField from "../../components/ui/SearchField.jsx";
 import {
   fetchOwnerCustomers,
   fetchOwnerCustomerBookings,
@@ -147,9 +148,7 @@ export default function OwnerCustomers() {
         subtitle={`Guests who have booked your properties (${(customers || []).length} total)`}
       />
 
-      <div className="flex-1">
-        <input type="text" placeholder="Search by name, email, or phone..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className={`${INPUT_STYLES} w-full max-w-md`} />
-      </div>
+      <SearchField value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Search by name, email, or phone..." className="max-w-md" />
 
       {filteredCustomers.length === 0 ? (
         <div className="rounded-2xl border border-border bg-panel py-12 text-center shadow-sm">

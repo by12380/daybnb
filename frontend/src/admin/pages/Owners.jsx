@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import PageHeader from "../../components/ui/PageHeader.jsx";
 import Button from "../../components/ui/Button.jsx";
 import FormInput, { INPUT_STYLES } from "../../guest/components/ui/FormInput.jsx";
+import SearchField from "../../components/ui/SearchField.jsx";
 import api, { setImpersonation, clearImpersonation, getImpersonation } from "../../redux/api.js";
 
 /* ── View Owner Modal ────────────────────────────────────── */
@@ -289,15 +290,7 @@ export default function AdminOwners() {
         subtitle={`Manage property owner accounts (${total} total)`}
       />
 
-      <div className="flex-1">
-        <input
-          type="text"
-          placeholder="Search by name or email..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className={`${INPUT_STYLES} w-full max-w-md`}
-        />
-      </div>
+      <SearchField value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Search by name or email..." className="max-w-md" />
 
       {error && (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-400">

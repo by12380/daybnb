@@ -6,6 +6,7 @@ import { useSocket } from "../../lib/SocketProvider.jsx";
 import ChatComposer from "../../components/chat/ChatComposer.jsx";
 import ChatMessageBubble from "../../components/chat/ChatMessageBubble.jsx";
 import { getChatMessagePreview } from "../../components/chat/chatHelpers.js";
+import SearchField from "../../components/ui/SearchField.jsx";
 import {
   fetchPanelConversations,
   fetchMessages,
@@ -149,12 +150,10 @@ export default function OwnerChat() {
         <div className="flex w-80 shrink-0 flex-col border-r border-border">
           {/* Search */}
           <div className="border-b border-border p-3">
-            <input
-              type="text"
-              placeholder="Search conversations..."
+            <SearchField
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full rounded-xl border border-border bg-surface/60 px-3 py-2 text-sm text-ink outline-none transition-colors placeholder:text-muted focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 dark:border-dark-border dark:bg-dark-navy/60 dark:text-dark-ink"
+              placeholder="Search conversations..."
             />
           </div>
 

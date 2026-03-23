@@ -7,6 +7,7 @@ import PageHeader from "../../components/ui/PageHeader.jsx";
 import { formatPrice } from "../../guest/utils/format.js";
 import Button from "../../components/ui/Button.jsx";
 import { INPUT_STYLES } from "../../guest/components/ui/FormInput.jsx";
+import SearchField from "../../components/ui/SearchField.jsx";
 import { fetchRooms, deleteRoom } from "../../redux/slices/roomSlice.js";
 import { fetchBookings } from "../../redux/slices/bookingSlice.js";
 import api from "../../redux/api.js";
@@ -176,12 +177,10 @@ export default function AdminRooms() {
         </div>
         <div>
           <label className="mb-2 block text-sm font-medium text-muted dark:text-dark-muted">Search</label>
-          <input
-            type="text"
-            placeholder="Search by title or location..."
+          <SearchField
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
-            className={`${INPUT_STYLES} w-full`}
+            placeholder="Search by title or location..."
           />
         </div>
         <div>
