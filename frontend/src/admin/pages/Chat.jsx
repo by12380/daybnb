@@ -175,7 +175,10 @@ export default function AdminChat() {
             <SearchField
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
+              onClear={() => setSearchTerm("")}
               placeholder="Search customers..."
+              tone="brand"
+              inputClassName="bg-surface/60 dark:bg-dark-navy/60"
             />
           </div>
 

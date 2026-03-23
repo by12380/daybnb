@@ -5,7 +5,6 @@ import { useDispatch, useSelector } from "react-redux";
 import { formatPrice } from "../../guest/utils/format.js";
 import Button from "../../components/ui/Button.jsx";
 import PageHeader from "../../components/ui/PageHeader.jsx";
-import { INPUT_STYLES } from "../../guest/components/ui/FormInput.jsx";
 import SearchField from "../../components/ui/SearchField.jsx";
 import {
   fetchOwnerRooms,
@@ -128,14 +127,15 @@ export default function OwnerRooms() {
         }
       />
 
-      <div className="max-w-md">
-        <label className="mb-2 block text-sm font-medium text-muted dark:text-dark-muted">Search</label>
-        <SearchField
-          value={searchTerm}
-          onChange={(event) => setSearchTerm(event.target.value)}
-          placeholder="Search by title or location..."
-        />
-      </div>
+      <SearchField
+        label="Search"
+        value={searchTerm}
+        onChange={(event) => setSearchTerm(event.target.value)}
+        onClear={() => setSearchTerm("")}
+        placeholder="Search by title or location..."
+        className="max-w-md"
+        labelClassName="dark:text-dark-muted"
+      />
 
       {filteredRooms.length === 0 ? (
         <div className="rounded-3xl border border-border bg-panel py-14 text-center shadow-sm dark:border-dark-border dark:bg-dark-panel">

@@ -132,7 +132,9 @@ export default function LanguageSelector() {
                   ref={searchRef}
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
+                  onClear={() => setSearch("")}
                   placeholder="Search languages..."
+                  inputClassName="bg-surface/60 py-2.5 dark:bg-dark-surface/60"
                 />
               </div>
 

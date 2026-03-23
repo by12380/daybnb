@@ -5,6 +5,7 @@ import { DatePicker } from "antd";
 import dayjs from "dayjs";
 import Card from "../components/ui/Card.jsx";
 import FormInput, { INPUT_STYLES } from "../components/ui/FormInput.jsx";
+import SearchField from "../../components/ui/SearchField.jsx";
 import { fetchRooms } from "../../redux/slices/roomSlice.js";
 
 const LandingSearch = React.memo(({ onSearch }) => {
@@ -62,12 +63,12 @@ const LandingSearch = React.memo(({ onSearch }) => {
         </p>
       </div>
       <div className="grid gap-4 md:grid-cols-7">
-      <FormInput
+        <SearchField
           label={t("search.searchLabel")}
-          name="searchText"
           value={formState.searchText}
           onChange={onChange}
-          type="search"
+          onClear={() => setFormState((prev) => ({ ...prev, searchText: "" }))}
+          name="searchText"
           placeholder={t("search.searchPlaceholder")}
           className="md:col-span-2"
         />

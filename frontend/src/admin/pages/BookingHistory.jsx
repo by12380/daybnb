@@ -7,8 +7,8 @@ import { formatPrice } from "../../guest/utils/format.js";
 import Button from "../../components/ui/Button.jsx";
 import Pagination from "../../guest/components/ui/Pagination.jsx";
 import { INPUT_STYLES } from "../../guest/components/ui/FormInput.jsx";
-import SearchField from "../../components/ui/SearchField.jsx";
 import useClientPagination from "../../hooks/useClientPagination.js";
+import SearchField from "../../components/ui/SearchField.jsx";
 import {
   fetchBookingHistory,
   clearHistoryBookings,
@@ -115,7 +115,13 @@ export default function AdminBookingHistory() {
       </div>
 
       <div className="flex flex-col gap-4 sm:flex-row">
-        <SearchField value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Search by room, guest name, email..." className="flex-1" />
+        <SearchField
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          onClear={() => setSearchTerm("")}
+          placeholder="Search by room, guest name, email..."
+          className="flex-1"
+        />
         <DatePicker
           className={INPUT_STYLES}
           placeholder="Filter by date"

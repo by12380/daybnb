@@ -1,34 +1,78 @@
-import React from "react";
+import React, { forwardRef } from "react";
+import { INPUT_STYLES } from "../../guest/components/ui/FormInput.jsx";
 
-const SearchField = React.memo(
-  React.forwardRef(
-    ({ value, onChange, placeholder = "Search...", className = "", ...props }, ref) => (
-      <div className={`relative ${className}`}>
-        <svg
-          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted dark:text-dark-muted"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2}
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
-          />
-        </svg>
+const TONE_STYLES = {
+  brand: "focus:border-brand-400/70 focus:ring-brand-200",
+  emerald: "focus:border-emerald-400/70 focus:ring-emerald-200",
+  neutral: "",
+};
+
+function SearchIcon({ className = "" }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+    </svg>
+  );
+}
+
+function ClearIcon({ className = "" }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+    </svg>
+  );
+}
+
+const SearchField = forwardRef(function SearchField(
+  {
+    label,
+    value,
+    onChange,
+    onClear,
+    placeholder = "Search...",
+    className = "",
+    inputClassName = "",
+    labelClassName = "",
+    tone = "brand",
+    ...props
+  },
+  ref
+) {
+  const Wrapper = label ? "label" : "div";
+  const hasValue = String(value ?? "").length > 0;
+  const toneClasses = TONE_STYLES[tone] || TONE_STYLES.brand;
+
+  return (
+    <Wrapper className={`${label ? "flex flex-col gap-2" : ""} ${className}`.trim()}>
+      {label ? <span className={`text-sm font-medium text-muted ${labelClassName}`.trim()}>{label}</span> : null}
+      <div className="relative">
+        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5">
+          <SearchIcon className="h-4 w-4 text-muted" />
+        </div>
         <input
+          {...props}
           ref={ref}
-          type="text"
+          type={props.type || "search"}
           value={value}
           onChange={onChange}
           placeholder={placeholder}
-          className="w-full rounded-xl border border-border bg-panel py-2 pl-10 pr-3 text-sm text-ink shadow-sm placeholder:text-muted/70 focus:border-brand-400/70 focus:outline-none focus:ring-2 focus:ring-brand-200 disabled:cursor-not-allowed disabled:bg-surface/60 disabled:text-muted dark:border-dark-border dark:bg-dark-panel dark:text-dark-ink dark:placeholder:text-dark-muted/70 dark:focus:border-brand-500 dark:focus:ring-brand-800"
-          {...props}
+          className={`${INPUT_STYLES} ${toneClasses} w-full pl-10 ${hasValue && onClear ? "pr-10" : ""} ${inputClassName}`.trim()}
         />
+        {hasValue && onClear ? (
+          <button
+            type="button"
+            onClick={onClear}
+            aria-label="Clear search"
+            className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted transition hover:text-ink"
+          >
+            <ClearIcon className="h-4 w-4" />
+          </button>
+        ) : null}
       </div>
-    )
-  )
-);
+    </Wrapper>
+  );
+});
 
-export default SearchField;
+SearchField.displayName = "SearchField";
+
+export default React.memo(SearchField);

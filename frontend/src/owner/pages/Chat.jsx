@@ -153,7 +153,10 @@ export default function OwnerChat() {
             <SearchField
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
+              onClear={() => setSearchTerm("")}
               placeholder="Search conversations..."
+              tone="emerald"
+              inputClassName="bg-surface/60 dark:bg-dark-navy/60"
             />
           </div>
 

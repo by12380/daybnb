@@ -4,7 +4,6 @@ import { useDispatch, useSelector } from "react-redux";
 import { formatPrice } from "../../guest/utils/format.js";
 import Button from "../../components/ui/Button.jsx";
 import PageHeader from "../../components/ui/PageHeader.jsx";
-import { INPUT_STYLES } from "../../guest/components/ui/FormInput.jsx";
 import SearchField from "../../components/ui/SearchField.jsx";
 import {
   fetchOwnerCustomers,
@@ -148,7 +147,14 @@ export default function OwnerCustomers() {
         subtitle={`Guests who have booked your properties (${(customers || []).length} total)`}
       />
 
-      <SearchField value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Search by name, email, or phone..." className="max-w-md" />
+      <SearchField
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
+        onClear={() => setSearchTerm("")}
+        placeholder="Search by name, email, or phone..."
+        className="flex-1"
+        inputClassName="max-w-md"
+      />
 
       {filteredCustomers.length === 0 ? (
         <div className="rounded-2xl border border-border bg-panel py-12 text-center shadow-sm">

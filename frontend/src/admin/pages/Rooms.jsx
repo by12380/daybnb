@@ -4,10 +4,10 @@ import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { useAuth } from "../../auth/useAuth.js";
 import PageHeader from "../../components/ui/PageHeader.jsx";
+import SearchField from "../../components/ui/SearchField.jsx";
 import { formatPrice } from "../../guest/utils/format.js";
 import Button from "../../components/ui/Button.jsx";
 import { INPUT_STYLES } from "../../guest/components/ui/FormInput.jsx";
-import SearchField from "../../components/ui/SearchField.jsx";
 import { fetchRooms, deleteRoom } from "../../redux/slices/roomSlice.js";
 import { fetchBookings } from "../../redux/slices/bookingSlice.js";
 import api from "../../redux/api.js";
@@ -180,6 +180,7 @@ export default function AdminRooms() {
           <SearchField
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
+            onClear={() => setSearchTerm("")}
             placeholder="Search by title or location..."
           />
         </div>

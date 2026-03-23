@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { useSearchBox } from "react-instantsearch";
 import { getUserLocation, DEFAULT_SEARCH_RADIUS } from "../../../lib/algoliaClient.js";
 import { INPUT_STYLES } from "../ui/FormInput.jsx";
+import SearchField from "../../../components/ui/SearchField.jsx";
 
 function LocationIcon({ className = "" }) {
   return (
@@ -132,30 +133,15 @@ const GeoSearchBox = React.memo(function GeoSearchBox({
   return (
     <div className="space-y-4">
       {/* Text Search */}
-      <div className="relative">
-        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-          <svg
-            className="h-5 w-5 text-muted dark:text-dark-muted"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-            />
-          </svg>
-        </div>
-        <input
-          type="search"
-          value={searchText}
-          onChange={handleSearchChange}
-          placeholder="Search by name, location, or type..."
-          className={`${INPUT_STYLES} pl-10`}
-        />
-      </div>
+      <SearchField
+        value={searchText}
+        onChange={handleSearchChange}
+        onClear={() => {
+          setSearchText("");
+          refineQuery("");
+        }}
+        placeholder="Search by name, location, or type..."
+      />
 
       {/* Location Controls */}
       <div className="flex flex-wrap items-center gap-3">

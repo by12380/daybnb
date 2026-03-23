@@ -2,9 +2,9 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Modal } from "antd";
 import { useNavigate } from "react-router-dom";
 import PageHeader from "../../components/ui/PageHeader.jsx";
+import SearchField from "../../components/ui/SearchField.jsx";
 import Button from "../../components/ui/Button.jsx";
 import FormInput, { INPUT_STYLES } from "../../guest/components/ui/FormInput.jsx";
-import SearchField from "../../components/ui/SearchField.jsx";
 import api, { setImpersonation, clearImpersonation, getImpersonation } from "../../redux/api.js";
 
 /* ── View Owner Modal ────────────────────────────────────── */
@@ -290,7 +290,14 @@ export default function AdminOwners() {
         subtitle={`Manage property owner accounts (${total} total)`}
       />
 
-      <SearchField value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Search by name or email..." className="max-w-md" />
+      <SearchField
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
+        onClear={() => setSearchTerm("")}
+        placeholder="Search by name or email..."
+        className="flex-1"
+        inputClassName="max-w-md"
+      />
 
       {error && (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-400">
