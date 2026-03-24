@@ -418,12 +418,54 @@ function toPromptLabel(question) {
   return value.length > 36 ? `${value.slice(0, 33).trim()}...` : value;
 }
 
-// ── Main chat endpoint ──────────────────────────────────────
-const chat = asyncHandler(async (req, res) => {
-  if (!getConfiguredProviders().length) {
-    throw ApiError.internal(getAiConfigError());
+function normalizeFaqQuestion(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function getLatestUserQuestion(messages) {
+  if (!Array.isArray(messages)) return "";
+
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (message?.role !== "assistant") {
+      return String(message?.text || message?.content || "").trim();
+    }
   }
 
+  return "";
+}
+
+async function findMatchingFaq(question) {
+  if (!supabaseAdmin) return null;
+
+  const normalizedQuestion = normalizeFaqQuestion(question);
+  if (!normalizedQuestion) return null;
+
+  const { data: faqs, error } = await supabaseAdmin
+    .from("ai_faqs")
+    .select("question, answer")
+    .eq("is_active", true)
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("[AI Chat] FAQ match lookup error:", error.message);
+    return null;
+  }
+
+  return (
+    (faqs || []).find(
+      (faq) => normalizeFaqQuestion(faq.question) === normalizedQuestion
+    ) || null
+  );
+}
+
+// ── Main chat endpoint ──────────────────────────────────────
+const chat = asyncHandler(async (req, res) => {
   const { messages, sessionId, guestEmail } = req.body;
 
   if (!messages || !Array.isArray(messages) || messages.length === 0) {
@@ -431,26 +473,8 @@ const chat = asyncHandler(async (req, res) => {
   }
 
   const userId = req.user?.id || null;
-
-  const recentMessages = messages.slice(-MAX_HISTORY_MESSAGES).map((m) => ({
-    role: m.role === "assistant" ? "assistant" : "user",
-    content: m.text || m.content || "",
-  }));
-
-  const [roomContext, bookingContext, offerContext, faqContext] = await Promise.all([
-    fetchRoomContext(),
-    fetchBookingContext(userId),
-    fetchActiveOffers(),
-    fetchActiveFaqContext(),
-  ]);
-
-  const fullSystemPrompt =
-    SYSTEM_PROMPT + roomContext + bookingContext + offerContext + faqContext;
-
-  const chatMessages = [
-    { role: "system", content: fullSystemPrompt },
-    ...recentMessages,
-  ];
+  const latestUserQuestion = getLatestUserQuestion(messages);
+  const matchedFaq = await findMatchingFaq(latestUserQuestion);
 
   if (sessionId && supabaseAdmin) {
     await supabaseAdmin.from("ai_chat_sessions").upsert(
@@ -465,27 +489,21 @@ const chat = asyncHandler(async (req, res) => {
     );
   }
 
-  try {
-    const response = await generateAiResponse(chatMessages);
-    res.json(response);
-  } catch (err) {
-    throw getUserFacingAiError(err);
+  if (matchedFaq) {
+    res.json({
+      reply: matchedFaq.answer,
+      model: "admin-faq",
+      provider: "faq",
+      usage: null,
+      source: "faq",
+      matchedQuestion: matchedFaq.question,
+    });
+    return;
   }
-});
 
-// ── Streaming chat endpoint ─────────────────────────────────
-const chatStream = asyncHandler(async (req, res) => {
   if (!getConfiguredProviders().length) {
     throw ApiError.internal(getAiConfigError());
   }
-
-  const { messages, sessionId, guestEmail } = req.body;
-
-  if (!messages || !Array.isArray(messages) || messages.length === 0) {
-    throw ApiError.badRequest("messages array is required");
-  }
-
-  const userId = req.user?.id || null;
 
   const recentMessages = messages.slice(-MAX_HISTORY_MESSAGES).map((m) => ({
     role: m.role === "assistant" ? "assistant" : "user",
@@ -506,6 +524,26 @@ const chatStream = asyncHandler(async (req, res) => {
     { role: "system", content: fullSystemPrompt },
     ...recentMessages,
   ];
+
+  try {
+    const response = await generateAiResponse(chatMessages);
+    res.json(response);
+  } catch (err) {
+    throw getUserFacingAiError(err);
+  }
+});
+
+// ── Streaming chat endpoint ─────────────────────────────────
+const chatStream = asyncHandler(async (req, res) => {
+  const { messages, sessionId, guestEmail } = req.body;
+
+  if (!messages || !Array.isArray(messages) || messages.length === 0) {
+    throw ApiError.badRequest("messages array is required");
+  }
+
+  const userId = req.user?.id || null;
+  const latestUserQuestion = getLatestUserQuestion(messages);
+  const matchedFaq = await findMatchingFaq(latestUserQuestion);
 
   if (sessionId && supabaseAdmin) {
     supabaseAdmin
@@ -525,6 +563,47 @@ const chatStream = asyncHandler(async (req, res) => {
         console.error("[AI Chat] session upsert error:", err.message)
       );
   }
+
+  if (matchedFaq) {
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.flushHeaders();
+    res.write(
+      `data: ${JSON.stringify({
+        content: matchedFaq.answer,
+        source: "faq",
+        matchedQuestion: matchedFaq.question,
+      })}\n\n`
+    );
+    res.write("data: [DONE]\n\n");
+    res.end();
+    return;
+  }
+
+  if (!getConfiguredProviders().length) {
+    throw ApiError.internal(getAiConfigError());
+  }
+
+  const recentMessages = messages.slice(-MAX_HISTORY_MESSAGES).map((m) => ({
+    role: m.role === "assistant" ? "assistant" : "user",
+    content: m.text || m.content || "",
+  }));
+
+  const [roomContext, bookingContext, offerContext, faqContext] = await Promise.all([
+    fetchRoomContext(),
+    fetchBookingContext(userId),
+    fetchActiveOffers(),
+    fetchActiveFaqContext(),
+  ]);
+
+  const fullSystemPrompt =
+    SYSTEM_PROMPT + roomContext + bookingContext + offerContext + faqContext;
+
+  const chatMessages = [
+    { role: "system", content: fullSystemPrompt },
+    ...recentMessages,
+  ];
 
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
