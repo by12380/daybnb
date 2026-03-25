@@ -48,6 +48,8 @@ import OwnerOffers from "../owner/pages/Offers.jsx";
 import OwnerCheckInOut from "../owner/pages/CheckInOut.jsx";
 import OwnerBookingHistory from "../owner/pages/BookingHistory.jsx";
 import OwnerRoomEditor from "../owner/pages/RoomEditor.jsx";
+import OwnerHostProfile from "../owner/pages/HostProfile.jsx";
+import OwnerCoHosts from "../owner/pages/CoHosts.jsx";
 
 // Admin chat
 import AdminChat from "../admin/pages/Chat.jsx";
@@ -120,6 +122,8 @@ export default function AppRouter() {
             <Route path="/owner/check-in-out" element={<OwnerCheckInOut />} />
             <Route path="/owner/booking-history" element={<OwnerBookingHistory />} />
             <Route path="/owner/offers" element={<OwnerOffers />} />
+            <Route path="/owner/host-profile" element={<OwnerHostProfile />} />
+            <Route path="/owner/co-hosts" element={<OwnerCoHosts />} />
           </Route>
         </Route>
       </Routes>

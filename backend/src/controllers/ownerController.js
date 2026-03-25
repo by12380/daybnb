@@ -816,6 +816,346 @@ exports.getMyProfile = asyncHandler(async (req, res) => {
 });
 
 /**
+ * PUT /api/owner/profile
+ * Update the owner's host-specific profile fields.
+ */
+exports.updateMyProfile = asyncHandler(async (req, res) => {
+  if (!supabaseAdmin) throw ApiError.internal("Supabase is not configured");
+
+  const ownerId = resolveOwnerId(req);
+  if (!ownerId) throw ApiError.forbidden("Owner context required");
+
+  const {
+    full_name, phone, bio, avatar_url, cover_photo_url,
+    languages, specialties, response_time, response_rate,
+    is_superhost, identity_verified, years_hosting, host_since,
+    accepts_cohosts,
+  } = req.body;
+
+  const updates = { updated_at: new Date().toISOString() };
+  if (full_name !== undefined) updates.full_name = full_name?.trim() || null;
+  if (phone !== undefined) updates.phone = phone?.trim() || null;
+  if (bio !== undefined) updates.bio = typeof bio === "string" ? bio.trim() : null;
+  if (avatar_url !== undefined) updates.avatar_url = avatar_url?.trim() || null;
+  if (cover_photo_url !== undefined) updates.cover_photo_url = cover_photo_url?.trim() || null;
+  if (languages !== undefined) updates.languages = Array.isArray(languages) ? languages : [];
+  if (specialties !== undefined) updates.specialties = Array.isArray(specialties) ? specialties : [];
+  if (response_time !== undefined) updates.response_time = response_time?.trim() || null;
+  if (response_rate !== undefined) updates.response_rate = Math.max(0, Math.min(100, Number(response_rate) || 0));
+  if (is_superhost !== undefined) updates.is_superhost = Boolean(is_superhost);
+  if (identity_verified !== undefined) updates.identity_verified = Boolean(identity_verified);
+  if (years_hosting !== undefined) updates.years_hosting = Math.max(0, Number(years_hosting) || 0);
+  if (host_since !== undefined) updates.host_since = host_since || null;
+  if (accepts_cohosts !== undefined) updates.accepts_cohosts = Boolean(accepts_cohosts);
+
+  const { data, error } = await supabaseAdmin
+    .from("profiles")
+    .update(updates)
+    .eq("id", ownerId)
+    .select()
+    .single();
+
+  if (error) throw ApiError.internal(error.message);
+  if (!data) throw ApiError.notFound("Profile not found");
+
+  res.json({ profile: data });
+});
+
+/* ══════════════════════════════════════════════════════════
+ * CO-HOSTS — Manage co-host relationships
+ * ══════════════════════════════════════════════════════════ */
+
+/**
+ * GET /api/owner/co-hosts
+ * List co-hosts for the current owner (as primary host).
+ */
+exports.getMyCoHosts = asyncHandler(async (req, res) => {
+  if (!supabaseAdmin) throw ApiError.internal("Supabase is not configured");
+
+  const ownerId = resolveOwnerId(req);
+  if (!ownerId) throw ApiError.forbidden("Owner context required");
+
+  const { data, error } = await supabaseAdmin
+    .from("co_hosts")
+    .select("*")
+    .eq("owner_id", ownerId)
+    .order("created_at", { ascending: false });
+
+  if (error) throw ApiError.internal(error.message);
+
+  // Fetch co-host profile details
+  const coHostIds = (data || []).map((c) => c.co_host_id).filter(Boolean);
+  let profiles = [];
+  if (coHostIds.length > 0) {
+    const { data: pData } = await supabaseAdmin
+      .from("profiles")
+      .select("id, full_name, email, phone, avatar_url, is_superhost")
+      .in("id", coHostIds);
+    profiles = pData || [];
+  }
+
+  const profilesMap = {};
+  profiles.forEach((p) => { profilesMap[p.id] = p; });
+
+  const coHosts = (data || []).map((c) => ({
+    ...c,
+    co_host_profile: profilesMap[c.co_host_id] || null,
+  }));
+
+  res.json({ co_hosts: coHosts });
+});
+
+/**
+ * GET /api/owner/co-host-invites
+ * List co-host invitations received by the current owner.
+ */
+exports.getMyCoHostInvites = asyncHandler(async (req, res) => {
+  if (!supabaseAdmin) throw ApiError.internal("Supabase is not configured");
+
+  const ownerId = resolveOwnerId(req);
+  if (!ownerId) throw ApiError.forbidden("Owner context required");
+
+  const { data, error } = await supabaseAdmin
+    .from("co_hosts")
+    .select("*")
+    .eq("co_host_id", ownerId)
+    .order("created_at", { ascending: false });
+
+  if (error) throw ApiError.internal(error.message);
+
+  const ownerIds = (data || []).map((c) => c.owner_id).filter(Boolean);
+  let profiles = [];
+  if (ownerIds.length > 0) {
+    const { data: pData } = await supabaseAdmin
+      .from("profiles")
+      .select("id, full_name, email, phone, avatar_url, is_superhost")
+      .in("id", ownerIds);
+    profiles = pData || [];
+  }
+
+  const profilesMap = {};
+  profiles.forEach((p) => { profilesMap[p.id] = p; });
+
+  const invites = (data || []).map((c) => ({
+    ...c,
+    owner_profile: profilesMap[c.owner_id] || null,
+  }));
+
+  res.json({ invites });
+});
+
+/**
+ * POST /api/owner/co-hosts
+ * Invite a co-host by email. The target must be an existing owner.
+ */
+exports.inviteCoHost = asyncHandler(async (req, res) => {
+  if (!supabaseAdmin) throw ApiError.internal("Supabase is not configured");
+
+  const ownerId = resolveOwnerId(req);
+  if (!ownerId) throw ApiError.forbidden("Owner context required");
+
+  const { email } = req.body;
+  if (!email?.trim()) throw ApiError.badRequest("Co-host email is required");
+
+  // Find the target owner by email
+  const { data: target } = await supabaseAdmin
+    .from("profiles")
+    .select("id, email, full_name, user_type")
+    .eq("email", email.trim().toLowerCase())
+    .eq("user_type", ROLES.OWNER)
+    .maybeSingle();
+
+  if (!target) throw ApiError.notFound("No owner account found with that email");
+  if (target.id === ownerId) throw ApiError.badRequest("You cannot invite yourself as a co-host");
+
+  // Check for existing relationship
+  const { data: existing } = await supabaseAdmin
+    .from("co_hosts")
+    .select("id, status")
+    .eq("owner_id", ownerId)
+    .eq("co_host_id", target.id)
+    .maybeSingle();
+
+  if (existing) {
+    if (existing.status === "pending" || existing.status === "accepted") {
+      throw ApiError.badRequest("A co-host relationship already exists with this owner");
+    }
+    // Re-invite if previously rejected/removed
+    const { data, error } = await supabaseAdmin
+      .from("co_hosts")
+      .update({ status: "pending", invited_at: new Date().toISOString(), responded_at: null, updated_at: new Date().toISOString() })
+      .eq("id", existing.id)
+      .select()
+      .single();
+    if (error) throw ApiError.internal(error.message);
+    return res.json({ co_host: data });
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from("co_hosts")
+    .insert({
+      owner_id: ownerId,
+      co_host_id: target.id,
+      status: "pending",
+      permissions: ["view_bookings", "view_rooms"],
+    })
+    .select()
+    .single();
+
+  if (error) throw ApiError.internal(error.message);
+
+  // Send notification to the co-host
+  const { emitNotificationToUser } = require("../socket");
+  const { data: ownerProfile } = await supabaseAdmin
+    .from("profiles")
+    .select("full_name")
+    .eq("id", ownerId)
+    .maybeSingle();
+
+  const notification = {
+    recipient_user_id: target.id,
+    type: "co_host_invite",
+    title: "Co-host Invitation",
+    body: `${ownerProfile?.full_name || "A host"} has invited you to be a co-host.`,
+    data: { co_host_id: data.id, owner_id: ownerId },
+  };
+
+  const { data: savedNotif } = await supabaseAdmin
+    .from("notifications")
+    .insert(notification)
+    .select()
+    .single();
+
+  emitNotificationToUser(target.id, savedNotif || notification);
+
+  res.status(201).json({ co_host: data });
+});
+
+/**
+ * PATCH /api/owner/co-hosts/:id/respond
+ * Accept or reject a co-host invitation.
+ */
+exports.respondToCoHostInvite = asyncHandler(async (req, res) => {
+  if (!supabaseAdmin) throw ApiError.internal("Supabase is not configured");
+
+  const ownerId = resolveOwnerId(req);
+  if (!ownerId) throw ApiError.forbidden("Owner context required");
+
+  const { action } = req.body;
+  if (!["accept", "reject"].includes(action)) {
+    throw ApiError.badRequest("Action must be 'accept' or 'reject'");
+  }
+
+  const { data: invite } = await supabaseAdmin
+    .from("co_hosts")
+    .select("*")
+    .eq("id", req.params.id)
+    .eq("co_host_id", ownerId)
+    .eq("status", "pending")
+    .maybeSingle();
+
+  if (!invite) throw ApiError.notFound("Invitation not found or already responded");
+
+  const newStatus = action === "accept" ? "accepted" : "rejected";
+
+  const { data, error } = await supabaseAdmin
+    .from("co_hosts")
+    .update({ status: newStatus, responded_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+    .eq("id", req.params.id)
+    .select()
+    .single();
+
+  if (error) throw ApiError.internal(error.message);
+
+  // Notify the primary owner
+  const { emitNotificationToUser } = require("../socket");
+  const { data: coHostProfile } = await supabaseAdmin
+    .from("profiles")
+    .select("full_name")
+    .eq("id", ownerId)
+    .maybeSingle();
+
+  const notification = {
+    recipient_user_id: invite.owner_id,
+    type: "co_host_response",
+    title: action === "accept" ? "Co-host Accepted!" : "Co-host Declined",
+    body: `${coHostProfile?.full_name || "A host"} has ${action === "accept" ? "accepted" : "declined"} your co-host invitation.`,
+    data: { co_host_id: data.id, co_host_user_id: ownerId },
+  };
+
+  const { data: savedNotif } = await supabaseAdmin
+    .from("notifications")
+    .insert(notification)
+    .select()
+    .single();
+
+  emitNotificationToUser(invite.owner_id, savedNotif || notification);
+
+  res.json({ co_host: data });
+});
+
+/**
+ * PATCH /api/owner/co-hosts/:id/permissions
+ * Update co-host permissions.
+ */
+exports.updateCoHostPermissions = asyncHandler(async (req, res) => {
+  if (!supabaseAdmin) throw ApiError.internal("Supabase is not configured");
+
+  const ownerId = resolveOwnerId(req);
+  if (!ownerId) throw ApiError.forbidden("Owner context required");
+
+  const { permissions } = req.body;
+  if (!Array.isArray(permissions)) throw ApiError.badRequest("Permissions must be an array");
+
+  const validPermissions = ["view_bookings", "manage_bookings", "view_rooms", "manage_rooms", "view_customers", "manage_checkin"];
+  const filtered = permissions.filter((p) => validPermissions.includes(p));
+
+  const { data, error } = await supabaseAdmin
+    .from("co_hosts")
+    .update({ permissions: filtered, updated_at: new Date().toISOString() })
+    .eq("id", req.params.id)
+    .eq("owner_id", ownerId)
+    .eq("status", "accepted")
+    .select()
+    .single();
+
+  if (error) throw ApiError.internal(error.message);
+  if (!data) throw ApiError.notFound("Co-host relationship not found");
+
+  res.json({ co_host: data });
+});
+
+/**
+ * DELETE /api/owner/co-hosts/:id
+ * Remove a co-host relationship.
+ */
+exports.removeCoHost = asyncHandler(async (req, res) => {
+  if (!supabaseAdmin) throw ApiError.internal("Supabase is not configured");
+
+  const ownerId = resolveOwnerId(req);
+  if (!ownerId) throw ApiError.forbidden("Owner context required");
+
+  // Owner can remove co-hosts they invited, or co-hosts can remove themselves
+  const { data: record } = await supabaseAdmin
+    .from("co_hosts")
+    .select("*")
+    .eq("id", req.params.id)
+    .or(`owner_id.eq.${ownerId},co_host_id.eq.${ownerId}`)
+    .maybeSingle();
+
+  if (!record) throw ApiError.notFound("Co-host relationship not found");
+
+  const { error } = await supabaseAdmin
+    .from("co_hosts")
+    .delete()
+    .eq("id", req.params.id);
+
+  if (error) throw ApiError.internal(error.message);
+
+  res.json({ message: "Co-host removed successfully" });
+});
+
+/**
  * GET /api/owner/stats
  * Dashboard stats for the owner (legacy — kept for backward compat).
  */

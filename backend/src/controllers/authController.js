@@ -216,6 +216,8 @@ exports.updateProfile = asyncHandler(async (req, res) => {
     state_region,
     postal_code,
     country,
+    avatar_url,
+    bio,
   } = req.body;
 
   const updates = { updated_at: new Date().toISOString() };
@@ -228,6 +230,8 @@ exports.updateProfile = asyncHandler(async (req, res) => {
   if (state_region !== undefined) updates.state_region = state_region?.trim() || null;
   if (postal_code !== undefined) updates.postal_code = postal_code?.trim() || null;
   if (country !== undefined) updates.country = country || null;
+  if (avatar_url !== undefined) updates.avatar_url = avatar_url?.trim() || null;
+  if (bio !== undefined) updates.bio = typeof bio === "string" ? bio.trim() : null;
 
   // Upsert so new profiles are created automatically
   const payload = {

@@ -122,12 +122,30 @@ exports.getOwner = asyncHandler(async (req, res) => {
 exports.updateOwner = asyncHandler(async (req, res) => {
   if (!supabaseAdmin) throw ApiError.internal("Supabase is not configured");
 
-  const { full_name, phone, email } = req.body;
+  const {
+    full_name, phone, email,
+    bio, avatar_url, cover_photo_url,
+    languages, specialties, response_time, response_rate,
+    is_superhost, identity_verified, years_hosting, host_since,
+    accepts_cohosts,
+  } = req.body;
 
   const updates = { updated_at: new Date().toISOString() };
   if (full_name !== undefined) updates.full_name = full_name?.trim() || null;
   if (phone !== undefined) updates.phone = phone?.trim() || null;
   if (email !== undefined) updates.email = email?.trim() || null;
+  if (bio !== undefined) updates.bio = typeof bio === "string" ? bio.trim() : null;
+  if (avatar_url !== undefined) updates.avatar_url = avatar_url?.trim() || null;
+  if (cover_photo_url !== undefined) updates.cover_photo_url = cover_photo_url?.trim() || null;
+  if (languages !== undefined) updates.languages = Array.isArray(languages) ? languages : [];
+  if (specialties !== undefined) updates.specialties = Array.isArray(specialties) ? specialties : [];
+  if (response_time !== undefined) updates.response_time = response_time?.trim() || null;
+  if (response_rate !== undefined) updates.response_rate = Math.max(0, Math.min(100, Number(response_rate) || 0));
+  if (is_superhost !== undefined) updates.is_superhost = Boolean(is_superhost);
+  if (identity_verified !== undefined) updates.identity_verified = Boolean(identity_verified);
+  if (years_hosting !== undefined) updates.years_hosting = Math.max(0, Number(years_hosting) || 0);
+  if (host_since !== undefined) updates.host_since = host_since || null;
+  if (accepts_cohosts !== undefined) updates.accepts_cohosts = Boolean(accepts_cohosts);
 
   const { data, error } = await supabaseAdmin
     .from("profiles")

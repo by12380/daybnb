@@ -21,8 +21,17 @@ const ownerMiddleware = [
 
 // ── Owner Profile / Dashboard ────────────────────────
 router.get("/profile", ...ownerMiddleware, ownerController.getMyProfile);
+router.put("/profile", ...ownerMiddleware, ownerController.updateMyProfile);
 router.get("/stats", ...ownerMiddleware, ownerController.getStats);
 router.get("/analytics", ...ownerMiddleware, ownerController.getAnalytics);
+
+// ── Co-hosts ─────────────────────────────────────────
+router.get("/co-hosts", ...ownerMiddleware, ownerController.getMyCoHosts);
+router.post("/co-hosts", ...ownerMiddleware, ownerController.inviteCoHost);
+router.get("/co-host-invites", ...ownerMiddleware, ownerController.getMyCoHostInvites);
+router.patch("/co-hosts/:id/respond", ...ownerMiddleware, ownerController.respondToCoHostInvite);
+router.patch("/co-hosts/:id/permissions", ...ownerMiddleware, ownerController.updateCoHostPermissions);
+router.delete("/co-hosts/:id", ...ownerMiddleware, ownerController.removeCoHost);
 
 // ── Rooms ────────────────────────────────────────────
 router.get("/rooms", ...ownerMiddleware, ownerController.getMyRooms);

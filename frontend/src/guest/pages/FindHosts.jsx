@@ -1,136 +1,6 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { Link } from "react-router-dom";
-
-const HOSTS = [
-  {
-    id: "h1",
-    name: "Sarah Mitchell",
-    avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&h=200&fit=crop&crop=face",
-    location: "Austin, TX",
-    bio: "Superhost with a passion for design and hospitality. I love creating warm, inviting spaces for guests to enjoy during the day.",
-    rating: 4.97,
-    reviewCount: 234,
-    yearsHosting: 5,
-    listingCount: 4,
-    responseRate: 99,
-    responseTime: "within an hour",
-    isSuperhost: true,
-    languages: ["English", "Spanish"],
-    specialties: ["Entire homes", "Pool access", "Pet-friendly"],
-  },
-  {
-    id: "h2",
-    name: "David Chen",
-    avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&h=200&fit=crop&crop=face",
-    location: "San Francisco, CA",
-    bio: "Tech professional turned host. My spaces are designed for remote workers who need a productive, distraction-free environment.",
-    rating: 4.89,
-    reviewCount: 156,
-    yearsHosting: 3,
-    listingCount: 2,
-    responseRate: 97,
-    responseTime: "within an hour",
-    isSuperhost: true,
-    languages: ["English", "Mandarin"],
-    specialties: ["Workspace", "High-speed Wi-Fi", "Quiet zones"],
-  },
-  {
-    id: "h3",
-    name: "Maria Gonzalez",
-    avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=200&h=200&fit=crop&crop=face",
-    location: "Miami, FL",
-    bio: "I offer beautiful beachside and poolside properties perfect for day relaxation. Every space is curated for a resort-like experience.",
-    rating: 4.93,
-    reviewCount: 312,
-    yearsHosting: 6,
-    listingCount: 7,
-    responseRate: 100,
-    responseTime: "within minutes",
-    isSuperhost: true,
-    languages: ["English", "Spanish", "Portuguese"],
-    specialties: ["Beachfront", "Pool", "Event spaces"],
-  },
-  {
-    id: "h4",
-    name: "James Wilson",
-    avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&h=200&fit=crop&crop=face",
-    location: "New York, NY",
-    bio: "Urban living specialist. I manage cozy studio apartments and lofts in Manhattan — perfect for day meetings, photo shoots, or simply unwinding.",
-    rating: 4.82,
-    reviewCount: 98,
-    yearsHosting: 2,
-    listingCount: 3,
-    responseRate: 95,
-    responseTime: "within a few hours",
-    isSuperhost: false,
-    languages: ["English"],
-    specialties: ["Urban lofts", "Photo studios", "Meeting spaces"],
-  },
-  {
-    id: "h5",
-    name: "Priya Patel",
-    avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&h=200&fit=crop&crop=face",
-    location: "Los Angeles, CA",
-    bio: "Wellness-focused host offering yoga studios, meditation rooms, and serene garden spaces for your day retreat.",
-    rating: 4.95,
-    reviewCount: 189,
-    yearsHosting: 4,
-    listingCount: 5,
-    responseRate: 98,
-    responseTime: "within an hour",
-    isSuperhost: true,
-    languages: ["English", "Hindi"],
-    specialties: ["Wellness spaces", "Yoga studios", "Gardens"],
-  },
-  {
-    id: "h6",
-    name: "Marcus Brown",
-    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop&crop=face",
-    location: "Chicago, IL",
-    bio: "Family-friendly host with spacious homes that have big backyards, play areas, and fully-equipped kitchens for day gatherings.",
-    rating: 4.88,
-    reviewCount: 145,
-    yearsHosting: 3,
-    listingCount: 3,
-    responseRate: 96,
-    responseTime: "within an hour",
-    isSuperhost: false,
-    languages: ["English", "French"],
-    specialties: ["Family spaces", "BBQ areas", "Large groups"],
-  },
-  {
-    id: "h7",
-    name: "Emma Thompson",
-    avatar: "https://images.unsplash.com/photo-1580489944761-15a19d654956?w=200&h=200&fit=crop&crop=face",
-    location: "Denver, CO",
-    bio: "Mountain retreat host with stunning views. My properties feature hot tubs, fireplaces, and panoramic windows for the perfect day escape.",
-    rating: 4.91,
-    reviewCount: 203,
-    yearsHosting: 4,
-    listingCount: 6,
-    responseRate: 99,
-    responseTime: "within an hour",
-    isSuperhost: true,
-    languages: ["English", "German"],
-    specialties: ["Mountain retreats", "Hot tubs", "Scenic views"],
-  },
-  {
-    id: "h8",
-    name: "Alex Rivera",
-    avatar: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=200&h=200&fit=crop&crop=face",
-    location: "Portland, OR",
-    bio: "Creative spaces host — art studios, music rooms, and maker spaces available for day use. Fuel your creativity in an inspiring environment.",
-    rating: 4.86,
-    reviewCount: 127,
-    yearsHosting: 2,
-    listingCount: 4,
-    responseRate: 94,
-    responseTime: "within a few hours",
-    isSuperhost: false,
-    languages: ["English", "Spanish"],
-    specialties: ["Art studios", "Music rooms", "Creative spaces"],
-  },
-];
+import api from "../../redux/api.js";
 
 const StarIcon = () => (
   <svg className="h-4 w-4 fill-amber-400 text-amber-400" viewBox="0 0 20 20">
@@ -141,7 +11,7 @@ const StarIcon = () => (
 const HostCard = React.memo(({ host }) => (
   <Link to={`/hosts/${host.id}`} className="group block">
     <div className="relative overflow-hidden rounded-2xl border border-border bg-white p-6 shadow-md transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-brand-500/10 dark:border-dark-border dark:bg-dark-panel dark:hover:shadow-brand-500/5">
-      {host.isSuperhost && (
+      {host.is_superhost && (
         <div className="absolute right-4 top-4">
           <span className="rounded-full bg-gradient-to-r from-amber-500 to-orange-500 px-3 py-1 text-xs font-bold text-white shadow-sm">
             Superhost
@@ -151,13 +21,14 @@ const HostCard = React.memo(({ host }) => (
 
       <div className="flex items-center gap-4">
         <div className="relative">
-          <img
-            src={host.avatar}
-            alt={host.name}
-            className="h-16 w-16 rounded-full object-cover ring-2 ring-brand-100 ring-offset-2 dark:ring-brand-800 dark:ring-offset-dark-panel"
-            loading="lazy"
-          />
-          {host.isSuperhost && (
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-brand-100 text-2xl font-bold text-brand-600 ring-2 ring-brand-100 ring-offset-2 dark:bg-brand-900/30 dark:text-brand-300 dark:ring-brand-800 dark:ring-offset-dark-panel">
+            {host.avatar_url ? (
+              <img src={host.avatar_url} alt={host.full_name} className="h-full w-full rounded-full object-cover" loading="lazy" />
+            ) : (
+              (host.full_name || "H").charAt(0).toUpperCase()
+            )}
+          </div>
+          {host.is_superhost && (
             <div className="absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 ring-2 ring-white dark:ring-dark-panel">
               <svg className="h-3 w-3 text-white" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
@@ -167,41 +38,55 @@ const HostCard = React.memo(({ host }) => (
         </div>
         <div className="min-w-0 flex-1">
           <h3 className="truncate text-lg font-semibold text-ink dark:text-dark-ink group-hover:text-brand-600 dark:group-hover:text-brand-400">
-            {host.name}
+            {host.full_name || "Host"}
           </h3>
-          <p className="flex items-center gap-1 text-sm text-muted dark:text-dark-muted">
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-            {host.location}
-          </p>
+          {host.location && (
+            <p className="flex items-center gap-1 text-sm text-muted dark:text-dark-muted">
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              {host.location}
+            </p>
+          )}
         </div>
       </div>
 
-      <p className="mt-4 line-clamp-2 text-sm leading-relaxed text-muted dark:text-dark-muted">
-        {host.bio}
-      </p>
+      {host.bio && (
+        <p className="mt-4 line-clamp-2 text-sm leading-relaxed text-muted dark:text-dark-muted">
+          {host.bio}
+        </p>
+      )}
 
       <div className="mt-4 flex items-center gap-4">
-        <div className="flex items-center gap-1">
-          <StarIcon />
-          <span className="text-sm font-semibold text-ink dark:text-dark-ink">{host.rating}</span>
-          <span className="text-xs text-muted dark:text-dark-muted">({host.reviewCount})</span>
-        </div>
-        <div className="h-4 w-px bg-border dark:bg-dark-border" />
-        <span className="text-xs text-muted dark:text-dark-muted">{host.yearsHosting} yr{host.yearsHosting !== 1 ? "s" : ""} hosting</span>
-        <div className="h-4 w-px bg-border dark:bg-dark-border" />
-        <span className="text-xs text-muted dark:text-dark-muted">{host.listingCount} listing{host.listingCount !== 1 ? "s" : ""}</span>
+        {host.rating > 0 && (
+          <>
+            <div className="flex items-center gap-1">
+              <StarIcon />
+              <span className="text-sm font-semibold text-ink dark:text-dark-ink">{host.rating}</span>
+              <span className="text-xs text-muted dark:text-dark-muted">({host.review_count})</span>
+            </div>
+            <div className="h-4 w-px bg-border dark:bg-dark-border" />
+          </>
+        )}
+        {host.years_hosting > 0 && (
+          <>
+            <span className="text-xs text-muted dark:text-dark-muted">{host.years_hosting} yr{host.years_hosting !== 1 ? "s" : ""} hosting</span>
+            <div className="h-4 w-px bg-border dark:bg-dark-border" />
+          </>
+        )}
+        <span className="text-xs text-muted dark:text-dark-muted">{host.listing_count} listing{host.listing_count !== 1 ? "s" : ""}</span>
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-2">
-        {host.specialties.map((s) => (
-          <span key={s} className="rounded-full bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700 dark:bg-brand-900/30 dark:text-brand-300">
-            {s}
-          </span>
-        ))}
-      </div>
+      {host.specialties?.length > 0 && (
+        <div className="mt-4 flex flex-wrap gap-2">
+          {host.specialties.map((s) => (
+            <span key={s} className="rounded-full bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700 dark:bg-brand-900/30 dark:text-brand-300">
+              {s}
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   </Link>
 ));
@@ -209,22 +94,28 @@ const HostCard = React.memo(({ host }) => (
 const FindHosts = React.memo(() => {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
+  const [hosts, setHosts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const filteredHosts = useMemo(() => {
-    let result = HOSTS;
-    if (filter === "superhost") {
-      result = result.filter((h) => h.isSuperhost);
-    }
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      result = result.filter(
-        (h) =>
-          h.name.toLowerCase().includes(q) ||
-          h.location.toLowerCase().includes(q) ||
-          h.specialties.some((s) => s.toLowerCase().includes(q))
-      );
-    }
-    return result;
+  useEffect(() => {
+    const fetchHosts = async () => {
+      setLoading(true);
+      setError("");
+      try {
+        const params = {};
+        if (search.trim()) params.search = search.trim();
+        if (filter === "superhost") params.superhost = "true";
+        const { data } = await api.get("/hosts", { params });
+        setHosts(data.hosts || []);
+      } catch (err) {
+        setError(err.message || "Failed to load hosts");
+      }
+      setLoading(false);
+    };
+
+    const debounce = setTimeout(fetchHosts, 300);
+    return () => clearTimeout(debounce);
   }, [search, filter]);
 
   return (
@@ -275,7 +166,18 @@ const FindHosts = React.memo(() => {
         </div>
       </div>
 
-      {filteredHosts.length === 0 ? (
+      {loading ? (
+        <div className="flex h-64 items-center justify-center">
+          <div className="text-center">
+            <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-brand-200 border-t-brand-600" />
+            <p className="mt-4 text-sm text-muted dark:text-dark-muted">Loading hosts...</p>
+          </div>
+        </div>
+      ) : error ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-center text-sm text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-400">
+          {error}
+        </div>
+      ) : hosts.length === 0 ? (
         <div className="py-16 text-center">
           <svg className="mx-auto h-16 w-16 text-muted/30 dark:text-dark-muted/30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
@@ -285,7 +187,7 @@ const FindHosts = React.memo(() => {
         </div>
       ) : (
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {filteredHosts.map((host) => (
+          {hosts.map((host) => (
             <HostCard key={host.id} host={host} />
           ))}
         </div>

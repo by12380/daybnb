@@ -15,6 +15,7 @@ const chatRoutes = require("./chat");
 const offerRoutes = require("./offers");
 const heroBannerRoutes = require("./heroBanners");
 const aiChatRoutes = require("./aiChat");
+const hostsRoutes = require("./hosts");
 
 const router = Router();
 
@@ -33,5 +34,6 @@ router.use("/chat", chatRoutes);
 router.use("/offers", offerRoutes);
 router.use("/hero-banners", heroBannerRoutes);
 router.use("/ai", aiChatRoutes);
+router.use("/hosts", hostsRoutes);
 
 module.exports = router;

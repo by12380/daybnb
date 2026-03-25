@@ -29,6 +29,21 @@ const ViewOwnerModal = React.memo(({ open, owner, onClose }) => {
           <div className="grid gap-2 text-sm">
             <div className="flex justify-between"><span className="text-muted">Role</span><span className="font-medium text-emerald-600 capitalize">Owner</span></div>
             <div className="flex justify-between"><span className="text-muted">User ID</span><span className="font-mono text-xs text-ink">{owner.id}</span></div>
+            {owner.is_superhost && (
+              <div className="flex justify-between"><span className="text-muted">Status</span><span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">Superhost</span></div>
+            )}
+            {owner.identity_verified && (
+              <div className="flex justify-between"><span className="text-muted">Identity</span><span className="text-emerald-600">Verified</span></div>
+            )}
+            {owner.years_hosting > 0 && (
+              <div className="flex justify-between"><span className="text-muted">Years Hosting</span><span className="text-ink">{owner.years_hosting}</span></div>
+            )}
+            {owner.response_rate > 0 && (
+              <div className="flex justify-between"><span className="text-muted">Response Rate</span><span className="text-ink">{owner.response_rate}%</span></div>
+            )}
+            {owner.response_time && (
+              <div className="flex justify-between"><span className="text-muted">Response Time</span><span className="text-ink capitalize">{owner.response_time}</span></div>
+            )}
             {owner.created_at && (
               <div className="flex justify-between">
                 <span className="text-muted">Joined</span>
@@ -43,6 +58,28 @@ const ViewOwnerModal = React.memo(({ open, owner, onClose }) => {
             )}
           </div>
         </div>
+        {owner.bio && (
+          <div className="space-y-2 rounded-xl border border-border bg-surface/60 p-4">
+            <h4 className="font-medium text-ink">Bio</h4>
+            <p className="text-sm text-muted">{owner.bio}</p>
+          </div>
+        )}
+        {owner.specialties?.length > 0 && (
+          <div className="space-y-2 rounded-xl border border-border bg-surface/60 p-4">
+            <h4 className="font-medium text-ink">Specialties</h4>
+            <div className="flex flex-wrap gap-1">
+              {owner.specialties.map((s) => (
+                <span key={s} className="rounded-full bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-700">{s}</span>
+              ))}
+            </div>
+          </div>
+        )}
+        {owner.languages?.length > 0 && (
+          <div className="space-y-2 rounded-xl border border-border bg-surface/60 p-4">
+            <h4 className="font-medium text-ink">Languages</h4>
+            <p className="text-sm text-muted">{owner.languages.join(", ")}</p>
+          </div>
+        )}
       </div>
     </Modal>
   );
@@ -53,35 +90,61 @@ const EditOwnerModal = React.memo(({ open, owner, onClose, onSave }) => {
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
+  const [bio, setBio] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState("");
+  const [isSuperhost, setIsSuperhost] = useState(false);
+  const [identityVerified, setIdentityVerified] = useState(false);
+  const [yearsHosting, setYearsHosting] = useState(0);
+  const [responseTime, setResponseTime] = useState("");
+  const [responseRate, setResponseRate] = useState(0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [showHostFields, setShowHostFields] = useState(false);
 
   useEffect(() => {
     if (owner && open) {
       setFullName(owner.full_name || "");
       setPhone(owner.phone || "");
       setEmail(owner.email || "");
+      setBio(owner.bio || "");
+      setAvatarUrl(owner.avatar_url || "");
+      setIsSuperhost(owner.is_superhost || false);
+      setIdentityVerified(owner.identity_verified || false);
+      setYearsHosting(owner.years_hosting || 0);
+      setResponseTime(owner.response_time || "");
+      setResponseRate(owner.response_rate || 0);
       setError("");
+      setShowHostFields(false);
     }
   }, [owner, open]);
 
   const handleSave = useCallback(async () => {
     setError(""); setSaving(true);
     try {
-      const { data } = await api.put(`/admin/owners/${owner.id}`, {
+      const payload = {
         full_name: fullName.trim() || null,
         phone: phone.trim() || null,
         email: email.trim() || null,
-      });
+      };
+      if (showHostFields) {
+        payload.bio = bio.trim() || null;
+        payload.avatar_url = avatarUrl.trim() || null;
+        payload.is_superhost = isSuperhost;
+        payload.identity_verified = identityVerified;
+        payload.years_hosting = yearsHosting;
+        payload.response_time = responseTime.trim() || null;
+        payload.response_rate = responseRate;
+      }
+      const { data } = await api.put(`/admin/owners/${owner.id}`, payload);
       onSave(data.owner);
     } catch (err) {
       setError(err.message || "Failed to update owner.");
     }
     setSaving(false);
-  }, [owner?.id, fullName, phone, email, onSave]);
+  }, [owner?.id, fullName, phone, email, bio, avatarUrl, isSuperhost, identityVerified, yearsHosting, responseTime, responseRate, showHostFields, onSave]);
 
   return (
-    <Modal title="Edit Owner" open={open} onCancel={onClose} footer={null} destroyOnClose>
+    <Modal title="Edit Owner" open={open} onCancel={onClose} footer={null} destroyOnClose width={560}>
       <div className="space-y-4 pt-4">
         <div className="flex items-center gap-3 rounded-xl border border-border bg-surface/60 p-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-lg font-bold text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400">
@@ -95,6 +158,52 @@ const EditOwnerModal = React.memo(({ open, owner, onClose, onSave }) => {
         <FormInput label="Full Name" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Enter full name" />
         <FormInput label="Email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="owner@example.com" />
         <FormInput label="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+1 (555) 123-4567" />
+
+        <button type="button" onClick={() => setShowHostFields(!showHostFields)} className="flex items-center gap-2 text-sm font-medium text-brand-600 transition hover:text-brand-700">
+          <svg className={`h-4 w-4 transition ${showHostFields ? "rotate-90" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+          {showHostFields ? "Hide" : "Show"} Host Profile Fields
+        </button>
+
+        {showHostFields && (
+          <div className="space-y-4 rounded-xl border border-border bg-surface/30 p-4">
+            <div>
+              <label className="text-sm font-medium text-muted">Bio</label>
+              <textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={3} className="mt-1 w-full rounded-lg border border-border bg-white px-3 py-2 text-sm text-ink focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-200 dark:border-dark-border dark:bg-dark-panel dark:text-dark-ink" />
+            </div>
+            <FormInput label="Avatar URL" value={avatarUrl} onChange={(e) => setAvatarUrl(e.target.value)} placeholder="https://..." />
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium text-muted">Years Hosting</label>
+                <input type="number" min={0} value={yearsHosting} onChange={(e) => setYearsHosting(Number(e.target.value))} className="mt-1 w-full rounded-lg border border-border bg-white px-3 py-2 text-sm text-ink focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-200 dark:border-dark-border dark:bg-dark-panel dark:text-dark-ink" />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-muted">Response Rate (%)</label>
+                <input type="number" min={0} max={100} value={responseRate} onChange={(e) => setResponseRate(Number(e.target.value))} className="mt-1 w-full rounded-lg border border-border bg-white px-3 py-2 text-sm text-ink focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-200 dark:border-dark-border dark:bg-dark-panel dark:text-dark-ink" />
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-muted">Response Time</label>
+              <select value={responseTime} onChange={(e) => setResponseTime(e.target.value)} className="mt-1 w-full rounded-lg border border-border bg-white px-3 py-2 text-sm text-ink focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-200 dark:border-dark-border dark:bg-dark-panel dark:text-dark-ink">
+                <option value="">Select...</option>
+                <option value="within minutes">Within minutes</option>
+                <option value="within an hour">Within an hour</option>
+                <option value="within a few hours">Within a few hours</option>
+                <option value="within a day">Within a day</option>
+              </select>
+            </div>
+            <div className="flex gap-6">
+              <label className="flex cursor-pointer items-center gap-2 text-sm text-ink">
+                <input type="checkbox" checked={isSuperhost} onChange={(e) => setIsSuperhost(e.target.checked)} className="rounded border-border text-brand-600 focus:ring-brand-500" />
+                Superhost
+              </label>
+              <label className="flex cursor-pointer items-center gap-2 text-sm text-ink">
+                <input type="checkbox" checked={identityVerified} onChange={(e) => setIdentityVerified(e.target.checked)} className="rounded border-border text-brand-600 focus:ring-brand-500" />
+                Identity Verified
+              </label>
+            </div>
+          </div>
+        )}
+
         {error && <p className="text-sm text-red-600">{error}</p>}
         <div className="flex justify-end gap-3 pt-2">
           <Button variant="outline" onClick={onClose}>Cancel</Button>
@@ -326,11 +435,18 @@ export default function AdminOwners() {
                       <p className="truncate text-sm text-muted">{owner.email}</p>
                     </div>
                   </div>
-                  {isCurrentlyImpersonating && (
-                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                      Active
-                    </span>
-                  )}
+                  <div className="flex items-center gap-1.5">
+                    {owner.is_superhost && (
+                      <span className="rounded-full bg-gradient-to-r from-amber-500 to-orange-500 px-2 py-0.5 text-xs font-bold text-white">
+                        Superhost
+                      </span>
+                    )}
+                    {isCurrentlyImpersonating && (
+                      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                        Active
+                      </span>
+                    )}
+                  </div>
                 </div>
                 {owner.phone && <p className="mt-3 text-sm text-muted">{owner.phone}</p>}
                 {owner.created_at && (

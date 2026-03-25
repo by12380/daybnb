@@ -19,7 +19,36 @@ User profile data linked to Supabase Auth users.
 | postal_code | TEXT | |
 | country | TEXT | |
 | user_type | TEXT | `"admin"`, `"owner"`, `"customer"` |
+| avatar_url | TEXT | Profile photo URL |
+| cover_photo_url | TEXT | Cover/banner photo URL for host profile page |
+| bio | TEXT | Host bio / about me text |
+| languages | TEXT[] | Languages the host speaks |
+| specialties | TEXT[] | Host specialties (e.g. Pool access, Pet-friendly) |
+| response_time | TEXT | Typical response time (e.g. "within an hour") |
+| response_rate | INT | Response rate percentage (0-100) |
+| is_superhost | BOOLEAN | Default false |
+| identity_verified | BOOLEAN | Default false |
+| years_hosting | INT | Default 0 |
+| host_since | DATE | Date when the owner started hosting |
+| accepts_cohosts | BOOLEAN | Default false |
 | updated_at | TIMESTAMPTZ | |
+
+### `co_hosts`
+Co-host relationships between owners.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | UUID (PK) | |
+| owner_id | UUID | The primary host (references profiles.id) |
+| co_host_id | UUID | The co-host user (references profiles.id) |
+| status | TEXT | `"pending"`, `"accepted"`, `"rejected"`, `"removed"` |
+| permissions | TEXT[] | Array of: `view_bookings`, `manage_bookings`, `view_rooms`, `manage_rooms`, `view_customers`, `manage_checkin` |
+| invited_at | TIMESTAMPTZ | |
+| responded_at | TIMESTAMPTZ | |
+| created_at | TIMESTAMPTZ | |
+| updated_at | TIMESTAMPTZ | |
+
+**Constraints**: owner_id != co_host_id, UNIQUE(owner_id, co_host_id).
 
 ### `rooms`
 Bookable spaces/properties.
@@ -331,3 +360,4 @@ Files in `supabase/` directory (not all are timestamped migrations):
 | `migrations/20260310_add_checkin_checkout_statuses.sql` | Add checked_in_at/checked_out_at columns to bookings |
 | `migrations/20260318_add_chat_message_attachments.sql` | Add chat attachment metadata columns, content/attachment check, and `chat-attachments` storage bucket |
 | `migrations/20260319_create_ai_chat_sessions.sql` | Create `ai_chat_sessions` table for AI chatbot session tracking |
+| `migrations/20260325_add_host_profile_and_cohosts.sql` | Add host profile fields to profiles + create co_hosts table |

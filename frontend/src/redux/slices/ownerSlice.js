@@ -163,6 +163,106 @@ export const fetchOwnerCustomerBookings = createAsyncThunk(
   }
 );
 
+// ─── Owner Profile ───────────────────────────────────────────
+
+export const fetchOwnerProfile = createAsyncThunk(
+  "owner/fetchProfile",
+  async (_, { rejectWithValue }) => {
+    try {
+      const { data } = await api.get("/owner/profile");
+      return data;
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
+export const updateOwnerProfile = createAsyncThunk(
+  "owner/updateProfile",
+  async (profileData, { rejectWithValue }) => {
+    try {
+      const { data } = await api.put("/owner/profile", profileData);
+      return data;
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
+// ─── Co-hosts ────────────────────────────────────────────────
+
+export const fetchCoHosts = createAsyncThunk(
+  "owner/fetchCoHosts",
+  async (_, { rejectWithValue }) => {
+    try {
+      const { data } = await api.get("/owner/co-hosts");
+      return data;
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
+export const fetchCoHostInvites = createAsyncThunk(
+  "owner/fetchCoHostInvites",
+  async (_, { rejectWithValue }) => {
+    try {
+      const { data } = await api.get("/owner/co-host-invites");
+      return data;
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
+export const inviteCoHost = createAsyncThunk(
+  "owner/inviteCoHost",
+  async ({ email }, { rejectWithValue }) => {
+    try {
+      const { data } = await api.post("/owner/co-hosts", { email });
+      return data;
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
+export const respondToCoHostInvite = createAsyncThunk(
+  "owner/respondToCoHostInvite",
+  async ({ id, action }, { rejectWithValue }) => {
+    try {
+      const { data } = await api.patch(`/owner/co-hosts/${id}/respond`, { action });
+      return data;
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
+export const updateCoHostPermissions = createAsyncThunk(
+  "owner/updateCoHostPermissions",
+  async ({ id, permissions }, { rejectWithValue }) => {
+    try {
+      const { data } = await api.patch(`/owner/co-hosts/${id}/permissions`, { permissions });
+      return data;
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
+export const removeCoHost = createAsyncThunk(
+  "owner/removeCoHost",
+  async (id, { rejectWithValue }) => {
+    try {
+      await api.delete(`/owner/co-hosts/${id}`);
+      return id;
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
 // ─── Stats ───────────────────────────────────────────────────
 
 export const fetchOwnerStats = createAsyncThunk(
@@ -209,6 +309,11 @@ const initialState = {
   analytics: null,
   analyticsLoading: false,
   analyticsError: null,
+  profile: null,
+  profileLoading: false,
+  coHosts: [],
+  coHostInvites: [],
+  coHostLoading: false,
   loading: false,
   todayLoading: false,
   historyLoading: false,
@@ -338,6 +443,53 @@ const ownerSlice = createSlice({
       .addCase(fetchOwnerAnalytics.pending, (state) => { state.analyticsLoading = true; state.analyticsError = null; })
       .addCase(fetchOwnerAnalytics.fulfilled, (state, action) => { state.analyticsLoading = false; state.analytics = action.payload; })
       .addCase(fetchOwnerAnalytics.rejected, (state, action) => { state.analyticsLoading = false; state.analyticsError = action.payload; });
+
+    // Owner Profile
+    builder
+      .addCase(fetchOwnerProfile.pending, (state) => { state.profileLoading = true; state.error = null; })
+      .addCase(fetchOwnerProfile.fulfilled, (state, action) => { state.profileLoading = false; state.profile = action.payload.profile; })
+      .addCase(fetchOwnerProfile.rejected, (state, action) => { state.profileLoading = false; state.error = action.payload; });
+
+    builder
+      .addCase(updateOwnerProfile.pending, (state) => { state.profileLoading = true; state.error = null; })
+      .addCase(updateOwnerProfile.fulfilled, (state, action) => { state.profileLoading = false; state.profile = action.payload.profile; })
+      .addCase(updateOwnerProfile.rejected, (state, action) => { state.profileLoading = false; state.error = action.payload; });
+
+    // Co-hosts
+    builder
+      .addCase(fetchCoHosts.pending, (state) => { state.coHostLoading = true; })
+      .addCase(fetchCoHosts.fulfilled, (state, action) => { state.coHostLoading = false; state.coHosts = action.payload.co_hosts; })
+      .addCase(fetchCoHosts.rejected, (state, action) => { state.coHostLoading = false; state.error = action.payload; });
+
+    builder
+      .addCase(fetchCoHostInvites.pending, (state) => { state.coHostLoading = true; })
+      .addCase(fetchCoHostInvites.fulfilled, (state, action) => { state.coHostLoading = false; state.coHostInvites = action.payload.invites; })
+      .addCase(fetchCoHostInvites.rejected, (state, action) => { state.coHostLoading = false; state.error = action.payload; });
+
+    builder
+      .addCase(inviteCoHost.fulfilled, (state, action) => { state.coHosts.unshift(action.payload.co_host); })
+      .addCase(inviteCoHost.rejected, (state, action) => { state.error = action.payload; });
+
+    builder
+      .addCase(respondToCoHostInvite.fulfilled, (state, action) => {
+        const updated = action.payload.co_host;
+        const idx = state.coHostInvites.findIndex((i) => i.id === updated.id);
+        if (idx !== -1) state.coHostInvites[idx] = { ...state.coHostInvites[idx], ...updated };
+      })
+      .addCase(respondToCoHostInvite.rejected, (state, action) => { state.error = action.payload; });
+
+    builder
+      .addCase(updateCoHostPermissions.fulfilled, (state, action) => {
+        const updated = action.payload.co_host;
+        const idx = state.coHosts.findIndex((c) => c.id === updated.id);
+        if (idx !== -1) state.coHosts[idx] = { ...state.coHosts[idx], ...updated };
+      });
+
+    builder
+      .addCase(removeCoHost.fulfilled, (state, action) => {
+        state.coHosts = state.coHosts.filter((c) => c.id !== action.payload);
+      })
+      .addCase(removeCoHost.rejected, (state, action) => { state.error = action.payload; });
   },
 });
 
