@@ -12,6 +12,8 @@ import MyBookings from "../guest/pages/MyBookings.jsx";
 import LikedRooms from "../guest/pages/LikedRooms.jsx";
 import PaymentSuccess from "../guest/pages/PaymentSuccess.jsx";
 import PaymentCancel from "../guest/pages/PaymentCancel.jsx";
+import FindHosts from "../guest/pages/FindHosts.jsx";
+import HostProfile from "../guest/pages/HostProfile.jsx";
 import RequireAuth from "../auth/RequireAuth.jsx";
 import RequireAdmin from "../auth/RequireAdmin.jsx";
 import RequireOwner from "../auth/RequireOwner.jsx";
@@ -62,6 +64,8 @@ export default function AppRouter() {
         <Route element={<GuestLayout />}>
           <Route path="/" element={<Landing />} />
           <Route path="/contact" element={<ContactUs />} />
+          <Route path="/hosts" element={<FindHosts />} />
+          <Route path="/hosts/:hostId" element={<HostProfile />} />
           <Route path="/room/:roomId" element={<RoomDetail />} />
           <Route path="/auth" element={<Auth />} />
           <Route element={<RequireAuth />}>

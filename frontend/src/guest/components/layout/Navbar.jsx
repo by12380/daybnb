@@ -63,6 +63,9 @@ export default function GuestNavbar() {
           <Link to="/" className="rounded-full px-3 py-1.5 hover:text-brand-600 dark:hover:text-brand-400">
             {t("navbar.browse")}
           </Link>
+          <Link to="/hosts" className="rounded-full px-3 py-1.5 hover:text-brand-600 dark:hover:text-brand-400">
+            {t("navbar.findHost", "Find a Host")}
+          </Link>
           <Link to="/contact" className="rounded-full px-3 py-1.5 hover:text-brand-600 dark:hover:text-brand-400">
             {t("navbar.contact")}
           </Link>
