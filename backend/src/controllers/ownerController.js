@@ -812,7 +812,42 @@ exports.getMyProfile = asyncHandler(async (req, res) => {
 
   if (error) throw ApiError.internal(error.message);
 
-  res.json({ profile: data });
+  let rating = 0;
+  let review_count = 0;
+  let years_hosting = 0;
+
+  if (data) {
+    // Compute years_hosting from profile created_at
+    if (data.created_at) {
+      const createdYear = new Date(data.created_at).getFullYear();
+      const currentYear = new Date().getFullYear();
+      years_hosting = currentYear - createdYear;
+    }
+
+    // Compute rating and review_count from reviews on owner's rooms
+    const { data: ownerRooms } = await supabaseAdmin
+      .from("rooms")
+      .select("id")
+      .eq("owner_id", ownerId);
+
+    const roomIds = (ownerRooms || []).map((r) => r.id);
+    if (roomIds.length > 0) {
+      const { data: reviews } = await supabaseAdmin
+        .from("room_reviews")
+        .select("rating")
+        .in("room_id", roomIds);
+
+      if (reviews && reviews.length > 0) {
+        review_count = reviews.length;
+        const sum = reviews.reduce((s, r) => s + r.rating, 0);
+        rating = Math.round((sum / review_count) * 100) / 100;
+      }
+    }
+  }
+
+  res.json({
+    profile: data ? { ...data, rating, review_count, years_hosting } : data,
+  });
 });
 
 /**
@@ -828,7 +863,7 @@ exports.updateMyProfile = asyncHandler(async (req, res) => {
   const {
     full_name, phone, bio, avatar_url, cover_photo_url,
     languages, specialties, response_time, response_rate,
-    is_superhost, identity_verified, years_hosting, host_since,
+    is_superhost, identity_verified,
     accepts_cohosts,
   } = req.body;
 
@@ -844,8 +879,6 @@ exports.updateMyProfile = asyncHandler(async (req, res) => {
   if (response_rate !== undefined) updates.response_rate = Math.max(0, Math.min(100, Number(response_rate) || 0));
   if (is_superhost !== undefined) updates.is_superhost = Boolean(is_superhost);
   if (identity_verified !== undefined) updates.identity_verified = Boolean(identity_verified);
-  if (years_hosting !== undefined) updates.years_hosting = Math.max(0, Number(years_hosting) || 0);
-  if (host_since !== undefined) updates.host_since = host_since || null;
   if (accepts_cohosts !== undefined) updates.accepts_cohosts = Boolean(accepts_cohosts);
 
   const { data, error } = await supabaseAdmin

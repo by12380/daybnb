@@ -66,7 +66,7 @@ exports.listHosts = asyncHandler(async (req, res) => {
     const allRoomIds = Object.keys(roomIdToOwner);
     if (allRoomIds.length > 0) {
       const { data: reviews } = await supabaseAdmin
-        .from("reviews")
+        .from("room_reviews")
         .select("room_id, rating")
         .in("room_id", allRoomIds);
 
@@ -80,13 +80,16 @@ exports.listHosts = asyncHandler(async (req, res) => {
     }
   }
 
+  const currentYear = new Date().getFullYear();
   const hosts = (data || []).map((h) => {
     const stats = reviewStats[h.id];
+    const createdYear = h.created_at ? new Date(h.created_at).getFullYear() : currentYear;
     return {
       ...h,
       listing_count: roomCounts[h.id] || 0,
       review_count: stats?.total || 0,
       rating: stats ? Math.round((stats.sum / stats.total) * 100) / 100 : 0,
+      years_hosting: currentYear - createdYear,
       location: [h.city, h.state_region].filter(Boolean).join(", ") || null,
     };
   });
@@ -129,8 +132,8 @@ exports.getHost = asyncHandler(async (req, res) => {
 
   if (roomIds.length > 0) {
     const { data: reviewData } = await supabaseAdmin
-      .from("reviews")
-      .select("id, room_id, user_id, rating, comment, created_at")
+      .from("room_reviews")
+      .select("id, room_id, user_id, rating, note, created_at")
       .in("room_id", roomIds)
       .order("created_at", { ascending: false })
       .limit(10);
@@ -152,13 +155,14 @@ exports.getHost = asyncHandler(async (req, res) => {
 
       reviews = reviews.map((r) => ({
         ...r,
+        comment: r.note,
         reviewer: reviewerMap[r.user_id] || null,
       }));
     }
 
     // Get full review count
     const { count: fullCount } = await supabaseAdmin
-      .from("reviews")
+      .from("room_reviews")
       .select("id", { count: "exact", head: true })
       .in("room_id", roomIds);
     reviewStats.total = fullCount || reviews.length;
@@ -166,7 +170,7 @@ exports.getHost = asyncHandler(async (req, res) => {
     // Get accurate average
     if (reviewStats.total > 0) {
       const { data: allRatings } = await supabaseAdmin
-        .from("reviews")
+        .from("room_reviews")
         .select("rating")
         .in("room_id", roomIds);
       reviewStats.sum = (allRatings || []).reduce((s, r) => s + r.rating, 0);
@@ -189,6 +193,8 @@ exports.getHost = asyncHandler(async (req, res) => {
     coHostProfiles = profiles || [];
   }
 
+  const hostCreatedYear = host.created_at ? new Date(host.created_at).getFullYear() : new Date().getFullYear();
+
   res.json({
     host: {
       ...host,
@@ -196,6 +202,7 @@ exports.getHost = asyncHandler(async (req, res) => {
       listing_count: (rooms || []).length,
       review_count: reviewStats.total,
       rating: reviewStats.total > 0 ? Math.round((reviewStats.sum / reviewStats.total) * 100) / 100 : 0,
+      years_hosting: new Date().getFullYear() - hostCreatedYear,
     },
     listings: rooms || [],
     reviews,

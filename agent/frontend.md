@@ -41,6 +41,8 @@
 /admin/check-in-out              → AdminCheckInOut
 /admin/booking-history           → AdminBookingHistory
 /admin/algolia                   → AdminAlgoliaSync
+/hosts                           → FindHosts (GuestLayout, public — real API data from /api/hosts)
+/hosts/:hostId                   → HostProfile (GuestLayout, public — real API data from /api/hosts/:id)
 /owner                           → OwnerDashboard (OwnerLayout, RequireOwner)
 /owner/rooms                     → OwnerRooms
 /owner/bookings                  → OwnerBookings
@@ -49,6 +51,8 @@
 /owner/customers                 → OwnerCustomers
 /owner/chat                      → OwnerChat
 /owner/offers                    → OwnerOffers
+/owner/host-profile              → OwnerHostProfile (edit host bio, photos, languages, specialties, badges)
+/owner/co-hosts                  → OwnerCoHosts (invite, accept/reject, manage permissions, remove)
 ```
 
 Note: Landing page auto-redirects admins to `/admin` and owners to `/owner` via `useProfile()` hook.
@@ -80,7 +84,7 @@ frontend/src/
 │       ├── contactSlice.js   # submitContact, fetchMessages, markMessageRead, deleteMessage
 │       ├── userSlice.js      # fetchUsers, updateUser, deleteUser (admin only)
 │       ├── stripeSlice.js    # createCheckoutSession
-│       ├── ownerSlice.js     # owner-scoped: rooms, bookings, customers, stats
+│       ├── ownerSlice.js     # owner-scoped: rooms, bookings, customers, stats, profile, co-hosts
 │       ├── chatSlice.js      # conversations, messages, contacts, real-time incoming
 │       ├── offerSlice.js     # admin offers, owner offers, public active/banners/roomOffer
 │       └── heroBannerSlice.js # admin CRUD + public fetch for hero banners
@@ -135,6 +139,8 @@ frontend/src/
 │   │   ├── MyBookings.jsx    # list of user's bookings
 │   │   ├── LikedRooms.jsx    # favorited rooms
 │   │   ├── ContactUs.jsx     # contact form
+│   │   ├── FindHosts.jsx    # public host directory — fetches from GET /api/hosts, search/filter by name/location/specialty/superhost
+│   │   ├── HostProfile.jsx  # public host profile — fetches from GET /api/hosts/:id, shows bio, listings, reviews, co-hosts, host details sidebar
 │   │   ├── PaymentSuccess.jsx
 │   │   └── PaymentCancel.jsx
 │   ├── sections/             # Landing page sections
@@ -203,7 +209,9 @@ frontend/src/
     │   ├── BookingHistory.jsx     # 4-tab history: No-show, Completed, Rejected, Cancelled by Guest
     │   ├── Customers.jsx
     │   ├── Chat.jsx
-    │   └── Offers.jsx
+    │   ├── Offers.jsx
+    │   ├── HostProfile.jsx      # Host profile editor (bio, avatar, cover photo, languages, specialties, response stats, badges, co-host toggle)
+    │   └── CoHosts.jsx          # Co-host management (invite by email, accept/reject invites, permissions editor, remove)
     └── components/
         ├── NotificationDropdown.jsx
         └── layout/
@@ -222,7 +230,7 @@ frontend/src/
   contact:       { messages[], unreadCount, submitSuccess, loading, error }
   users:         { users[], selectedUser, userBookings[], total, loading, error }
   stripe:        { sessionId, sessionUrl, loading, error }
-  owner:         { rooms[], roomsTotal, bookings[], bookingsTotal, todayBookings[], todayTotal, historyBookings[], historyTotal, customers[], customersTotal, customerBookings[], stats, loading, todayLoading, historyLoading, error }
+  owner:         { rooms[], roomsTotal, bookings[], bookingsTotal, todayBookings[], todayTotal, historyBookings[], historyTotal, customers[], customersTotal, customerBookings[], stats, analytics, analyticsLoading, analyticsError, profile, profileLoading, coHosts[], coHostInvites[], coHostLoading, loading, todayLoading, historyLoading, error }
   chat:          { contacts[], conversations[], activeConversationId, messages{}, loading, messagesLoading, error }
   offers:        { offers[], total, activeOffers[], banners[], roomOffer, loading, error }
   heroBanners:   { adminBanners[], publicBanners[], loading, publicLoading, publicLoaded, error }

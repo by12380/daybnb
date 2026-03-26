@@ -126,7 +126,7 @@ In-app notification system.
 | id | UUID (PK) | |
 | recipient_user_id | UUID | For user-targeted notifications |
 | recipient_role | TEXT | For role-targeted notifications (e.g., `"admin"`) |
-| type | TEXT | `"booking_created"`, `"booking_approved"`, `"booking_rejected"`, `"booking_updated"`, `"booking_cancelled"` |
+| type | TEXT | `"booking_created"`, `"booking_approved"`, `"booking_rejected"`, `"booking_updated"`, `"booking_cancelled"`, `"co_host_invite"`, `"co_host_response"` |
 | title | TEXT | |
 | body | TEXT | |
 | data | JSONB | Additional context (booking_id, room_id, etc.) |
@@ -343,6 +343,8 @@ Key indexes defined in migrations:
 - `offers`: room_id, owner_id, (is_active + start_date + end_date), show_banner
 - `special_offer_campaigns`: (is_active + start_date + end_date)
 - `hero_banners`: (is_active, sort_order, created_at DESC)
+- `co_hosts`: owner_id, co_host_id, status
+- `profiles`: (user_type, is_superhost) WHERE user_type = 'owner'
 
 ## Supabase SQL Files
 

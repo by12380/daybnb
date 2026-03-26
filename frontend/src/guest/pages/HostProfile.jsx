@@ -63,7 +63,7 @@ const HostProfile = React.memo(() => {
 
   const joinedDate = host.created_at
     ? new Date(host.created_at).toLocaleDateString("en-US", { month: "long", year: "numeric" })
-    : host.host_since || "";
+    : "";
 
   return (
     <div className="space-y-8">

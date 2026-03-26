@@ -43,6 +43,7 @@ backend/
     │   ├── chat.js
     │   ├── aiChat.js         # AI chatbot routes (chat, stream, prompts)
     │   ├── offers.js
+    │   ├── hosts.js          # Public host directory routes (GET /, GET /:hostId)
     │   └── heroBanners.js    # Public hero banner route (GET /)
     ├── controllers/
     │   ├── authController.js
@@ -59,6 +60,7 @@ backend/
     │   ├── chatController.js
     │   ├── aiChatController.js  # OpenAI-powered AI chatbot (context-aware, streaming)
     │   ├── offerController.js
+    │   ├── hostsController.js       # Public host directory (listHosts, getHost with listings/reviews/co-hosts)
     │   └── heroBannerController.js  # Hero banner CRUD (admin) + public getActive
     └── socket/
         └── index.js          # Socket.IO server: auth, rooms, notifications, chat events
@@ -163,7 +165,9 @@ Typical protected route: `requireAuth → attachRole → [requireRole(...)] → 
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/profile` | Owner's profile |
+| PUT | `/profile` | Update host profile (bio, avatar, cover photo, languages, specialties, response time/rate, superhost, verified, years hosting, host since, accepts co-hosts) |
 | GET | `/stats` | Owner dashboard stats |
+| GET | `/analytics?period=` | Rich analytics (revenue, funnel, time-series, top rooms). Period: `7d`, `30d`, `6m`, `all` |
 | GET | `/rooms` | Owner's rooms |
 | POST | `/rooms` | Create room (owned by current owner) |
 | PUT | `/rooms/:id` | Update own room |
@@ -182,6 +186,18 @@ Typical protected route: `requireAuth → attachRole → [requireRole(...)] → 
 | POST | `/offers` | Create offer for own rooms |
 | PUT | `/offers/:id` | Update own offer |
 | DELETE | `/offers/:id` | Delete own offer |
+| GET | `/co-hosts` | List owner's co-hosts (with profiles) |
+| POST | `/co-hosts` | Invite co-host by email (target must be an owner) |
+| GET | `/co-host-invites` | List co-host invitations received |
+| PATCH | `/co-hosts/:id/respond` | Accept or reject co-host invite (body: `{ action: "accept"|"reject" }`) |
+| PATCH | `/co-hosts/:id/permissions` | Update co-host permissions (body: `{ permissions: [...] }`) |
+| DELETE | `/co-hosts/:id` | Remove a co-host relationship |
+
+### Hosts (`/api/hosts`) — Public
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/` | List owners with host profiles. Supports `?search`, `?superhost=true`, `?limit`, `?offset`. Returns aggregated rating, review_count, listing_count from rooms/reviews. |
+| GET | `/:hostId` | Single host profile with listings, reviews (with reviewer profiles), and accepted co-hosts |
 
 ### Offers (`/api/offers`) — Public
 | Method | Path | Description |
@@ -346,6 +362,8 @@ Booking events trigger notifications persisted in `notifications` table and emit
 - `booking_rejected` → notifies customer
 - `booking_updated` → notifies room owner or admins
 - `booking_cancelled` → notifies room owner or admins
+- `co_host_invite` → notifies invited co-host
+- `co_host_response` → notifies primary owner when co-host accepts/declines
 
 ## Hero Banner Controller (`heroBannerController.js`)
 

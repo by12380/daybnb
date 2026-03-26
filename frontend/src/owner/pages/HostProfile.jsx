@@ -96,7 +96,6 @@ export default function OwnerHostProfile() {
     languages: [], specialties: [],
     response_time: "", response_rate: 0,
     is_superhost: false, identity_verified: false,
-    years_hosting: 0, host_since: "",
     accepts_cohosts: false,
   });
   const [success, setSuccess] = useState("");
@@ -118,8 +117,6 @@ export default function OwnerHostProfile() {
         response_rate: profile.response_rate || 0,
         is_superhost: profile.is_superhost || false,
         identity_verified: profile.identity_verified || false,
-        years_hosting: profile.years_hosting || 0,
-        host_since: profile.host_since || "",
         accepts_cohosts: profile.accepts_cohosts || false,
       });
     }
@@ -225,6 +222,38 @@ export default function OwnerHostProfile() {
           </div>
         </section>
 
+        {/* Hosting Stats (computed, read-only) */}
+        <section className="rounded-2xl border border-border bg-white p-6 shadow-sm dark:border-dark-border dark:bg-dark-panel">
+          <h2 className="text-lg font-semibold text-ink dark:text-dark-ink">Hosting Stats</h2>
+          <p className="mt-1 text-xs text-muted dark:text-dark-muted">
+            These values are calculated automatically from your property reviews and profile creation date.
+          </p>
+          <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <div className="rounded-xl border border-border bg-surface/40 p-4 text-center dark:border-dark-border dark:bg-dark-surface/40">
+              <p className="text-2xl font-bold text-ink dark:text-dark-ink">
+                {profile?.rating > 0 ? profile.rating : "—"}
+              </p>
+              <p className="mt-1 text-xs text-muted dark:text-dark-muted">Rating</p>
+            </div>
+            <div className="rounded-xl border border-border bg-surface/40 p-4 text-center dark:border-dark-border dark:bg-dark-surface/40">
+              <p className="text-2xl font-bold text-ink dark:text-dark-ink">{profile?.review_count || 0}</p>
+              <p className="mt-1 text-xs text-muted dark:text-dark-muted">Reviews</p>
+            </div>
+            <div className="rounded-xl border border-border bg-surface/40 p-4 text-center dark:border-dark-border dark:bg-dark-surface/40">
+              <p className="text-2xl font-bold text-ink dark:text-dark-ink">{profile?.years_hosting || 0}</p>
+              <p className="mt-1 text-xs text-muted dark:text-dark-muted">Years hosting</p>
+            </div>
+            <div className="rounded-xl border border-border bg-surface/40 p-4 text-center dark:border-dark-border dark:bg-dark-surface/40">
+              <p className="text-2xl font-bold text-ink dark:text-dark-ink">
+                {profile?.created_at
+                  ? new Date(profile.created_at).toLocaleDateString("en-US", { month: "short", year: "numeric" })
+                  : "—"}
+              </p>
+              <p className="mt-1 text-xs text-muted dark:text-dark-muted">Hosting since</p>
+            </div>
+          </div>
+        </section>
+
         {/* Hosting Details */}
         <section className="rounded-2xl border border-border bg-white p-6 shadow-sm dark:border-dark-border dark:bg-dark-panel">
           <h2 className="text-lg font-semibold text-ink dark:text-dark-ink">Hosting Details</h2>
@@ -238,14 +267,6 @@ export default function OwnerHostProfile() {
             <div>
               <label className="text-sm font-medium text-muted dark:text-dark-muted">Response Rate (%)</label>
               <input type="number" min={0} max={100} value={form.response_rate} onChange={(e) => setField("response_rate", Number(e.target.value))} className="mt-1.5 w-full rounded-xl border border-border bg-white px-4 py-2.5 text-sm text-ink shadow-sm transition focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-200 dark:border-dark-border dark:bg-dark-panel dark:text-dark-ink dark:focus:border-brand-600 dark:focus:ring-brand-800" />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-muted dark:text-dark-muted">Years Hosting</label>
-              <input type="number" min={0} value={form.years_hosting} onChange={(e) => setField("years_hosting", Number(e.target.value))} className="mt-1.5 w-full rounded-xl border border-border bg-white px-4 py-2.5 text-sm text-ink shadow-sm transition focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-200 dark:border-dark-border dark:bg-dark-panel dark:text-dark-ink dark:focus:border-brand-600 dark:focus:ring-brand-800" />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-muted dark:text-dark-muted">Hosting Since</label>
-              <input type="date" value={form.host_since} onChange={(e) => setField("host_since", e.target.value)} className="mt-1.5 w-full rounded-xl border border-border bg-white px-4 py-2.5 text-sm text-ink shadow-sm transition focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-200 dark:border-dark-border dark:bg-dark-panel dark:text-dark-ink dark:focus:border-brand-600 dark:focus:ring-brand-800" />
             </div>
           </div>
         </section>
